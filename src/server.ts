@@ -6,6 +6,8 @@ import { register as registerExtractFigma } from "./tools/brand-extract-figma.js
 import { register as registerCompile } from "./tools/brand-compile.js";
 import { register as registerAudit } from "./tools/brand-audit.js";
 import { register as registerReport } from "./tools/brand-report.js";
+import { register as registerStart } from "./tools/brand-start.js";
+import { register as registerClarify } from "./tools/brand-clarify.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -13,6 +15,7 @@ export function createServer(): McpServer {
     version: "0.1.0",
   });
 
+  registerStart(server);
   registerInit(server);
   registerStatus(server);
   registerExtractWeb(server);
@@ -20,6 +23,7 @@ export function createServer(): McpServer {
   registerCompile(server);
   registerAudit(server);
   registerReport(server);
+  registerClarify(server);
 
   return server;
 }
