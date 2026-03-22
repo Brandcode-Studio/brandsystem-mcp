@@ -7,6 +7,7 @@ import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryCol
 import { extractLogos, fetchLogo } from "../lib/logo-extractor.js";
 import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
+import { getVersion } from "../lib/version.js";
 import type { ColorEntry, TypographyEntry, LogoSpec, CoreIdentity } from "../types/index.js";
 
 const paramsShape = {
@@ -28,8 +29,15 @@ async function handler(input: { url: string }) {
   try {
     const response = await fetch(input.url, {
       signal: AbortSignal.timeout(15000),
-      headers: { "User-Agent": "brandsystem-mcp/0.1.0" },
+      headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
+    if (!response.ok) {
+      return buildResponse({
+        what_happened: `Failed to fetch ${input.url} (HTTP ${response.status})`,
+        next_steps: ["Check the URL is correct and accessible", "Try brand_extract_figma instead"],
+        data: { error: "fetch_failed", status: response.status, statusText: response.statusText },
+      });
+    }
     html = await response.text();
   } catch (err) {
     return buildResponse({
@@ -65,7 +73,7 @@ async function handler(input: { url: string }) {
     try {
       const resp = await fetch(sheetUrl, {
         signal: AbortSignal.timeout(5000),
-        headers: { "User-Agent": "brandsystem-mcp/0.1.0" },
+        headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
       allCSS += (await resp.text()) + "\n";
     } catch {

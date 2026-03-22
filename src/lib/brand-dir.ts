@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir, access, readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { stringify, parse } from "yaml";
 import type { BrandConfigData, CoreIdentityData, NeedsClarificationData, VisualIdentityData, MessagingData } from "../schemas/index.js";
 import type { AssetManifestEntry } from "../types/index.js";
@@ -175,10 +175,17 @@ export class BrandDir {
   // --- Assets ---
 
   async writeAsset(relativePath: string, content: string | Buffer): Promise<void> {
-    const fullPath = this.path("assets", relativePath);
-    const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+    const fullPath = join(this.brandPath, "assets", relativePath);
+    const resolved = resolve(fullPath);
+    const assetsDir = resolve(this.brandPath, "assets");
+    // Allow writing to .brand/ root for specific files
+    const brandDir = resolve(this.brandPath);
+    if (!resolved.startsWith(assetsDir) && !resolved.startsWith(brandDir)) {
+      throw new Error(`Path traversal blocked: ${relativePath} resolves outside .brand/`);
+    }
+    const dir = resolved.substring(0, resolved.lastIndexOf("/"));
     await mkdir(dir, { recursive: true });
-    await writeFile(fullPath, content, typeof content === "string" ? "utf-8" : undefined);
+    await writeFile(resolved, content, typeof content === "string" ? "utf-8" : undefined);
   }
 
   async readAsset(relativePath: string): Promise<string> {

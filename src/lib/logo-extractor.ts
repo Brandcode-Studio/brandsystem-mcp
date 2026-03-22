@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { getVersion } from "./version.js";
 
 export interface ExtractedLogo {
   url: string;
@@ -112,7 +113,7 @@ export async function fetchLogo(
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(10000),
-      headers: { "User-Agent": "brandsystem-mcp/0.1.0" },
+      headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
 
     if (!response.ok) return null;

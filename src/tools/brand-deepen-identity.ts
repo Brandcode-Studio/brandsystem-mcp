@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
-import type { VisualIdentityData } from "../schemas/index.js";
+import { SCHEMA_VERSION, type VisualIdentityData } from "../schemas/index.js";
 
 const SECTIONS = [
   "composition",
@@ -140,7 +140,7 @@ function getMissingSections(visual: VisualIdentityData | null): Section[] {
 
 function getEmptyVisualIdentity(): VisualIdentityData {
   return {
-    schema_version: "0.1.0",
+    schema_version: SCHEMA_VERSION,
     session: 2,
     composition: null,
     patterns: null,

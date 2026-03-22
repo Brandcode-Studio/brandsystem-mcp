@@ -43,5 +43,6 @@
     "figma",
     "brand-governance"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/zk-xyz/brandsystem-mcp.git" }
 }

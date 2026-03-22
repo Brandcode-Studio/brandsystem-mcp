@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { getVersion } from "./lib/version.js";
 import { register as registerInit } from "./tools/brand-init.js";
 import { register as registerStatus } from "./tools/brand-status.js";
 import { register as registerExtractWeb } from "./tools/brand-extract-web.js";
@@ -18,7 +19,7 @@ import { register as registerCompileMessaging } from "./tools/brand-compile-mess
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "brandsystem",
-    version: "0.1.0",
+    version: getVersion(),
   });
 
   registerStart(server);

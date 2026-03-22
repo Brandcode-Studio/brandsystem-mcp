@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
+import { getVersion } from "../lib/version.js";
 import type { MessagingAuditResult } from "../types/index.js";
 
 // ─── Parameters ──────────────────────────────────────────────────────────────
@@ -588,8 +589,9 @@ async function handler(input: { url: string; pages?: string }) {
     try {
       const response = await fetch(pageUrl, {
         signal: AbortSignal.timeout(15000),
-        headers: { "User-Agent": "brandsystem-mcp/0.1.0" },
+        headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
+      if (!response.ok) continue;
       const html = await response.text();
       const $ = cheerio.load(html);
       const text = extractTextContent($);

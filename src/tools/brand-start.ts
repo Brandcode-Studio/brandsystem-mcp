@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
+import { SCHEMA_VERSION } from "../schemas/index.js";
 
 const paramsShape = {
   client_name: z.string().describe("Company or brand name"),
@@ -132,7 +133,7 @@ async function handler(input: Params) {
   await brandDir.scaffold();
 
   const config = {
-    schema_version: "0.1.0",
+    schema_version: SCHEMA_VERSION,
     session: 1,
     client_name: input.client_name,
     industry: input.industry,
@@ -143,7 +144,7 @@ async function handler(input: Params) {
   await brandDir.writeConfig(config);
 
   await brandDir.writeCoreIdentity({
-    schema_version: "0.1.0",
+    schema_version: SCHEMA_VERSION,
     colors: [],
     typography: [],
     logo: [],

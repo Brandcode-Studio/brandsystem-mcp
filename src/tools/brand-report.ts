@@ -3,6 +3,7 @@ import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
 import { generateReportHTML, generateBrandInstructions } from "../lib/report-html.js";
 import type { NeedsClarification } from "../types/index.js";
+import { SCHEMA_VERSION } from "../schemas/index.js";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -30,7 +31,7 @@ async function handler() {
   const identity = await brandDir.readCoreIdentity();
 
   // Read clarifications if they exist
-  let clarifications: NeedsClarification = { schema_version: "0.1.0", items: [] };
+  let clarifications: NeedsClarification = { schema_version: SCHEMA_VERSION, items: [] };
   try {
     await access(join(brandDir.brandPath, "needs-clarification.yaml"));
     clarifications = await brandDir.readClarifications();
@@ -75,7 +76,7 @@ async function handler() {
   });
 
   // Write to disk for Code environments
-  await brandDir.writeAsset("../brand-report.html", html);
+  await brandDir.writeMarkdown("brand-report.html", html);
 
   // Build the conversation guide for the LLM
   const hasLogo = identity.logo.length > 0;

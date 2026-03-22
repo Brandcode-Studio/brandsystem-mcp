@@ -5,6 +5,7 @@ import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { needsClarification } from "../lib/confidence.js";
 import { generateVIM, generateSystemIntegration } from "../lib/vim-generator.js";
 import type { ClarificationItem } from "../types/index.js";
+import { SCHEMA_VERSION } from "../schemas/index.js";
 
 async function handler() {
   const brandDir = new BrandDir(process.cwd());
@@ -91,7 +92,7 @@ async function handler() {
     });
   }
 
-  await brandDir.writeClarifications({ schema_version: "0.1.0", items: clarifications });
+  await brandDir.writeClarifications({ schema_version: SCHEMA_VERSION, items: clarifications });
 
   const brandTokens = tokens.brand as Record<string, unknown>;
   const colorTokenCount = Object.keys((brandTokens.color as Record<string, unknown>) || {}).length;

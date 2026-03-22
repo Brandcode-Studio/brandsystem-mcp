@@ -378,6 +378,7 @@ function buildClarifications(items: ClarificationItem[]): string {
 }
 
 export function generateReportHTML(data: ReportData): string {
+  copyBlockCounter = 0;
   const { config, identity, clarifications, tokenCount, auditSummary } = data;
   const overall = auditSummary.fail > 0 ? "FAIL" : auditSummary.warn > 0 ? "WARN" : "PASS";
 

@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import * as cheerio from "cheerio";
 import type { CoreIdentityData } from "../schemas/index.js";
 import type { AntiPatternRule } from "../types/index.js";
@@ -683,8 +684,16 @@ async function handler(input: Params) {
     !html.includes("<") &&
     (html.endsWith(".html") || html.endsWith(".htm") || html.startsWith("/"))
   ) {
+    const resolvedPath = resolve(process.cwd(), html);
+    if (!resolvedPath.startsWith(resolve(process.cwd()))) {
+      return buildResponse({
+        what_happened: "File path must be within the current working directory",
+        next_steps: ["Provide an HTML string or a file path within your project"],
+        data: { error: "path_outside_cwd" },
+      });
+    }
     try {
-      html = await readFile(html, "utf-8");
+      html = await readFile(resolvedPath, "utf-8");
     } catch {
       return buildResponse({
         what_happened: `Could not read file: ${input.html}`,

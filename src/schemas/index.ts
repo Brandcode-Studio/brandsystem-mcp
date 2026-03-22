@@ -1,3 +1,5 @@
+export const SCHEMA_VERSION = "0.1.0";
+
 export { BrandConfigSchema, type BrandConfigData } from "./brand-config.js";
 export {
   CoreIdentitySchema,

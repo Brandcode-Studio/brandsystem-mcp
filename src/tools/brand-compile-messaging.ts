@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
 import type { MessagingData } from "../schemas/messaging.js";
+import { SCHEMA_VERSION } from "../schemas/index.js";
 import type {
   Perspective,
   VoiceCodex,
@@ -210,7 +211,7 @@ const BRAND_STORY_QUESTIONS: InterviewQuestion[] = [
 
 function getEmptyMessaging(): MessagingData {
   return {
-    schema_version: "0.1.0",
+    schema_version: SCHEMA_VERSION,
     session: 3,
     perspective: null,
     voice: null,
