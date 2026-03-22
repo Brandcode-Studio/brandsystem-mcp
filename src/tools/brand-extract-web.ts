@@ -11,7 +11,7 @@ import { getVersion } from "../lib/version.js";
 import type { ColorEntry, TypographyEntry, LogoSpec, CoreIdentity } from "../types/index.js";
 
 const paramsShape = {
-  url: z.string().describe("Website URL to extract brand identity from"),
+  url: z.string().url().describe("Website URL to extract brand identity from"),
 };
 
 async function handler(input: { url: string }) {
@@ -22,6 +22,14 @@ async function handler(input: { url: string }) {
       what_happened: "No .brand/ directory found",
       next_steps: ["Run brand_init first to create the brand system"],
       data: { error: "not_initialized" },
+    });
+  }
+
+  if (!input.url.startsWith("http://") && !input.url.startsWith("https://")) {
+    return buildResponse({
+      what_happened: "Only http:// and https:// URLs are supported",
+      next_steps: ["Provide a URL starting with https://"],
+      data: { error: "invalid_protocol" },
     });
   }
 
@@ -59,13 +67,14 @@ async function handler(input: { url: string }) {
   $('link[rel="stylesheet"]').each((_, el) => {
     const href = $(el).attr("href");
     if (href) {
-      const base = input.url.replace(/\/$/, "");
-      const resolved = href.startsWith("http")
-        ? href
-        : href.startsWith("//")
-        ? `https:${href}`
-        : `${base}${href.startsWith("/") ? "" : "/"}${href}`;
-      stylesheetUrls.push(resolved);
+      try {
+        const resolved = new URL(href, input.url).href;
+        if (resolved.startsWith("http://") || resolved.startsWith("https://")) {
+          stylesheetUrls.push(resolved);
+        }
+      } catch {
+        // Invalid URL — skip
+      }
     }
   });
 

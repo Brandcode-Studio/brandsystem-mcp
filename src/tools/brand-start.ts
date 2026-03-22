@@ -129,26 +129,14 @@ async function handler(input: Params) {
     return handleExistingBrand(brandDir);
   }
 
-  // Scaffold the .brand/ directory (same as brand_init)
-  await brandDir.scaffold();
-
-  const config = {
+  // Initialize the .brand/ directory (shared logic with brand_init)
+  await brandDir.initBrand({
     schema_version: SCHEMA_VERSION,
     session: 1,
     client_name: input.client_name,
     industry: input.industry,
     website_url: input.website_url,
     created_at: new Date().toISOString(),
-  };
-
-  await brandDir.writeConfig(config);
-
-  await brandDir.writeCoreIdentity({
-    schema_version: SCHEMA_VERSION,
-    colors: [],
-    typography: [],
-    logo: [],
-    spacing: null,
   });
 
   const sourceMenu = buildSourceMenu(input.website_url);

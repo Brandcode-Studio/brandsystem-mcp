@@ -1,4 +1,5 @@
 import type { CoreIdentity, BrandConfig, ClarificationItem } from "../types/index.js";
+import { sanitizeSvg } from "./svg-resolver.js";
 
 export interface ReportData {
   config: BrandConfig;
@@ -164,8 +165,9 @@ function buildLogoSection(identity: CoreIdentity): string {
   const blocks: string[] = [];
   for (const logo of identity.logo) {
     for (const variant of logo.variants) {
-      const svgMarkup = variant.inline_svg || "";
-      if (!svgMarkup) continue;
+      const rawSvg = variant.inline_svg || "";
+      if (!rawSvg) continue;
+      const svgMarkup = sanitizeSvg(rawSvg);
 
       blocks.push(`
     <div class="logo-pair">
@@ -266,7 +268,7 @@ function buildComparisonSection(config: BrandConfig, identity: CoreIdentity): st
           <td class="comp-label">Logo</td>
           <td class="comp-yours">${
             hasLogo
-              ? `<div class="comp-logo-preview">${identity.logo[0].variants[0].inline_svg}</div><span>Embedded vector &mdash; renders everywhere, no files needed</span>`
+              ? `<div class="comp-logo-preview">${sanitizeSvg(identity.logo[0].variants[0].inline_svg || "")}</div><span>Embedded vector &mdash; renders everywhere, no files needed</span>`
               : `<span class="comp-missing">Not yet extracted &mdash; add via Figma or upload</span>`
           }</td>
           <td class="comp-generic">Would type &ldquo;${clientName}&rdquo; in a similar-looking font, or skip the logo entirely</td>

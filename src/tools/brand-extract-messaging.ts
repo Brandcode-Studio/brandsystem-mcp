@@ -9,7 +9,7 @@ import type { MessagingAuditResult } from "../types/index.js";
 // ─── Parameters ──────────────────────────────────────────────────────────────
 
 const paramsShape = {
-  url: z.string().describe("Website URL to audit messaging from (typically the homepage)"),
+  url: z.string().url().describe("Website URL to audit messaging from (typically the homepage)"),
   pages: z
     .string()
     .optional()
@@ -564,6 +564,14 @@ async function handler(input: { url: string; pages?: string }) {
     });
   }
 
+  if (!input.url.startsWith("http://") && !input.url.startsWith("https://")) {
+    return buildResponse({
+      what_happened: "Only http:// and https:// URLs are supported",
+      next_steps: ["Provide a URL starting with https://"],
+      data: { error: "invalid_protocol" },
+    });
+  }
+
   // Build URL list
   const urls: string[] = [input.url];
   if (input.pages) {
@@ -581,26 +589,29 @@ async function handler(input: { url: string; pages?: string }) {
     }
   }
 
-  // Fetch all pages
-  const pageTexts: string[] = [];
-  const fetchedUrls: string[] = [];
-
-  for (const pageUrl of urls.slice(0, 10)) {
-    try {
-      const response = await fetch(pageUrl, {
+  // Fetch all pages in parallel
+  const allUrls = urls.slice(0, 10);
+  const fetchResults = await Promise.allSettled(
+    allUrls.map(async (pageUrl) => {
+      const resp = await fetch(pageUrl, {
         signal: AbortSignal.timeout(15000),
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
-      if (!response.ok) continue;
-      const html = await response.text();
+      if (!resp.ok) return { url: pageUrl, text: "" };
+      const html = await resp.text();
       const $ = cheerio.load(html);
       const text = extractTextContent($);
-      if (text.length > 50) {
-        pageTexts.push(text);
-        fetchedUrls.push(pageUrl);
-      }
-    } catch {
-      // Skip failed pages, continue with what we have
+      return { url: pageUrl, text };
+    })
+  );
+
+  const pageTexts: string[] = [];
+  const fetchedUrls: string[] = [];
+
+  for (const result of fetchResults) {
+    if (result.status === "fulfilled" && result.value.text.length > 50) {
+      pageTexts.push(result.value.text);
+      fetchedUrls.push(result.value.url);
     }
   }
 

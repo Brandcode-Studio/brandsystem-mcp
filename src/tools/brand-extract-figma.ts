@@ -176,7 +176,14 @@ Figma data is more authoritative than web extraction — it will override web-so
     async (args) => {
       const parsed = args as Params;
       if (parsed.mode === "plan") {
-        return handlePlan(parsed.figma_file_key || "");
+        if (!parsed.figma_file_key || parsed.figma_file_key.trim() === "") {
+          return buildResponse({
+            what_happened: "Figma file key is required for plan mode",
+            next_steps: ["Provide a Figma file key (from the URL: figma.com/file/YOUR_KEY/...)"],
+            data: { error: "missing_figma_file_key" },
+          });
+        }
+        return handlePlan(parsed.figma_file_key);
       }
       return handleIngest(parsed);
     }

@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, access, readdir, stat } from "node:fs/promi
 import { join, resolve } from "node:path";
 import { stringify, parse } from "yaml";
 import type { BrandConfigData, CoreIdentityData, NeedsClarificationData, VisualIdentityData, MessagingData } from "../schemas/index.js";
+import { SCHEMA_VERSION } from "../schemas/index.js";
 import type { AssetManifestEntry } from "../types/index.js";
 
 export interface AssetManifest {
@@ -11,10 +12,24 @@ export interface AssetManifest {
 export class BrandDir {
   readonly root: string;
   readonly brandPath: string;
+  private locks = new Map<string, Promise<void>>();
 
   constructor(cwd: string) {
     this.root = cwd;
     this.brandPath = join(cwd, ".brand");
+  }
+
+  private async withLock<T>(filename: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.locks.get(filename) ?? Promise.resolve();
+    let resolve: () => void;
+    const next = new Promise<void>((r) => { resolve = r; });
+    this.locks.set(filename, next);
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      resolve!();
+    }
   }
 
   private path(...segments: string[]): string {
@@ -35,6 +50,22 @@ export class BrandDir {
     await mkdir(this.path("assets", "logo"), { recursive: true });
   }
 
+  /**
+   * Scaffold + write initial config and empty core identity in one call.
+   * Shared by brand_start and brand_init to avoid duplicated init logic.
+   */
+  async initBrand(config: BrandConfigData): Promise<void> {
+    await this.scaffold();
+    await this.writeConfig(config);
+    await this.writeCoreIdentity({
+      schema_version: SCHEMA_VERSION,
+      colors: [],
+      typography: [],
+      logo: [],
+      spacing: null,
+    });
+  }
+
   // --- YAML helpers ---
 
   private async readYaml<T>(filename: string): Promise<T> {
@@ -43,8 +74,10 @@ export class BrandDir {
   }
 
   private async writeYaml(filename: string, data: unknown): Promise<void> {
-    const content = stringify(data, { lineWidth: 120 });
-    await writeFile(this.path(filename), content, "utf-8");
+    await this.withLock(filename, async () => {
+      const content = stringify(data, { lineWidth: 120 });
+      await writeFile(this.path(filename), content, "utf-8");
+    });
   }
 
   // --- JSON helpers ---
@@ -55,8 +88,10 @@ export class BrandDir {
   }
 
   private async writeJson(filename: string, data: unknown): Promise<void> {
-    const content = JSON.stringify(data, null, 2);
-    await writeFile(this.path(filename), content, "utf-8");
+    await this.withLock(filename, async () => {
+      const content = JSON.stringify(data, null, 2);
+      await writeFile(this.path(filename), content, "utf-8");
+    });
   }
 
   // --- Config ---
@@ -119,7 +154,9 @@ export class BrandDir {
   }
 
   async writeMarkdown(filename: string, content: string): Promise<void> {
-    await writeFile(this.path(filename), content, "utf-8");
+    await this.withLock(filename, async () => {
+      await writeFile(this.path(filename), content, "utf-8");
+    });
   }
 
   async readMarkdown(filename: string): Promise<string> {

@@ -27,9 +27,8 @@ async function handler(input: Params) {
     });
   }
 
-  await brandDir.scaffold();
-
-  const config = {
+  // Shared init logic (scaffold + config + empty core identity)
+  await brandDir.initBrand({
     schema_version: SCHEMA_VERSION,
     session: 1,
     client_name: input.client_name,
@@ -37,16 +36,6 @@ async function handler(input: Params) {
     website_url: input.website_url,
     figma_file_key: input.figma_file_key,
     created_at: new Date().toISOString(),
-  };
-
-  await brandDir.writeConfig(config);
-
-  await brandDir.writeCoreIdentity({
-    schema_version: SCHEMA_VERSION,
-    colors: [],
-    typography: [],
-    logo: [],
-    spacing: null,
   });
 
   const nextSteps: string[] = [];
