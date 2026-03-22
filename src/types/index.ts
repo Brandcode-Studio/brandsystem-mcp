@@ -217,6 +217,82 @@ export interface MessagingAuditResult {
   gaps: string[];
 }
 
+// --- Session 4: Content Strategy ---
+
+export interface Persona {
+  id: string; // e.g. PER-001
+  name: string; // e.g. "The Overwhelmed VP"
+  role_tag: string; // e.g. "VP Marketing"
+  seniority: "C-Suite" | "VP" | "Director" | "Manager" | "IC" | string;
+  company_stage?: string[]; // e.g. ["Series C+", "Public"]
+  decision_authority: "Budget Holder" | "Influencer" | "Champion" | "Evaluator" | string;
+  status: "Active" | "Hypothesis" | "Retired";
+  source?: string;
+  core_tension: string;
+  key_objections: string[];
+  information_needs: {
+    first_touch: string;
+    context_and_meaning: string;
+    validation_and_proof: string;
+    decision_support: string;
+  };
+  narrative_emphasis: {
+    primary: string;
+    secondary?: string;
+    elements?: string[];
+  };
+  preferred_channels: string[];
+}
+
+export interface JourneyStage {
+  id: string; // e.g. "first-touch"
+  name: string;
+  buyer_mindset: string;
+  content_goal: string;
+  story_types: string[];
+  narrative_elements: string[];
+  claims_policy: {
+    preferred_salience: string | string[];
+    max_per_piece: number | null;
+    min_confidence?: number;
+  };
+  tone_shift: string;
+}
+
+export interface MessagingVariant {
+  id: string; // e.g. MV-001
+  persona: string; // persona id ref
+  journey_stage: string; // stage id ref
+  status: "Active" | "Draft" | "Retired";
+  core_message: string;
+  tone_shift: string;
+  proof_points: string[];
+  supporting_claims?: string[];
+  source_element?: string;
+}
+
+export interface ContentTheme {
+  id: string; // e.g. THM-001
+  name: string;
+  status: "Active" | "Planned" | "Retired";
+  quarter?: string;
+  content_intent: "Brand Heat" | "Momentum" | "Conversion" | string;
+  strategic_priority: string;
+  narrative_route?: string;
+  target_personas: string[]; // persona id refs
+  key_claims?: string[];
+  success_criteria?: string;
+}
+
+export interface ContentStrategy {
+  schema_version: string;
+  session: number;
+  personas: Persona[];
+  journey_stages: JourneyStage[];
+  messaging_matrix: MessagingVariant[];
+  themes: ContentTheme[];
+}
+
 /** DTCG token value */
 export interface DTCGToken {
   $value: string | number;

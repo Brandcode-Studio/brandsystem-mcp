@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir, access, readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { stringify, parse } from "yaml";
-import type { BrandConfigData, CoreIdentityData, NeedsClarificationData, VisualIdentityData, MessagingData } from "../schemas/index.js";
+import type { BrandConfigData, CoreIdentityData, NeedsClarificationData, VisualIdentityData, MessagingData, ContentStrategyData } from "../schemas/index.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import type { AssetManifestEntry } from "../types/index.js";
 
@@ -176,6 +176,25 @@ export class BrandDir {
   async hasMessaging(): Promise<boolean> {
     try {
       await access(this.path("messaging.yaml"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // --- Content Strategy (Session 4) ---
+
+  async readStrategy(): Promise<ContentStrategyData> {
+    return this.readYaml<ContentStrategyData>("strategy.yaml");
+  }
+
+  async writeStrategy(data: ContentStrategyData): Promise<void> {
+    await this.writeYaml("strategy.yaml", data);
+  }
+
+  async hasStrategy(): Promise<boolean> {
+    try {
+      await access(this.path("strategy.yaml"));
       return true;
     } catch {
       return false;

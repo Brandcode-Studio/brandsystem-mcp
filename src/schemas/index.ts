@@ -35,3 +35,11 @@ export {
   type VoiceCodexData,
   type BrandStoryData,
 } from "./messaging.js";
+export {
+  ContentStrategySchema,
+  PersonaSchema,
+  JourneyStageSchema,
+  MessagingVariantSchema,
+  ContentThemeSchema,
+  type ContentStrategyData,
+} from "./strategy.js";
