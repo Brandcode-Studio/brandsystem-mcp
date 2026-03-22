@@ -131,11 +131,24 @@ async function handler() {
       "Visual Identity Manifest written — share visual-identity-manifest.md with your team",
       "System Integration Guide written — paste the quick-setup block into CLAUDE.md or .cursorrules"
     );
+
+    // Check if Session 3 is needed
+    const hasMessaging = await brandDir.hasMessaging();
+    if (!hasMessaging) {
+      nextSteps.push("Ready for Session 3: run brand_extract_messaging to audit your voice, then brand_compile_messaging to define perspective + voice + brand story");
+    }
   }
 
-  // Session 2 transition guidance
+  // Session transition guidance
   const conversationGuide: Record<string, string> = {};
-  if (!hasVisual && clarifications.length === 0) {
+  if (hasVisual && !(await brandDir.hasMessaging())) {
+    conversationGuide.session_3_transition = [
+      "Session 2 (Visual Identity) is complete. Now transition to Session 3.",
+      "Tell the user: 'Your visual identity is locked in — composition, patterns, signature moves, and anti-patterns. Now let's capture how your brand *sounds*. This is where output goes from color-correct to distinctively yours.'",
+      "Suggest: 'I can start by auditing what your brand currently sounds like on your website. Want me to run that analysis?'",
+      "If yes: run brand_extract_messaging. If they want to skip the audit: run brand_compile_messaging directly.",
+    ].join("\n");
+  } else if (!hasVisual && clarifications.length === 0) {
     conversationGuide.session_2_transition = [
       "Session 1 (Core Identity) is complete. Now transition to Session 2.",
       "Tell the user: 'Your core identity is set — colors, fonts, logo, and tokens are ready. Now let's go deeper into your visual identity. This captures what makes your brand *recognizable* beyond just the correct colors — composition rules, patterns, illustration style, and anti-patterns.'",

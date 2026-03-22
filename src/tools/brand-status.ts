@@ -63,28 +63,61 @@ async function handler() {
   lines.push("── Confidence ────────────────────────");
   lines.push(`  Confirmed: ${confidenceDist.confirmed}  High: ${confidenceDist.high}  Medium: ${confidenceDist.medium}  Low: ${confidenceDist.low}`);
 
+  // Check Session 2 + 3 state
+  const hasVisual = await brandDir.hasVisualIdentity();
+  const hasMessaging = await brandDir.hasMessaging();
+
+  const s1Done = identity.colors.length > 0 && identity.typography.length > 0;
+  const s1Status = s1Done ? "✓ Complete" : identity.colors.length > 0 || identity.typography.length > 0 ? "◐ In progress" : "○ Not started";
+  const s2Status = hasVisual ? "✓ Complete" : s1Done ? "→ Ready" : "○ Needs Session 1";
+  const s3Status = hasMessaging ? "✓ Complete" : hasVisual ? "→ Ready" : "○ Needs Session 2";
+
   lines.push("");
   lines.push("── Sessions ──────────────────────────");
-  lines.push(`Session 1: Core Identity        ${identity.colors.length > 0 || identity.typography.length > 0 ? "✓ In progress" : "○ Empty"}`);
-  lines.push("Session 2: Full Visual Identity ○ Not started");
-  lines.push("Session 3: Core Messaging       ○ Not started");
+  lines.push(`Session 1: Core Identity        ${s1Status}`);
+  lines.push(`Session 2: Full Visual Identity ${s2Status}`);
+  lines.push(`Session 3: Core Messaging       ${s3Status}`);
   lines.push("Session 4: Content Strategy     ○ Not started");
   lines.push("Session 5: Full Governance      ○ Not started");
   lines.push("Session 6: Content Operations   ○ Not started");
 
+  if (hasVisual) {
+    const visual = await brandDir.readVisualIdentity();
+    lines.push("");
+    lines.push("── Visual Identity ───────────────────");
+    lines.push(`Anti-patterns: ${visual.anti_patterns.length} rules`);
+    lines.push(`Composition:   ${visual.composition ? "✓" : "○"}`);
+    lines.push(`Patterns:      ${visual.patterns ? "✓" : "○"}`);
+    lines.push(`Illustration:  ${visual.illustration ? "✓" : "○"}`);
+    lines.push(`Signature:     ${visual.signature ? "✓" : "○"}`);
+  }
+
+  if (hasMessaging) {
+    const messaging = await brandDir.readMessaging();
+    lines.push("");
+    lines.push("── Messaging ─────────────────────────");
+    lines.push(`Perspective:   ${messaging.perspective ? "✓" : "○"}`);
+    lines.push(`Voice Codex:   ${messaging.voice ? "✓" : "○"}`);
+    lines.push(`Brand Story:   ${messaging.brand_story ? "✓" : "○"}`);
+  }
+
   const nextSteps: string[] = [];
-  if (identity.colors.length === 0 && identity.typography.length === 0) {
+  if (!s1Done) {
     if (config.website_url) {
       nextSteps.push(`Run brand_extract_web with url "${config.website_url}"`);
     } else {
       nextSteps.push("Run brand_extract_web with your website URL");
     }
+  } else if (!hasVisual) {
+    nextSteps.push("Run brand_deepen_identity to start Session 2 — capture composition, patterns, and anti-patterns");
+  } else if (!hasMessaging) {
+    nextSteps.push("Run brand_extract_messaging to audit your current voice, then brand_compile_messaging for Session 3");
+  } else {
+    nextSteps.push("Run brand_write to generate on-brand content using your full brand system");
   }
+
   if (config.figma_file_key && identity.colors.every((c) => c.source !== "figma")) {
-    nextSteps.push(`Run brand_extract_figma with figma_file_key "${config.figma_file_key}"`);
-  }
-  if (identity.colors.length > 0 && identity.typography.length > 0) {
-    nextSteps.push("Run brand_compile to generate tokens.json and surface clarification items");
+    nextSteps.push(`Run brand_extract_figma with figma_file_key "${config.figma_file_key}" for higher-accuracy data`);
   }
 
   return buildResponse({
