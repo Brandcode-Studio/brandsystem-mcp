@@ -3,6 +3,7 @@ import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
 import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { needsClarification } from "../lib/confidence.js";
+import { generateVIM, generateSystemIntegration } from "../lib/vim-generator.js";
 import type { ClarificationItem } from "../types/index.js";
 
 async function handler() {
@@ -96,23 +97,55 @@ async function handler() {
   const colorTokenCount = Object.keys((brandTokens.color as Record<string, unknown>) || {}).length;
   const typoTokenCount = Object.keys((brandTokens.typography as Record<string, unknown>) || {}).length;
 
+  const filesWritten: string[] = ["tokens.json", "needs-clarification.yaml"];
+  const nextSteps: string[] = [
+    clarifications.length > 0
+      ? `${clarifications.length} item(s) need clarification — review needs-clarification.yaml`
+      : "No clarification items — system is clean",
+    "Run brand_audit to validate the compiled output",
+    "Run brand_status to see the full picture",
+  ];
+
+  // --- Session 2: VIM generation if visual-identity.yaml exists ---
+  const hasVisual = await brandDir.hasVisualIdentity();
+
+  if (hasVisual) {
+    const visual = await brandDir.readVisualIdentity();
+
+    const vimMarkdown = generateVIM(config, identity, visual);
+    await brandDir.writeMarkdown("visual-identity-manifest.md", vimMarkdown);
+    filesWritten.push("visual-identity-manifest.md");
+
+    const integrationMarkdown = generateSystemIntegration(config, identity, visual);
+    await brandDir.writeMarkdown("system-integration.md", integrationMarkdown);
+    filesWritten.push("system-integration.md");
+
+    // Bump session to 2 if not already there
+    if (config.session < 2) {
+      config.session = 2;
+      await brandDir.writeConfig(config);
+    }
+
+    nextSteps.push(
+      "Visual Identity Manifest written — share visual-identity-manifest.md with your team",
+      "System Integration Guide written — paste the quick-setup block into CLAUDE.md or .cursorrules"
+    );
+  }
+
   return buildResponse({
-    what_happened: `Compiled brand system for "${config.client_name}"`,
-    next_steps: [
-      clarifications.length > 0
-        ? `${clarifications.length} item(s) need clarification — review needs-clarification.yaml`
-        : "No clarification items — system is clean",
-      "Run brand_audit to validate the compiled output",
-      "Run brand_status to see the full picture",
-    ],
+    what_happened: hasVisual
+      ? `Compiled brand system + Visual Identity Manifest for "${config.client_name}"`
+      : `Compiled brand system for "${config.client_name}"`,
+    next_steps: nextSteps,
     data: {
-      files_written: ["tokens.json", "needs-clarification.yaml"],
+      files_written: filesWritten,
       tokens: { colors: colorTokenCount, typography: typoTokenCount, total: colorTokenCount + typoTokenCount },
       clarifications: {
         total: clarifications.length,
         high_priority: clarifications.filter((c) => c.priority === "high").length,
         items: clarifications.map((c) => `[${c.priority}] ${c.question}`),
       },
+      ...(hasVisual && { vim_generated: true }),
     },
   });
 }
@@ -120,7 +153,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_compile",
-    "Compile all extracted brand data into final outputs. Generates DTCG tokens.json from core-identity.yaml and surfaces unresolved items in needs-clarification.yaml. Use AFTER running extraction tools (brand_extract_web and/or brand_extract_figma).",
+    "Compile all extracted brand data into final outputs. Generates DTCG tokens.json from core-identity.yaml and surfaces unresolved items in needs-clarification.yaml. When Session 2 visual-identity.yaml exists, also generates visual-identity-manifest.md and system-integration.md. Use AFTER running extraction tools (brand_extract_web and/or brand_extract_figma).",
     async () => handler()
   );
 }

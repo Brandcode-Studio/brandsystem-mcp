@@ -8,6 +8,9 @@ import { register as registerAudit } from "./tools/brand-audit.js";
 import { register as registerReport } from "./tools/brand-report.js";
 import { register as registerStart } from "./tools/brand-start.js";
 import { register as registerClarify } from "./tools/brand-clarify.js";
+import { register as registerDeepenIdentity } from "./tools/brand-deepen-identity.js";
+import { register as registerIngestAssets } from "./tools/brand-ingest-assets.js";
+import { register as registerPreflight } from "./tools/brand-preflight.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -24,6 +27,9 @@ export function createServer(): McpServer {
   registerAudit(server);
   registerReport(server);
   registerClarify(server);
+  registerDeepenIdentity(server);
+  registerIngestAssets(server);
+  registerPreflight(server);
 
   return server;
 }

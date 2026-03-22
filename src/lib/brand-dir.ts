@@ -1,8 +1,12 @@
-import { readFile, writeFile, mkdir, access } from "node:fs/promises";
+import { readFile, writeFile, mkdir, access, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify, parse } from "yaml";
-import { readdir, stat } from "node:fs/promises";
 import type { BrandConfigData, CoreIdentityData, NeedsClarificationData, VisualIdentityData } from "../schemas/index.js";
+import type { AssetManifestEntry } from "../types/index.js";
+
+export interface AssetManifest {
+  assets: AssetManifestEntry[];
+}
 
 export class BrandDir {
   readonly root: string;
@@ -128,7 +132,7 @@ export class BrandDir {
     const dir = this.path("assets", subdir);
     try {
       const entries = await readdir(dir);
-      return entries.filter((e) => !e.startsWith(".") && !e.endsWith(".md"));
+      return entries.filter((e) => !e.startsWith(".") && !e.endsWith(".md") && e !== "MANIFEST.yaml");
     } catch {
       return [];
     }
@@ -160,5 +164,27 @@ export class BrandDir {
 
   async readAsset(relativePath: string): Promise<string> {
     return readFile(this.path("assets", relativePath), "utf-8");
+  }
+
+  // --- Asset Manifests ---
+
+  async readManifest(subdir: string): Promise<AssetManifest> {
+    try {
+      const content = await readFile(
+        this.path("assets", subdir, "MANIFEST.yaml"),
+        "utf-8"
+      );
+      const parsed = parse(content) as AssetManifest | null;
+      return parsed ?? { assets: [] };
+    } catch {
+      return { assets: [] };
+    }
+  }
+
+  async writeManifest(subdir: string, data: AssetManifest): Promise<void> {
+    const dir = this.path("assets", subdir);
+    await mkdir(dir, { recursive: true });
+    const content = stringify(data, { lineWidth: 120 });
+    await writeFile(join(dir, "MANIFEST.yaml"), content, "utf-8");
   }
 }
