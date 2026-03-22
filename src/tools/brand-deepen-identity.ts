@@ -317,7 +317,10 @@ async function handleRecord(brandDir: BrandDir, section: Section, answersRaw: st
   } catch {
     return buildResponse({
       what_happened: "Failed to parse answers — invalid JSON",
-      next_steps: ["Provide answers as a valid JSON string"],
+      next_steps: [
+        "Provide answers as a valid JSON string",
+        "If this keeps happening, run brand_feedback to report the issue.",
+      ],
       data: { error: "invalid_json", raw: answersRaw },
     });
   }

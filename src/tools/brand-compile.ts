@@ -13,7 +13,10 @@ async function handler() {
   if (!(await brandDir.exists())) {
     return buildResponse({
       what_happened: "No .brand/ directory found",
-      next_steps: ["Run brand_init first"],
+      next_steps: [
+        "Run brand_init first to create the .brand/ directory",
+        "If this keeps happening, run brand_feedback to report the issue.",
+      ],
       data: { error: "not_initialized" },
     });
   }

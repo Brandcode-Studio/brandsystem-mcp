@@ -44,7 +44,12 @@ async function handler(input: { url: string; logo_url?: string }) {
     if (!response.ok) {
       return buildResponse({
         what_happened: `Failed to fetch ${input.url} (HTTP ${response.status})`,
-        next_steps: ["Check the URL is correct and accessible", "Try brand_extract_figma instead"],
+        next_steps: [
+          "Check the URL is correct and publicly accessible (not behind a login)",
+          "Try a different page URL on the same domain",
+          "Try brand_extract_figma instead if you have a Figma file",
+          "If this keeps happening, run brand_feedback to report the issue.",
+        ],
         data: { error: "fetch_failed", status: response.status, statusText: response.statusText },
       });
     }
@@ -52,7 +57,12 @@ async function handler(input: { url: string; logo_url?: string }) {
   } catch (err) {
     return buildResponse({
       what_happened: `Failed to fetch ${input.url}`,
-      next_steps: ["Check the URL is correct and accessible", "Try brand_extract_figma instead"],
+      next_steps: [
+        "Check the URL is correct and publicly accessible (not behind a login)",
+        "Try a different page URL on the same domain",
+        "Try brand_extract_figma instead if you have a Figma file",
+        "If this keeps happening, run brand_feedback to report the issue.",
+      ],
       data: { error: "fetch_failed", details: String(err) },
     });
   }
@@ -275,6 +285,78 @@ async function handler(input: { url: string; logo_url?: string }) {
     firstLogo?.variants[0]?.inline_svg || firstLogo?.variants[0]?.data_uri
   );
 
+  // --- Extraction quality scoring ---
+  let qualityPoints = 0;
+  const qualityReasons: string[] = [];
+
+  // Logo: +3 if inline SVG found
+  const hasInlineSvgLogo = logos.some((l) =>
+    l.variants.some((v) => v.inline_svg)
+  );
+  if (hasInlineSvgLogo) {
+    qualityPoints += 3;
+    qualityReasons.push("Logo found with inline SVG");
+  } else if (logoFound) {
+    qualityReasons.push("Logo found but not as inline SVG");
+  }
+
+  // Colors: +2 if 4+, +1 if 2-3
+  if (colors.length >= 4) {
+    qualityPoints += 2;
+    qualityReasons.push(`${colors.length} colors extracted`);
+  } else if (colors.length >= 2) {
+    qualityPoints += 1;
+    qualityReasons.push(`Only ${colors.length} colors extracted`);
+  } else {
+    qualityReasons.push("Fewer than 2 colors extracted");
+  }
+
+  // Fonts: +2 if 3+, +1 if 1-2
+  if (typography.length >= 3) {
+    qualityPoints += 2;
+    qualityReasons.push(`${typography.length} fonts extracted`);
+  } else if (typography.length >= 1) {
+    qualityPoints += 1;
+    qualityReasons.push(`Only ${typography.length} font(s) extracted`);
+  } else {
+    qualityReasons.push("No fonts extracted");
+  }
+
+  // Primary color candidate: +1
+  if (suggestedPrimary) {
+    qualityPoints += 1;
+    qualityReasons.push("Primary color candidate identified");
+  }
+
+  // Surface and text roles detected: +1
+  const hasSurfaceRole = colors.some((c) => c.role === "surface");
+  const hasTextRole = colors.some((c) => c.role === "text");
+  if (hasSurfaceRole && hasTextRole) {
+    qualityPoints += 1;
+    qualityReasons.push("Both surface and text color roles detected");
+  }
+
+  // Score mapping
+  let qualityScore: "HIGH" | "MEDIUM" | "LOW";
+  let qualityRecommendation: string;
+  if (qualityPoints >= 8) {
+    qualityScore = "HIGH";
+    qualityRecommendation = "Strong extraction. Ready to confirm and compile.";
+  } else if (qualityPoints >= 5) {
+    qualityScore = "MEDIUM";
+    qualityRecommendation = "Decent extraction but some gaps. Consider Figma extraction for higher accuracy.";
+  } else {
+    qualityScore = "LOW";
+    qualityRecommendation = "Limited extraction. Try a different page URL, connect to Figma, or add your brand assets manually.";
+  }
+
+  const extractionQuality = {
+    score: qualityScore,
+    points: qualityPoints,
+    reasons: qualityReasons,
+    recommendation: qualityRecommendation,
+  };
+
   return buildResponse({
     what_happened: `Extracted brand identity from ${input.url}`,
     next_steps: [
@@ -282,6 +364,7 @@ async function handler(input: { url: string; logo_url?: string }) {
     ],
     data: {
       url: input.url,
+      extraction_quality: extractionQuality,
       extraction: {
         colors: { total: colors.length, new: newColors },
         typography: { total: typography.length, new: newFonts },
@@ -299,6 +382,7 @@ async function handler(input: { url: string; logo_url?: string }) {
         fonts: typography.map((t) => t.family),
       },
       conversation_guide: {
+        extraction_quality_guidance: `Extraction quality: ${qualityScore} (${qualityPoints}/10 points). ${qualityRecommendation} Communicate this to the user before confirming details.`,
         confirm_before_compile: [
           "After showing extraction results, CONFIRM THREE THINGS with the user before compiling:",
           "",

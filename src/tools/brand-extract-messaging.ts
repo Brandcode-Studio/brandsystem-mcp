@@ -619,8 +619,10 @@ async function handler(input: { url: string; pages?: string }) {
     return buildResponse({
       what_happened: `Failed to extract text content from any of the ${urls.length} URLs`,
       next_steps: [
-        "Check the URLs are correct and accessible",
-        "Make sure the pages have text content (not just images/JS)",
+        "Check the URLs are correct and publicly accessible (not behind a login)",
+        "Make sure the pages have text content (not just images or JavaScript-rendered content)",
+        "Try a different page on the same domain (e.g. /about or /services)",
+        "If this keeps happening, run brand_feedback to report the issue.",
       ],
       data: { error: "no_content", urls },
     });

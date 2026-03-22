@@ -1,11 +1,11 @@
 {
   "name": "@brandsystem/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for progressive brand governance — extract, compile, and audit brand identity systems",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "brandsystem-mcp": "./bin/brandsystem-mcp.mjs"
+    "brandsystem-mcp": "bin/brandsystem-mcp.mjs"
   },
   "scripts": {
     "build": "tsc",
@@ -44,5 +44,8 @@
     "brand-governance"
   ],
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/zk-xyz/brandsystem-mcp.git" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zk-xyz/brandsystem-mcp.git"
+  }
 }

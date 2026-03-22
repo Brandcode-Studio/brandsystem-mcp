@@ -334,6 +334,7 @@ async function handler(input: Params) {
           'Format: "#hex is role" or "the purple one is accent, the dark color is neutral"',
           `Valid roles: ${VALID_ROLES.join(", ")}`,
           `Available colors: ${colorList.join(", ")}`,
+          "If this keeps happening, run brand_feedback to report the issue.",
         ],
         data: { error: "parse_failed", answer: input.answer },
       });
