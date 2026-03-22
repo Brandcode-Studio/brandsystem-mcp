@@ -129,7 +129,10 @@ function formatResults(results: AuditResult[]) {
   const nextSteps: string[] = [];
   if (fails > 0) nextSteps.push("Fix failing checks before proceeding");
   if (warns > 0) nextSteps.push("Review warnings — run brand_compile to address clarification items");
-  if (fails === 0 && warns === 0) nextSteps.push("Brand system passes all checks — ready for Session 2");
+  if (fails === 0 && warns === 0) {
+    nextSteps.push("Brand system passes all checks");
+    nextSteps.push("Run brand_deepen_identity to start Session 2 — capture composition rules, visual patterns, and anti-patterns that make your brand recognizable beyond tokens");
+  }
 
   return buildResponse({
     what_happened: `Audit complete: ${overall} (${passes} pass, ${warns} warn, ${fails} fail)`,

@@ -241,17 +241,19 @@ async function handler(input: Params) {
   const remaining = clarifications.items.length;
 
   const nextSteps: string[] = [];
+  const conversationGuide: Record<string, string> = {};
+
   if (remaining > 0) {
     const nextItem = clarifications.items[0];
     nextSteps.push(
       `${remaining} clarification(s) remaining — next: brand_clarify id="${nextItem.id}" (${nextItem.question})`
     );
+    conversationGuide.auto_chain = `Immediately ask the user about the next clarification item: "${nextItem.question}" (id: ${nextItem.id}). Don't wait for them to ask.`;
   } else {
-    nextSteps.push(
-      "All clarifications resolved — run brand_compile to regenerate tokens with confirmed values"
-    );
+    nextSteps.push("All clarifications resolved — run brand_compile to regenerate tokens with confirmed values");
+    nextSteps.push("Then run brand_report to generate the updated report");
+    conversationGuide.auto_chain = "All clarifications resolved. Immediately run brand_compile (don't wait for the user to ask). After compile, run brand_report. After the report, transition to Session 2 by running brand_deepen_identity.";
   }
-  nextSteps.push("Run brand_report to regenerate the HTML report with updated values");
 
   return buildResponse({
     what_happened: `Resolved clarification "${item.id}": ${item.question}`,
@@ -265,6 +267,7 @@ async function handler(input: Params) {
         question: i.question,
         priority: i.priority,
       })),
+      conversation_guide: conversationGuide,
     },
   });
 }

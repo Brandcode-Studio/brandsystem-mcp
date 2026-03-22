@@ -186,9 +186,8 @@ async function handler(input: { url: string }) {
   return buildResponse({
     what_happened: `Extracted brand identity from ${input.url}`,
     next_steps: [
-      "Run brand_extract_figma if you have a Figma file (Figma data is more authoritative)",
-      "Run brand_compile to generate tokens.json and surface items needing clarification",
-      "Run brand_status to see the full picture",
+      "Run brand_compile next to generate tokens and surface items needing clarification",
+      "Then run brand_report to generate the portable brand identity report",
     ],
     data: {
       url: input.url,
@@ -200,6 +199,11 @@ async function handler(input: { url: string }) {
       },
       top_colors: colors.slice(0, 5).map((c) => `${c.value} (${c.role}, ${c.confidence})`),
       fonts: typography.map((t) => `${t.family} (${t.confidence})`),
+      conversation_guide: {
+        auto_chain: "After reporting extraction results, immediately run brand_compile — do not wait for the user to ask.",
+        figma_check: "Check if you have access to Figma MCP tools (get_design_context, get_variable_defs, get_screenshot). If yes, tell the user: 'I also have access to Figma — if you share a file URL, I can pull higher-accuracy colors, typography, and your logo directly from the source design file.' If they provide a Figma URL, use the Figma MCP tools alongside brand_extract_figma.",
+        after_compile: "After compile finishes, check for clarification items. If there are any, walk through resolving them with brand_clarify. After all resolved, run brand_report.",
+      },
     },
   });
 }

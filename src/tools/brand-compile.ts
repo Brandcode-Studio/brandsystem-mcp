@@ -98,13 +98,14 @@ async function handler() {
   const typoTokenCount = Object.keys((brandTokens.typography as Record<string, unknown>) || {}).length;
 
   const filesWritten: string[] = ["tokens.json", "needs-clarification.yaml"];
-  const nextSteps: string[] = [
-    clarifications.length > 0
-      ? `${clarifications.length} item(s) need clarification — review needs-clarification.yaml`
-      : "No clarification items — system is clean",
-    "Run brand_audit to validate the compiled output",
-    "Run brand_status to see the full picture",
-  ];
+  const nextSteps: string[] = [];
+
+  if (clarifications.length > 0) {
+    nextSteps.push(`${clarifications.length} item(s) need clarification — walk the user through brand_clarify for each one`);
+  } else {
+    nextSteps.push("No clarification items — system is clean");
+    nextSteps.push("Run brand_report to generate the portable brand identity report");
+  }
 
   // --- Session 2: VIM generation if visual-identity.yaml exists ---
   const hasVisual = await brandDir.hasVisualIdentity();
@@ -132,6 +133,19 @@ async function handler() {
     );
   }
 
+  // Session 2 transition guidance
+  const conversationGuide: Record<string, string> = {};
+  if (!hasVisual && clarifications.length === 0) {
+    conversationGuide.session_2_transition = [
+      "Session 1 (Core Identity) is complete. Now transition to Session 2.",
+      "Tell the user: 'Your core identity is set — colors, fonts, logo, and tokens are ready. Now let's go deeper into your visual identity. This captures what makes your brand *recognizable* beyond just the correct colors — composition rules, patterns, illustration style, and anti-patterns.'",
+      "Then immediately run brand_deepen_identity to start the visual identity interview.",
+      "Do NOT wait for the user to ask — this is the natural next step.",
+    ].join("\n");
+  } else if (!hasVisual && clarifications.length > 0) {
+    conversationGuide.after_clarify = "After resolving all clarification items, recompile (brand_compile), then generate the report (brand_report). Once the report is done, transition to Session 2 by running brand_deepen_identity.";
+  }
+
   return buildResponse({
     what_happened: hasVisual
       ? `Compiled brand system + Visual Identity Manifest for "${config.client_name}"`
@@ -146,6 +160,7 @@ async function handler() {
         items: clarifications.map((c) => `[${c.priority}] ${c.question}`),
       },
       ...(hasVisual && { vim_generated: true }),
+      ...(Object.keys(conversationGuide).length > 0 && { conversation_guide: conversationGuide }),
     },
   });
 }

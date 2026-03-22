@@ -127,10 +127,19 @@ async function handler() {
         },
       },
       conversation_guide: {
-        instruction: "Tell the user the report has been saved to .brand/brand-report.html. Summarize the key findings (colors, fonts, logo status). Then ask: 'Does this look right?'",
+        instruction: [
+          "Tell the user the report has been saved to .brand/brand-report.html.",
+          "Summarize: colors found, fonts found, logo status, token count.",
+          "Then ask: 'Does this look right?'",
+          "IMPORTANT: After the user confirms (or fixes issues), transition to Session 2:",
+          "'Your core identity is captured. Now let's go deeper — I'll ask a few questions about your visual style, composition, and what to never do. This is what makes AI output look like *your brand*, not just color-correct.'",
+          "Then run brand_deepen_identity to start the visual identity interview.",
+          "Also check: do you have access to Figma MCP tools? If yes, mention: 'I can also connect to your Figma file for higher-accuracy data — share a URL anytime.'",
+        ].join("\n"),
         if_looks_right: {
-          say: `Great — here's how to start using your brand identity everywhere:`,
-          actions: looksRightActions,
+          say: "Great — your core identity is locked in. Let's go deeper into your visual identity. I'll ask a few questions about how your brand expresses itself — composition, patterns, signature moves, and what to never do.",
+          next_action: "Run brand_deepen_identity immediately",
+          also_mention: looksRightActions,
         },
         if_looks_wrong: {
           say: "No problem — let's get it right. What's off?",
