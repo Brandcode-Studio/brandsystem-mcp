@@ -18,6 +18,7 @@ const paramsShape = {
 // ─── Stop words (filtered from vocabulary frequency) ─────────────────────────
 
 const STOP_WORDS = new Set([
+  // ── English stop words ──────────────────────────────────────────────────────
   "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
   "any", "are", "aren't", "as", "at", "be", "because", "been", "before",
   "being", "below", "between", "both", "but", "by", "can", "can't", "cannot",
@@ -43,6 +44,34 @@ const STOP_WORDS = new Set([
   "going", "know", "make", "much", "new", "now", "one", "really", "right",
   "see", "still", "take", "thing", "think", "two", "use", "want", "way",
   "well", "work", "year", "d", "m", "re", "ve", "ll",
+
+  // ── JavaScript keywords / patterns (web artifact noise) ─────────────────────
+  "function", "const", "var", "let", "return", "class", "export", "import",
+  "default", "async", "await", "typeof", "undefined", "null", "true", "false",
+  "this", "new", "void", "delete", "throw", "catch", "finally", "switch",
+  "case", "break", "continue", "else", "instanceof", "constructor", "prototype",
+  "arguments", "module", "require", "window", "document", "console", "error",
+  "object", "array", "string", "number", "boolean", "symbol",
+
+  // ── CSS / HTML artifacts ────────────────────────────────────────────────────
+  "width", "height", "display", "none", "block", "flex", "grid", "margin",
+  "padding", "border", "color", "font", "size", "style", "background",
+  "position", "absolute", "relative", "fixed", "overflow", "hidden", "visible",
+  "auto", "inherit", "initial", "important", "hover", "active", "focus",
+  "opacity", "transition", "transform", "animation", "index", "container",
+  "wrapper", "section", "header", "footer", "main", "article", "button",
+  "input", "image", "link", "content", "currentindex", "maxindex", "previndex",
+  "nextindex", "slideto", "arialabel", "classname", "onclick", "onchange",
+  "onload", "queryselector", "addeventlistener", "setinterval", "settimeout",
+  "innerhtml", "textcontent", "appendchild", "createelement", "getelementbyid",
+  "parentnode", "childnodes",
+
+  // ── Common web framework terms ──────────────────────────────────────────────
+  "component", "props", "state", "render", "mount", "unmount", "usestate",
+  "useeffect", "useref", "memo", "callback", "dispatch", "reducer", "context",
+  "provider", "consumer", "router", "route", "navigate", "params", "query",
+  "middleware", "handler", "controller", "endpoint", "schema", "config",
+  "utils", "helpers", "types", "interfaces",
 ]);
 
 // ─── Overused / generic marketing words ──────────────────────────────────────

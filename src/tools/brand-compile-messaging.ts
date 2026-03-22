@@ -66,6 +66,7 @@ interface InterviewQuestion {
   key: string;
   question: string;
   follow_up?: string;
+  guidance?: string;
 }
 
 interface VoiceInterviewPart {
@@ -175,28 +176,33 @@ const VOICE_INTERVIEW_PARTS: VoiceInterviewPart[] = [
 const BRAND_STORY_QUESTIONS: InterviewQuestion[] = [
   {
     key: "origin",
-    question: "How did this company start? What was the founding insight or frustration?",
+    question: "How did this company start? What was the founding insight or frustration? If you don't know the full answer, that's OK — give me what you can. We can refine later.",
     follow_up: "Not the press release version — the real story.",
+    guidance: "Check your About page, LinkedIn company page, or ask the founder. If you're a team member (not the founder), share what you know and mark it for founder review.",
   },
   {
     key: "tension",
-    question: "What obstacle or broken system did you run into?",
+    question: "What obstacle or broken system did you run into? If you don't know the full answer, that's OK — give me what you can. We can refine later.",
     follow_up: "Every good story has tension. What was the wall you hit?",
+    guidance: "Check your About page, LinkedIn company page, or ask the founder. If you're a team member (not the founder), share what you know and mark it for founder review.",
   },
   {
     key: "resolution",
-    question: "What did you build or discover that resolved it?",
+    question: "What did you build or discover that resolved it? If you don't know the full answer, that's OK — give me what you can. We can refine later.",
     follow_up: "This is the turning point — how did you overcome the obstacle?",
+    guidance: "Check your About page, LinkedIn company page, or ask the founder. If you're a team member (not the founder), share what you know and mark it for founder review.",
   },
   {
     key: "vision",
-    question: "Where are you going? What does the next chapter look like?",
+    question: "Where are you going? What does the next chapter look like? If you don't know the full answer, that's OK — give me what you can. We can refine later.",
     follow_up: "Not a 5-year plan — the narrative arc. What are you building toward?",
+    guidance: "Check your About page, LinkedIn company page, or ask the founder. If you're a team member (not the founder), share what you know and mark it for founder review.",
   },
   {
     key: "tagline",
-    question: "If you could put the whole thing in one sentence?",
+    question: "If you could put the whole thing in one sentence? If you don't know the full answer, that's OK — give me what you can. We can refine later.",
     follow_up: "The origin, the tension, the resolution — compressed into a single line.",
+    guidance: "Check your About page, LinkedIn company page, or ask the founder. If you're a team member (not the founder), share what you know and mark it for founder review.",
   },
 ];
 
@@ -440,7 +446,7 @@ async function handleInterview(brandDir: BrandDir) {
             : []),
           "",
           "BRAND STORY:",
-          `"Last part — your origin story. Not a mission statement, but an actual story with tension and stakes."`,
+          `"Last part — your origin story. Not a mission statement, but an actual story with tension and stakes. If you don't know all the details, that's completely fine — give me what you know and we'll flag the rest for the founder or leadership team to fill in."`,
           "",
           "AFTER ALL SECTIONS ARE RECORDED:",
           `"Your messaging architecture is set. Want to test it? Give me a content type and a topic and I'll generate something using your full brand system."`,
@@ -494,6 +500,25 @@ async function handleRecord(brandDir: BrandDir, section: Section, answersRaw: st
     case "brand_story": {
       messaging.brand_story = parseBrandStory(answers);
       changes.push("Set brand story (origin, tension, resolution, vision, tagline)");
+
+      // Detect thin or empty fields and flag for refinement
+      const storyFields: Array<{ key: string; label: string }> = [
+        { key: "origin", label: "Origin" },
+        { key: "tension", label: "Tension" },
+        { key: "resolution", label: "Resolution" },
+        { key: "vision", label: "Vision" },
+        { key: "tagline", label: "Tagline" },
+      ];
+      const thinFields = storyFields.filter((f) => {
+        const val = messaging.brand_story?.[f.key as keyof BrandStory] ?? "";
+        return val.length < 20;
+      });
+      if (thinFields.length > 0) {
+        const fieldNames = thinFields.map((f) => f.label).join(", ");
+        changes.push(
+          `Note: ${fieldNames} ${thinFields.length === 1 ? "is" : "are"} thin or empty — consider revisiting with the founder or leadership team to add more detail.`
+        );
+      }
 
       // Generate brand-story.md as human-readable markdown
       const storyMd = generateBrandStoryMarkdown(messaging.brand_story);
