@@ -257,6 +257,10 @@ export function isChromatic(hex: string): boolean {
 /**
  * After extraction, if no primary color was identified, promote the
  * most frequent chromatic color. Returns a new array.
+ *
+ * The promoted color gets `_promoted_role: "primary"` and
+ * `_promoted_confidence: "low"` so downstream can surface it
+ * as a confirmation item rather than treating it as certain.
  */
 export function promotePrimaryColor(colors: ExtractedColor[]): ExtractedColor[] {
   const hasExplicitPrimary = colors.some(
@@ -271,11 +275,25 @@ export function promotePrimaryColor(colors: ExtractedColor[]): ExtractedColor[] 
 
   if (chromatic.length === 0) return colors;
 
-  // Tag the winner so the caller can detect it
+  // Tag the winner so the caller can detect it — low confidence since auto-promoted
   const winner = chromatic[0];
   return colors.map((c) =>
-    c === winner ? { ...c, _promoted_role: "primary" as const } : c
+    c === winner
+      ? { ...c, _promoted_role: "primary" as const, _promoted_confidence: "low" as const }
+      : c
   );
+}
+
+/**
+ * Get the top chromatic color candidates from extraction results.
+ * Used by the confirmation flow to show the user color options.
+ */
+export function getTopChromaticCandidates(colors: ExtractedColor[], max = 4): string[] {
+  return colors
+    .filter((c) => isChromatic(c.value))
+    .sort((a, b) => b.frequency - a.frequency)
+    .slice(0, max)
+    .map((c) => c.value);
 }
 
 /** Infer confidence from extraction quality */

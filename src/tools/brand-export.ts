@@ -10,6 +10,7 @@ import type {
   MessagingData,
 } from "../schemas/index.js";
 import type { BrandConfig } from "../types/index.js";
+import { cleanColorName } from "../lib/color-namer.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,7 +75,7 @@ function colorTable(colors: CoreIdentityData["colors"]): string {
   lines.push("| Name | Hex | Role |");
   lines.push("|------|-----|------|");
   for (const c of colors) {
-    lines.push(`| ${c.name} | \`${c.value}\` | ${c.role} |`);
+    lines.push(`| ${cleanColorName(c)} | \`${c.value}\` | ${c.role} |`);
   }
   return lines.join("\n") + "\n";
 }
@@ -404,7 +405,7 @@ export function generateTeam(data: BrandData, includeLogo: boolean): string {
   } else {
     for (const c of identity.colors) {
       const roleLabel = c.role !== "unknown" ? ` (${c.role})` : "";
-      lines.push(`- **${c.name}**: \`${c.value}\`${roleLabel}`);
+      lines.push(`- **${cleanColorName(c)}**: \`${c.value}\`${roleLabel}`);
     }
     lines.push("");
   }
@@ -487,7 +488,7 @@ export function generateEmail(data: BrandData): string {
     lines.push("**Colors:**");
     for (const c of topColors) {
       const roleLabel = c.role !== "unknown" ? ` (${c.role})` : "";
-      lines.push(`- ${c.name}: \`${c.value}\`${roleLabel}`);
+      lines.push(`- ${cleanColorName(c)}: \`${c.value}\`${roleLabel}`);
     }
     lines.push("");
   }

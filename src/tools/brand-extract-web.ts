@@ -3,18 +3,20 @@ import * as cheerio from "cheerio";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
-import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryColor } from "../lib/css-parser.js";
+import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryColor, getTopChromaticCandidates } from "../lib/css-parser.js";
 import { extractLogos, fetchLogo } from "../lib/logo-extractor.js";
 import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
 import { getVersion } from "../lib/version.js";
+import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import type { ColorEntry, TypographyEntry, LogoSpec, CoreIdentity } from "../types/index.js";
 
 const paramsShape = {
   url: z.string().url().describe("Website URL to extract brand identity from"),
+  logo_url: z.string().optional().describe("Direct URL to a logo SVG/PNG file. Use if automatic extraction didn't find the logo."),
 };
 
-async function handler(input: { url: string }) {
+async function handler(input: { url: string; logo_url?: string }) {
   const brandDir = new BrandDir(process.cwd());
 
   if (!(await brandDir.exists())) {
@@ -92,19 +94,36 @@ async function handler(input: { url: string }) {
 
   const { colors: extractedColors, fonts: extractedFonts } = extractFromCSS(allCSS);
 
+  // Get top chromatic candidates BEFORE promotion (for confirmation flow)
+  const chromaticCandidates = getTopChromaticCandidates(extractedColors);
+
   // Promote the most frequent chromatic color to primary if none was explicitly named
   const promotedColors = promotePrimaryColor(extractedColors);
+
+  // Track what the auto-promoted primary was (if any)
+  const autoPromoted = promotedColors.find(
+    (c) => (c as unknown as { _promoted_role?: string })._promoted_role === "primary"
+  );
+  const suggestedPrimary = autoPromoted?.value ?? null;
 
   const identity = await brandDir.readCoreIdentity();
   let colors = [...identity.colors];
 
   for (const ec of promotedColors.slice(0, 20)) {
+    const role = inferColorRole(ec as Parameters<typeof inferColorRole>[0]);
+    const rawName = ec.property.startsWith("--")
+      ? ec.property.replace(/^--/, "").replace(/[-_]/g, " ")
+      : `${ec.property} ${ec.value}`;
+
+    // Generate clean human-readable name
+    const name = isCssArtifactName(rawName, ec.value)
+      ? generateColorName(ec.value, role)
+      : rawName;
+
     const entry: ColorEntry = {
-      name: ec.property.startsWith("--")
-        ? ec.property.replace(/^--/, "").replace(/[-_]/g, " ")
-        : `${ec.property} ${ec.value}`,
+      name,
       value: ec.value,
-      role: inferColorRole(ec),
+      role,
       source: "web",
       confidence: inferColorConfidence(ec),
       css_property: ec.property,
@@ -123,67 +142,117 @@ async function handler(input: { url: string }) {
     typography = mergeTypography(typography, entry);
   }
 
-  const logoCandidates = extractLogos(html, input.url);
+  // --- Logo extraction ---
   const logos: LogoSpec[] = [...identity.logo];
+  let logoFound = false;
 
-  for (const candidate of logoCandidates.slice(0, 5)) {
-    // Handle inline SVGs directly — no fetch needed
-    if (candidate.inline_svg) {
-      const { inline_svg, data_uri } = resolveSvg(candidate.inline_svg);
-      const filename = `logo-${candidate.type}.svg`;
-      await brandDir.writeAsset(`logo/${filename}`, candidate.inline_svg);
+  // If logo_url is provided, use it directly (override auto-extraction)
+  if (input.logo_url) {
+    const fetched = await fetchLogo(input.logo_url);
+    if (fetched) {
+      const isSvg = fetched.contentType.includes("svg") || fetched.content.toString("utf-8").trim().startsWith("<");
 
-      logos.push({
-        type: "wordmark",
-        source: "web",
-        confidence: candidate.confidence,
-        variants: [{
-          name: "default",
-          file: `logo/${filename}`,
-          inline_svg,
-          data_uri,
-        }],
-      });
-      break;
+      if (isSvg) {
+        const svgContent = fetched.content.toString("utf-8");
+        const { inline_svg, data_uri } = resolveSvg(svgContent);
+        const filename = "logo-wordmark.svg";
+        await brandDir.writeAsset(`logo/${filename}`, svgContent);
+
+        logos.push({
+          type: "wordmark",
+          source: "web",
+          confidence: "high",
+          variants: [{
+            name: "default",
+            file: `logo/${filename}`,
+            inline_svg,
+            data_uri,
+          }],
+        });
+        logoFound = true;
+      } else {
+        const { data_uri } = resolveImage(fetched.content, fetched.contentType);
+        const ext = fetched.contentType.includes("png") ? "png" : "jpg";
+        const filename = `logo-wordmark.${ext}`;
+        await brandDir.writeAsset(`logo/${filename}`, fetched.content);
+
+        logos.push({
+          type: "wordmark",
+          source: "web",
+          confidence: "high",
+          variants: [{ name: "default", file: `logo/${filename}`, data_uri }],
+        });
+        logoFound = true;
+      }
     }
+  }
 
-    // Fetch remote logos
-    const fetched = await fetchLogo(candidate.url);
-    if (!fetched) continue;
+  // Auto-extract logos from HTML only if no logo_url was provided
+  if (!logoFound) {
+    const logoCandidates = extractLogos(html, input.url);
 
-    const isSvg = fetched.contentType.includes("svg") || fetched.content.toString("utf-8").trim().startsWith("<");
+    for (const candidate of logoCandidates.slice(0, 5)) {
+      // Handle inline SVGs directly — no fetch needed
+      if (candidate.inline_svg) {
+        const { inline_svg, data_uri } = resolveSvg(candidate.inline_svg);
+        const filename = `logo-${candidate.type}.svg`;
+        await brandDir.writeAsset(`logo/${filename}`, candidate.inline_svg);
 
-    if (isSvg) {
-      const svgContent = fetched.content.toString("utf-8");
-      const { inline_svg, data_uri } = resolveSvg(svgContent);
-      const filename = `logo-${candidate.type}.svg`;
-      await brandDir.writeAsset(`logo/${filename}`, svgContent);
+        logos.push({
+          type: "wordmark",
+          source: "web",
+          confidence: candidate.confidence,
+          variants: [{
+            name: "default",
+            file: `logo/${filename}`,
+            inline_svg,
+            data_uri,
+          }],
+        });
+        logoFound = true;
+        break;
+      }
 
-      logos.push({
-        type: "wordmark",
-        source: "web",
-        confidence: candidate.confidence,
-        variants: [{
-          name: "default",
-          file: `logo/${filename}`,
-          inline_svg,
-          data_uri,
-        }],
-      });
-      break;
-    } else {
-      const { data_uri } = resolveImage(fetched.content, fetched.contentType);
-      const ext = fetched.contentType.includes("png") ? "png" : "jpg";
-      const filename = `logo-${candidate.type}.${ext}`;
-      await brandDir.writeAsset(`logo/${filename}`, fetched.content);
+      // Fetch remote logos
+      const fetched = await fetchLogo(candidate.url);
+      if (!fetched) continue;
 
-      logos.push({
-        type: "wordmark",
-        source: "web",
-        confidence: candidate.confidence,
-        variants: [{ name: "default", file: `logo/${filename}`, data_uri }],
-      });
-      break;
+      const isSvg = fetched.contentType.includes("svg") || fetched.content.toString("utf-8").trim().startsWith("<");
+
+      if (isSvg) {
+        const svgContent = fetched.content.toString("utf-8");
+        const { inline_svg, data_uri } = resolveSvg(svgContent);
+        const filename = `logo-${candidate.type}.svg`;
+        await brandDir.writeAsset(`logo/${filename}`, svgContent);
+
+        logos.push({
+          type: "wordmark",
+          source: "web",
+          confidence: candidate.confidence,
+          variants: [{
+            name: "default",
+            file: `logo/${filename}`,
+            inline_svg,
+            data_uri,
+          }],
+        });
+        logoFound = true;
+        break;
+      } else {
+        const { data_uri } = resolveImage(fetched.content, fetched.contentType);
+        const ext = fetched.contentType.includes("png") ? "png" : "jpg";
+        const filename = `logo-${candidate.type}.${ext}`;
+        await brandDir.writeAsset(`logo/${filename}`, fetched.content);
+
+        logos.push({
+          type: "wordmark",
+          source: "web",
+          confidence: candidate.confidence,
+          variants: [{ name: "default", file: `logo/${filename}`, data_uri }],
+        });
+        logoFound = true;
+        break;
+      }
     }
   }
 
@@ -200,11 +269,16 @@ async function handler(input: { url: string }) {
   const newFonts = typography.length - identity.typography.length;
   const newLogos = logos.length - identity.logo.length;
 
+  // Check if the first logo has a preview-capable variant
+  const firstLogo = logos.length > 0 ? logos[logos.length - 1] : null;
+  const logoPreviewAvailable = !!(
+    firstLogo?.variants[0]?.inline_svg || firstLogo?.variants[0]?.data_uri
+  );
+
   return buildResponse({
     what_happened: `Extracted brand identity from ${input.url}`,
     next_steps: [
-      "Run brand_compile next to generate tokens and surface items needing clarification",
-      "Then run brand_report to generate the portable brand identity report",
+      "CONFIRM the three items below with the user BEFORE running brand_compile",
     ],
     data: {
       url: input.url,
@@ -214,12 +288,35 @@ async function handler(input: { url: string }) {
         logos: { total: logos.length, new: newLogos },
         stylesheets_parsed: stylesheetUrls.slice(0, 5).length + 1,
       },
-      top_colors: colors.slice(0, 5).map((c) => `${c.value} (${c.role}, ${c.confidence})`),
-      fonts: typography.map((t) => `${t.family} (${t.confidence})`),
+      top_colors: colors.slice(0, 6).map((c) => ({ name: c.name, hex: c.value, role: c.role, confidence: c.confidence })),
+      fonts: typography.map((t) => ({ family: t.family, confidence: t.confidence })),
+      confirmation_needed: {
+        logo: { found: logoFound, preview_available: logoPreviewAvailable },
+        primary_color: {
+          candidates: chromaticCandidates,
+          auto_assigned: suggestedPrimary,
+        },
+        fonts: typography.map((t) => t.family),
+      },
       conversation_guide: {
-        auto_chain: "After reporting extraction results, immediately run brand_compile — do not wait for the user to ask.",
+        confirm_before_compile: [
+          "After showing extraction results, CONFIRM THREE THINGS with the user before compiling:",
+          "",
+          "1. LOGO: If a logo was found, show it and ask 'Is this your logo?' If no logo was found, say:",
+          "   'I couldn't find your logo automatically. Here are 3 ways to add it:",
+          "   A) Share a direct URL to your logo file (e.g., yoursite.com/logo.svg)",
+          "   B) Paste the SVG code if you have it",
+          "   C) Connect to Figma — I can pull it directly from your design file",
+          "   D) Upload the logo file (if your AI tool supports file uploads)'",
+          "",
+          "2. PRIMARY COLOR: Show the top 3-4 chromatic colors extracted and ask 'Which of these is your primary brand color?' Do NOT auto-assign. List them with hex values.",
+          "",
+          "3. FONTS: List the extracted fonts and ask 'Are these your brand fonts? Any missing or wrong?'",
+          "",
+          "After the user confirms (or provides corrections), THEN run brand_compile.",
+        ].join("\n"),
         figma_check: "Check if you have access to Figma MCP tools (get_design_context, get_variable_defs, get_screenshot). If yes, tell the user: 'I also have access to Figma — if you share a file URL, I can pull higher-accuracy colors, typography, and your logo directly from the source design file.' If they provide a Figma URL, use the Figma MCP tools alongside brand_extract_figma.",
-        after_compile: "After compile finishes, check for clarification items. If there are any, walk through resolving them with brand_clarify. After all resolved, run brand_report.",
+        logo_missing_tools: "If the user wants to add a logo: use brand_set_logo with SVG markup, a URL, or a data URI. If they provide a direct URL, you can also re-run brand_extract_web with the logo_url parameter.",
       },
     },
   });
@@ -228,8 +325,8 @@ async function handler(input: { url: string }) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_web",
-    "Extract brand identity from a website. Parses CSS for colors and fonts, finds logos in HTML. Use AFTER brand_init. Results are confidence-scored — Figma extraction (if available) will override lower-confidence web data.",
+    "Extract brand identity from a website. Parses CSS for colors and fonts, finds logos in HTML. Use AFTER brand_init. Results are confidence-scored — Figma extraction (if available) will override lower-confidence web data. Optionally pass logo_url to directly fetch a specific logo file.",
     paramsShape,
-    async (args) => handler(args as { url: string })
+    async (args) => handler(args as { url: string; logo_url?: string })
   );
 }

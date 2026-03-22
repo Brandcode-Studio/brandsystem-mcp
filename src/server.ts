@@ -20,6 +20,8 @@ import { register as registerBuildPersonas } from "./tools/brand-build-personas.
 import { register as registerBuildMatrix } from "./tools/brand-build-matrix.js";
 import { register as registerBuildThemes } from "./tools/brand-build-themes.js";
 import { register as registerExport } from "./tools/brand-export.js";
+import { register as registerSetLogo } from "./tools/brand-set-logo.js";
+import { register as registerFeedback } from "./tools/brand-feedback.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -47,6 +49,8 @@ export function createServer(): McpServer {
   registerBuildMatrix(server);
   registerBuildThemes(server);
   registerExport(server);
+  registerSetLogo(server);
+  registerFeedback(server);
 
   return server;
 }

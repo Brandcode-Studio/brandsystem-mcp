@@ -246,6 +246,71 @@ A Figma-sourced primary color will replace a web-extracted one. A manually confi
 
 ---
 
+## The Bigger Picture
+
+brandsystem.app is a standalone product — it works for any brand, in any AI tool, with no external dependencies. But it's also the entry point into a larger system.
+
+### Where brandsystem.app Fits
+
+The [Ultimate Content System (UCS)](https://github.com/zk-xyz/column-five-prototypes) is an end-to-end content system that governs everything from brand identity to production to measurement — and loops measurement insights back into the brand. brandsystem.app is the first-touch onramp.
+
+```
+                    ┌──────────────────────┐
+                    │   Brand OS Creation   │
+                    │  ★ brandsystem.app    │
+                    └──────────┬───────────┘
+                               │ creates
+                               ▼
+┌──────────────────────────────────────────────────┐
+│                      UCS                          │
+│                                                   │
+│  Market Intelligence ──→ Brand Perspective         │
+│         ▲                      │                  │
+│         │               Governance layer          │
+│         │          (claims, narratives, rules)     │
+│         │                      │                  │
+│         │               Production engines        │
+│         │          (web, PDF, viz, copywriting)    │
+│         │                      │                  │
+│         └──── Measurement ◄────┘                  │
+│               (performance → insights → loop)     │
+└──────────────────────────────────────────────────┘
+```
+
+**brandsystem.app creates the Brand OS** — the first artifact of UCS. Colors, typography, voice, composition rules, messaging. This is valuable on its own: paste the report into any AI tool and get better brand compliance immediately.
+
+**The pull into UCS comes naturally.** Once you have a Brand OS, the next questions are operational: What can we claim? How should different content types use this identity? How do we measure whether it's working? That's the UCS governance and production loop — Market Intelligence feeds the brand perspective, production creates governed content, measurement evaluates performance, and those insights loop back to evolve the Brand OS.
+
+**You don't need the full loop.** brandsystem.app delivers standalone value at every session. The UCS ecosystem is there when you're ready to operationalize.
+
+### Progressive Depth
+
+Each stage builds on the previous. Stop anywhere — you get value immediately.
+
+| Stage | What You Get | How |
+|-------|-------------|-----|
+| **1. Free scan** | Brand tokens + HTML report with platform setup guides | `brand_extract_web` → `brand_compile` → `brand_report` |
+| **2. MCP depth** | Figma extraction, clarification, full audit | Session 1 with `brand_extract_figma` + `brand_clarify` |
+| **3. Visual identity** | Composition rules, patterns, anti-patterns, VIM | Session 2: `brand_deepen_identity` → `brand_compile` |
+| **4. Core messaging** | Voice profile, perspective, brand story | Session 3: `brand_extract_messaging` → `brand_compile_messaging` |
+| **5. UCS governance** | Claims, narratives, application rules, scoring, measurement | Operationalize the Brand OS within UCS |
+| **6. Full loop** | Market Intelligence → production → measurement → insights back into Brand OS | UCS end-to-end |
+
+Stages 1–4 are brandsystem.app. Open source, fully portable, no dependencies.
+
+Stages 5–6 are the full UCS ecosystem — where the Brand OS becomes operational. Available through [Column Five Media](https://columnfivemedia.com).
+
+### What's Portable
+
+| Artifact | Portable? | Owned By |
+|----------|-----------|----------|
+| brandsystem.app (tools) | Fully — open source, any brand | MIT license |
+| `.brand/` directory (outputs) | Fully — works in any tool | Client |
+| UCS framework (schema + workflows) | Yes — universal | Open |
+| Client claims, narratives, rules | Per-instance | Client |
+
+---
+
 ## Development
 
 ```bash

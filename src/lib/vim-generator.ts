@@ -1,4 +1,5 @@
 import type { BrandConfigData, CoreIdentityData, VisualIdentityData, MessagingData } from "../schemas/index.js";
+import { cleanColorName as cleanColorNameShared } from "./color-namer.js";
 
 /**
  * Generate a Visual Identity Manifest (VIM) markdown document
@@ -849,14 +850,7 @@ function capitalize(s: string): string {
 
 /** Generate a clean, human-readable color name from extracted data */
 function cleanColorName(color: { name: string; value: string; role: string }): string {
-  const raw = color.name;
-  // If the name is just a CSS property + hex, generate from role or hex
-  if (/^(color|background|border-color|--tw-|tw )/.test(raw) || raw.includes(color.value)) {
-    if (color.role !== "unknown") return capitalize(color.role);
-    // Generate from hex — create a descriptive name
-    return color.value.toUpperCase();
-  }
-  return raw;
+  return cleanColorNameShared(color);
 }
 
 function groupBy<T>(arr: T[], keyFn: (item: T) => string): Record<string, T[]> {
