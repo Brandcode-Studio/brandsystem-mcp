@@ -276,7 +276,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_ingest_assets",
-    'Scan and catalog brand assets in .brand/assets/. In "scan" mode (default), lists all asset directories, counts files, and identifies untagged assets. In "tag" mode, adds or updates a MANIFEST.yaml entry for a specific file with description, usage context, and theme compatibility.',
+    "Scan and catalog brand assets (illustrations, stickers, patterns, icons) in .brand/assets/. Mode 'scan' (default) inventories all asset directories and identifies files missing from MANIFEST.yaml. Mode 'tag' adds metadata to a specific file: description, usage context, and theme compatibility. Use after adding asset files to .brand/assets/ subdirectories. Returns directory summaries and untagged file lists.",
     paramsShape,
     async (args) => handler(args as Params)
   );

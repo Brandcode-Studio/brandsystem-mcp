@@ -668,18 +668,18 @@ const paramsShape = {
   target: z
     .enum(["chat", "code", "team", "email"])
     .describe(
-      'Export target. "chat" = self-contained markdown for AI Chat uploads. "code" = MCP config + CLAUDE.md snippet. "team" = human-readable brand guidelines. "email" = ultra-concise 500-word summary.'
+      "Where this export will be used. 'chat': upload to AI conversation (Claude/ChatGPT/Gemini). 'code': paste into CLAUDE.md or .cursorrules. 'team': share with designers/writers. 'email': send via Slack or email."
     ),
   include_logo: z
     .boolean()
     .default(true)
-    .describe("Whether to embed the logo SVG/data URI in the export (default: true)"),
+    .describe("Embed logo SVG/data URI in the export. Set false to reduce file size. Default: true."),
 };
 
 export function register(server: McpServer) {
   server.tool(
     "brand_export",
-    "Generate purpose-specific bundles of the brand system for sharing. Targets: \"chat\" (self-contained markdown for any AI chat), \"code\" (MCP config + CLAUDE.md snippet for coding tools), \"team\" (clean brand guidelines for designers/writers), \"email\" (500-word summary for Slack/email). Writes to .brand/exports/ and returns the content.",
+    "Generate portable brand files for any environment — Chat, Code, team sharing, or email. Target 'chat': self-contained markdown to upload to any AI conversation (Claude, ChatGPT, Gemini). Target 'code': MCP config + CLAUDE.md/.cursorrules snippet. Target 'team': clean brand guidelines for designers and writers. Target 'email': concise 500-word summary for Slack or email. Writes to .brand/exports/ and returns the full content. Use when the user wants to share their brand system or set up a new tool.",
     paramsShape,
     async (args) => handler(args as ExportParams)
   );

@@ -33,7 +33,12 @@ export class BrandDir {
   }
 
   private path(...segments: string[]): string {
-    return join(this.brandPath, ...segments);
+    const full = join(this.brandPath, ...segments);
+    const resolved = resolve(full);
+    if (!resolved.startsWith(resolve(this.brandPath))) {
+      throw new Error(`Path traversal blocked: ${segments.join("/")}`);
+    }
+    return full;
   }
 
   async exists(): Promise<boolean> {
@@ -231,17 +236,19 @@ export class BrandDir {
   // --- Assets ---
 
   async writeAsset(relativePath: string, content: string | Buffer): Promise<void> {
-    const fullPath = join(this.brandPath, "assets", relativePath);
-    const resolved = resolve(fullPath);
-    const assetsDir = resolve(this.brandPath, "assets");
-    // Allow writing to .brand/ root for specific files
-    const brandDir = resolve(this.brandPath);
-    if (!resolved.startsWith(assetsDir) && !resolved.startsWith(brandDir)) {
-      throw new Error(`Path traversal blocked: ${relativePath} resolves outside .brand/`);
-    }
-    const dir = resolved.substring(0, resolved.lastIndexOf("/"));
-    await mkdir(dir, { recursive: true });
-    await writeFile(resolved, content, typeof content === "string" ? "utf-8" : undefined);
+    await this.withLock(`asset:${relativePath}`, async () => {
+      const fullPath = join(this.brandPath, "assets", relativePath);
+      const resolved = resolve(fullPath);
+      const assetsDir = resolve(this.brandPath, "assets");
+      // Allow writing to .brand/ root for specific files
+      const brandDir = resolve(this.brandPath);
+      if (!resolved.startsWith(assetsDir) && !resolved.startsWith(brandDir)) {
+        throw new Error(`Path traversal blocked: ${relativePath} resolves outside .brand/`);
+      }
+      const dir = resolved.substring(0, resolved.lastIndexOf("/"));
+      await mkdir(dir, { recursive: true });
+      await writeFile(resolved, content, typeof content === "string" ? "utf-8" : undefined);
+    });
   }
 
   async readAsset(relativePath: string): Promise<string> {
@@ -264,9 +271,11 @@ export class BrandDir {
   }
 
   async writeManifest(subdir: string, data: AssetManifest): Promise<void> {
-    const dir = this.path("assets", subdir);
-    await mkdir(dir, { recursive: true });
-    const content = stringify(data, { lineWidth: 120 });
-    await writeFile(join(dir, "MANIFEST.yaml"), content, "utf-8");
+    await this.withLock(`manifest:${subdir}`, async () => {
+      const dir = this.path("assets", subdir);
+      await mkdir(dir, { recursive: true });
+      const content = stringify(data, { lineWidth: 120 });
+      await writeFile(join(dir, "MANIFEST.yaml"), content, "utf-8");
+    });
   }
 }

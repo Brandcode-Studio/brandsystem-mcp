@@ -58,6 +58,13 @@ async function handler(input: SetLogoInput) {
   }
   // --- Handle URL ---
   else if (input.url) {
+    if (!input.url.startsWith("http://") && !input.url.startsWith("https://")) {
+      return buildResponse({
+        what_happened: "Only http:// and https:// URLs are supported",
+        next_steps: ["Provide a logo URL starting with http:// or https://"],
+        data: { error: "invalid_protocol" },
+      });
+    }
     const fetched = await fetchLogo(input.url);
     if (!fetched) {
       return buildResponse({
@@ -173,7 +180,7 @@ async function handler(input: SetLogoInput) {
 export function register(server: McpServer) {
   server.tool(
     "brand_set_logo",
-    "Add or replace a logo in the brand system. Accepts SVG markup, a URL to fetch, or a base64 data URI. Use when automatic extraction didn't find the logo, or to replace an incorrect one. Sanitizes SVG input and writes to core-identity.yaml.",
+    "Add or replace a logo in the brand system. Accepts raw SVG markup, a URL to a logo file (SVG/PNG), or a base64 data URI. Use when brand_extract_web missed the logo, extracted the wrong image, or the user provides a logo directly. Sanitizes SVG, saves to .brand/assets/logo/, and updates core-identity.yaml with inline_svg and data_uri for portable embedding. Returns logo preview data.",
     paramsShape,
     async (args) => handler(args as SetLogoInput)
   );

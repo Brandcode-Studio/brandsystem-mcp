@@ -9,11 +9,11 @@ import type { MessagingAuditResult } from "../types/index.js";
 // ─── Parameters ──────────────────────────────────────────────────────────────
 
 const paramsShape = {
-  url: z.string().url().describe("Website URL to audit messaging from (typically the homepage)"),
+  url: z.string().url().describe("Primary website URL to audit (typically the homepage, e.g. 'https://acme.com')"),
   pages: z
     .string()
     .optional()
-    .describe("JSON array of additional page URLs to include in the analysis"),
+    .describe("JSON array of additional page URLs to include (e.g. '[\"https://acme.com/about\", \"https://acme.com/services\"]'). Analyzes up to 10 pages."),
 };
 
 // ─── Stop words (filtered from vocabulary frequency) ─────────────────────────
@@ -576,9 +576,10 @@ async function handler(input: { url: string; pages?: string }) {
   const urls: string[] = [input.url];
   if (input.pages) {
     try {
-      const additionalPages = JSON.parse(input.pages) as string[];
-      if (Array.isArray(additionalPages)) {
-        urls.push(...additionalPages);
+      const parsedPages = JSON.parse(input.pages) as string[];
+      if (Array.isArray(parsedPages)) {
+        const validUrls = parsedPages.filter(u => u.startsWith("http://") || u.startsWith("https://"));
+        urls.push(...validUrls);
       }
     } catch {
       return buildResponse({
@@ -701,7 +702,7 @@ async function handler(input: { url: string; pages?: string }) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_messaging",
-    "Audit a brand's existing website messaging. Analyzes voice fingerprint, vocabulary patterns, claims, AI-isms, and gaps. Writes a detailed report to .brand/messaging-audit.md. Use AFTER brand_init. Produces findings that transition into brand_compile_messaging.",
+    "Audit how a brand currently sounds on its website. Analyzes voice fingerprint (formality, jargon density, active voice %, hedging), vocabulary frequency (distinctive vs generic terms), claims (explicit with data, superlative/unqualified), AI-ism detection, and messaging gaps. Writes .brand/messaging-audit.md. Use when the user wants to understand their current brand voice before defining how it should sound. Returns structured analysis with scores and actionable findings.",
     paramsShape,
     async (args) => handler(args as { url: string; pages?: string })
   );

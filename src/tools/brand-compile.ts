@@ -188,7 +188,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_compile",
-    "Compile all extracted brand data into final outputs. Generates DTCG tokens.json from core-identity.yaml and surfaces unresolved items in needs-clarification.yaml. When Session 2 visual-identity.yaml exists, also generates visual-identity-manifest.md and system-integration.md. Use AFTER running extraction tools (brand_extract_web and/or brand_extract_figma).",
+    "Generate DTCG design tokens and a Visual Identity Manifest from extracted brand data. Transforms core-identity.yaml into standards-compliant tokens.json (colors, typography, spacing). Surfaces ambiguous values in needs-clarification.yaml for human review. When Session 2 data exists, also generates visual-identity-manifest.md and system-integration.md (CLAUDE.md/.cursorrules setup guide). Use after brand_extract_web or brand_extract_figma. Returns token counts, clarification items, and file list.",
     async () => handler()
   );
 }

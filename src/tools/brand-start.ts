@@ -15,11 +15,11 @@ import { generateReportHTML, generateBrandInstructions } from "../lib/report-htm
 import type { ColorEntry, TypographyEntry, LogoSpec, CoreIdentity, ClarificationItem } from "../types/index.js";
 
 const paramsShape = {
-  client_name: z.string().describe("Company or brand name"),
-  website_url: z.string().optional().describe("Company website URL"),
-  industry: z.string().optional().describe("Industry vertical (e.g. 'fintech', 'healthcare')"),
+  client_name: z.string().describe("Company or brand name (e.g. 'Acme Corp')"),
+  website_url: z.string().url().optional().describe("Company website URL to extract brand identity from (e.g. 'https://acme.com')"),
+  industry: z.string().optional().describe("Industry vertical for smarter extraction (e.g. 'fintech', 'healthcare', 'content marketing')"),
   mode: z.enum(["interactive", "auto"]).default("interactive")
-    .describe("'interactive' presents source menu (default). 'auto' runs full Session 1 pipeline automatically when website_url is provided."),
+    .describe("'auto' (recommended): runs full pipeline in one call when website_url is provided. 'interactive': presents source menu for user to choose extraction method."),
 };
 
 type Params = { client_name: string; website_url?: string; industry?: string; mode?: "interactive" | "auto" };
@@ -134,7 +134,20 @@ async function handleExistingBrand(brandDir: BrandDir): Promise<ReturnType<typeo
 }
 
 async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<ReturnType<typeof buildResponse>> {
-  const url = input.website_url!;
+  const websiteUrl = input.website_url!;
+
+  // SSRF guard: only allow http/https protocols
+  if (!websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
+    // fall back to interactive mode
+    const sourceMenu = buildSourceMenu(input.website_url);
+    return buildResponse({
+      what_happened: `Auto mode: website_url has unsupported protocol. Falling back to interactive mode.`,
+      next_steps: ["Provide a URL starting with http:// or https://"],
+      data: { source_menu: sourceMenu, fallback: "interactive" },
+    });
+  }
+
+  const url = websiteUrl;
 
   // --- Step 1: Web extraction (same logic as brand_extract_web) ---
   let html: string;
@@ -658,7 +671,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_start",
-    "Onboarding entry point. Creates a brand system for a new client and presents extraction source options (website scan, Figma, upload guidelines, upload asset, or manual). If .brand/ already exists, returns current status with actionable next steps. Use this FIRST — it replaces the need to call brand_init directly. Set mode='auto' with a website_url to run the entire Session 1 pipeline (extract, compile, report) in one call.",
+    "Begin here. Creates a brand system from any website URL in under 60 seconds. Use when a user mentions brand identity, brand guidelines, logo extraction, brand system setup, design tokens, or brand colors. If .brand/ already exists, returns current status with actionable next steps. Set mode='auto' with a website_url to run the full pipeline (extract colors/fonts/logo, compile DTCG tokens, generate HTML report) in one call. Returns structured brand data: colors with roles, typography, logo (SVG/PNG), and confidence scores.",
     paramsShape,
     async (args) => handler(args as Params)
   );

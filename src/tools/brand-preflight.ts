@@ -649,13 +649,13 @@ const paramsShape = {
   html: z
     .string()
     .describe(
-      "HTML content to check — either an inline HTML string or a file path to an HTML file"
+      "HTML to validate: either a full HTML string (with <style> blocks) or a file path ending in .html (e.g. 'output.html')"
     ),
   mode: z
     .enum(["check", "rules"])
     .default("check")
     .describe(
-      '"check" runs compliance against HTML (default), "rules" lists all active preflight rules'
+      "'check' (default): validates HTML against all brand rules. 'rules': lists all active rules without running checks."
     ),
 };
 
@@ -709,7 +709,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_preflight",
-    "Check HTML content against brand compliance rules. Validates colors, typography, logo usage, and anti-patterns from the brand system. Use mode 'rules' to list all active rules, or mode 'check' (default) with HTML content to run compliance.",
+    "Check HTML/CSS against brand rules — catches off-brand colors, wrong fonts, missing logo, and anti-pattern violations (drop shadows, gradients, etc.). Pass an HTML string or file path. Mode 'check' (default) runs all compliance checks and returns pass/warn/fail per rule. Mode 'rules' lists all active preflight rules without checking content. Use after generating any visual content to validate brand compliance. Returns overall status and per-check details.",
     paramsShape,
     async (args) => handler(args as Params)
   );

@@ -9,8 +9,8 @@ import type { NeedsClarificationData } from "../schemas/index.js";
 import type { CoreIdentityData } from "../schemas/index.js";
 
 const paramsShape = {
-  id: z.string().describe("Clarification item ID (e.g. 'clarify-1')"),
-  answer: z.string().describe("Your answer or correction for this clarification item"),
+  id: z.string().describe("Clarification item ID from needs-clarification.yaml (e.g. 'clarify-1')"),
+  answer: z.string().describe("The user's answer: a hex color (#ff0000), a role name (primary, secondary, accent), a font name, 'yes'/'no', or natural language ('the purple one is accent, the dark one is neutral')"),
 };
 
 type Params = { id: string; answer: string };
@@ -541,7 +541,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_clarify",
-    "Resolve a clarification item from needs-clarification.yaml. Each item has an ID and a question about ambiguous brand data (colors, fonts, roles). Provide the item ID and your answer to update core-identity.yaml with confirmed values. Use AFTER brand_compile surfaces clarification items.",
+    "Resolve an ambiguous brand value interactively. After brand_compile, some values need human confirmation — wrong primary color, unknown font, unassigned color roles. Pass the clarification item ID and the user's answer (hex color, role name, font name, or 'yes'/'no'). Supports natural language: 'the purple one is accent' or '#5544f2 is secondary'. Returns updated identity and remaining clarification count.",
     paramsShape,
     async (args) => handler(args as Params)
   );

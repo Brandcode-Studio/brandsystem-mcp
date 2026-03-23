@@ -580,7 +580,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_build_themes",
-    "Define editorial content themes — strategic pillars that organize what to write about. Three modes: 'interview' presents 5 questions per theme with conversation guidance; 'record' saves a theme to strategy.yaml (auto-generates ID, parses freeform persona refs and intent labels); 'list' returns all themes with ID, name, intent, status, quarter, and persona targets. Most brands have 3-5 active themes balanced across Brand Heat (awareness), Momentum (engagement), and Conversion (pipeline). Use AFTER messaging is populated (Session 3).",
+    "Define editorial content themes — the strategic pillars that organize what to write about. Each theme has a content intent (Brand Heat for awareness, Momentum for engagement, Conversion for pipeline), target personas, and proof points. Mode 'interview' guides through 5 questions per theme. Mode 'record' saves (auto-generates ID like THM-001). Mode 'list' shows all themes with intent distribution. Most brands need 3-5 themes balanced across all three intents. Returns theme data and balance analysis.",
     paramsShape,
     async (args) => handler(args as Params)
   );

@@ -12,8 +12,8 @@ import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import type { ColorEntry, TypographyEntry, LogoSpec, CoreIdentity } from "../types/index.js";
 
 const paramsShape = {
-  url: z.string().url().describe("Website URL to extract brand identity from"),
-  logo_url: z.string().optional().describe("Direct URL to a logo SVG/PNG file. Use if automatic extraction didn't find the logo."),
+  url: z.string().url().describe("Website URL to scan (e.g. 'https://acme.com'). The homepage usually has the best logo and color data."),
+  logo_url: z.string().optional().describe("Direct URL to a logo SVG/PNG file (e.g. 'https://acme.com/logo.svg'). Use if automatic extraction misses the logo."),
 };
 
 async function handler(input: { url: string; logo_url?: string }) {
@@ -157,7 +157,8 @@ async function handler(input: { url: string; logo_url?: string }) {
   let logoFound = false;
 
   // If logo_url is provided, use it directly (override auto-extraction)
-  if (input.logo_url) {
+  // SSRF guard: only fetch logo_url with http/https protocols
+  if (input.logo_url && (input.logo_url.startsWith("http://") || input.logo_url.startsWith("https://"))) {
     const fetched = await fetchLogo(input.logo_url);
     if (fetched) {
       const isSvg = fetched.contentType.includes("svg") || fetched.content.toString("utf-8").trim().startsWith("<");
@@ -471,7 +472,7 @@ async function handler(input: { url: string; logo_url?: string }) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_web",
-    "Extract brand identity from a website. Parses CSS for colors and fonts, finds logos in HTML. Use AFTER brand_init. Results are confidence-scored — Figma extraction (if available) will override lower-confidence web data. Optionally pass logo_url to directly fetch a specific logo file.",
+    "Extract logo (SVG/PNG), colors, and fonts from any website URL. Parses HTML for logo candidates (inline SVG, img tags, favicons, Clearbit fallback), parses CSS for color values and font-family declarations, and confidence-scores everything. Use when the user provides a website URL or says 'scan my site.' Optionally pass logo_url to fetch a specific logo file directly. Returns all extracted colors with roles, fonts with frequency, logo preview data, and extraction quality score.",
     paramsShape,
     async (args) => handler(args as { url: string; logo_url?: string })
   );

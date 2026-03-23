@@ -64,7 +64,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_init",
-    "Initialize a new brand system. Creates a .brand/ directory with configuration scaffold and empty core-identity.yaml. Use this FIRST before any other brand tools. Do NOT use if .brand/ already exists — use brand_status instead.",
+    "Initialize a .brand/ directory with empty config scaffold. Low-level tool — prefer brand_start instead, which calls this automatically and also presents extraction options. Only use brand_init directly if you need to set up the directory without running extraction. Returns list of created files.",
     paramsShape,
     async (args) => handler(args as Params)
   );

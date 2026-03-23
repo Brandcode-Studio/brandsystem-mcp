@@ -8,9 +8,46 @@ async function handler() {
 
   if (!(await brandDir.exists())) {
     return buildResponse({
-      what_happened: "No .brand/ directory found",
-      next_steps: ["Run brand_init to create a new brand system"],
-      data: { error: "not_found" },
+      what_happened: "No .brand/ directory found in this project. Run brand_start to create one.",
+      next_steps: [
+        "Run brand_start with a client_name and website_url to create a brand system in under 60 seconds",
+      ],
+      data: {
+        error: "not_found",
+        getting_started: {
+          what_is_brandsystem: "brandsystem extracts and manages brand identity (logo, colors, fonts, voice, visual rules) so AI tools produce on-brand output. It creates a .brand/ directory with structured YAML, DTCG tokens, and a portable HTML report.",
+          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, compiles DTCG tokens, and generates a portable brand report — all in one call.",
+          session_overview: {
+            "Session 1 — Core Identity": "brand_start → brand_extract_web → brand_compile → brand_report. Extracts colors, fonts, logo. Produces tokens.json and brand-report.html.",
+            "Session 2 — Visual Identity": "brand_deepen_identity (interview). Captures composition rules, patterns, illustration style, anti-patterns. Produces visual-identity-manifest.md.",
+            "Session 3 — Messaging": "brand_extract_messaging → brand_compile_messaging (interview). Defines perspective, voice codex, brand story. Produces messaging.yaml and brand-story.md.",
+            "Session 4 — Content Strategy": "brand_build_personas → brand_build_journey → brand_build_themes → brand_build_matrix. Creates audience personas, journey stages, editorial themes, and a messaging matrix.",
+          },
+          available_tools: [
+            "brand_start — Entry point. Creates brand system from a website URL",
+            "brand_status — Shows current progress (you are here)",
+            "brand_extract_web — Extract colors, fonts, logo from any website",
+            "brand_extract_figma — Extract from Figma files (higher accuracy)",
+            "brand_compile — Generate DTCG tokens and VIM from extracted data",
+            "brand_report — Generate portable HTML brand report",
+            "brand_clarify — Resolve ambiguous brand data interactively",
+            "brand_audit — Validate .brand/ directory against schema",
+            "brand_set_logo — Add/replace logo via SVG, URL, or data URI",
+            "brand_deepen_identity — Session 2: visual identity interview",
+            "brand_ingest_assets — Catalog brand assets with manifests",
+            "brand_preflight — Check HTML/CSS against brand compliance rules",
+            "brand_extract_messaging — Audit existing website voice",
+            "brand_compile_messaging — Session 3: perspective + voice interview",
+            "brand_write — Load full brand context for content generation",
+            "brand_export — Generate portable brand files for any environment",
+            "brand_build_personas — Define buyer personas",
+            "brand_build_journey — Define buyer journey stages",
+            "brand_build_themes — Define editorial content themes",
+            "brand_build_matrix — Generate persona x stage messaging variants",
+            "brand_feedback — Report bugs, friction, or feature ideas",
+          ],
+        },
+      },
     });
   }
 
@@ -152,7 +189,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_status",
-    "Show the current state of the .brand/ directory. Reports extraction completeness, confidence distribution, and what's missing. Use this to check progress or resume a previous session.",
+    "Check brand system progress and get next steps. Shows what has been extracted (colors, fonts, logo), confidence levels, session completion status, and what to do next. Use when resuming a previous session, checking readiness, or when the user asks 'what's the state of my brand?' If no .brand/ exists, returns a full getting-started guide with all available tools. Returns structured status data.",
     async () => handler()
   );
 }

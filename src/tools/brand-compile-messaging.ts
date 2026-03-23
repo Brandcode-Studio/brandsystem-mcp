@@ -887,7 +887,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_compile_messaging",
-    "Capture brand messaging — perspective, voice codex, and brand story. Two modes: 'interview' reads current state and returns structured questions for missing sections; 'record' writes answers to messaging.yaml for a specific section. Perspective defines worldview and positioning. Voice codex defines tone, vocabulary (anchor terms, never-say list), sentence conventions, and AI-ism detection patterns. Brand story captures the origin narrative. Use AFTER visual identity is populated (Session 2). All 3 sections complete triggers Session 3 — bumps config, regenerates system-integration.md with voice rules, and generates brand-story.md.",
+    "Define how a brand should sound — perspective (worldview, positioning), voice codex (tone descriptors, anchor vocabulary, never-say list, AI-ism detection), and brand story (origin, tension, resolution). Session 3 guided interview with 3 sections. Mode 'interview' returns structured questions. Mode 'record' saves answers to messaging.yaml. Completing all 3 sections generates brand-story.md and updates system-integration.md with voice rules. Use after Session 2 (visual identity). Returns section status and remaining gaps.",
     paramsShape,
     async (args) => handler(args as Params)
   );

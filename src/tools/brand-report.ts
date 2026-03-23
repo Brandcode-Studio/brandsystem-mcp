@@ -156,7 +156,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_report",
-    "Generate a self-contained HTML brand identity report. Embeds logos as inline SVG, lists colors with roles, typography, and DTCG tokens. The HTML is portable — it works when pasted into any AI conversation as brand guidelines. Use AFTER brand_compile. In Chat: present the HTML as an artifact. In Code: also written to .brand/brand-report.html.",
+    "Generate a portable HTML brand identity report with embedded logos, color swatches, typography, and tokens. The HTML is self-contained and works offline — upload it to any AI chat (Claude, ChatGPT, Gemini) as instant brand guidelines. Written to .brand/brand-report.html. Use after brand_compile. Returns file path, report summary (color/font/logo counts), and a ready-to-copy Brand Instructions text block.",
     async () => handler()
   );
 }

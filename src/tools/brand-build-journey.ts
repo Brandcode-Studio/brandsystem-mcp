@@ -338,7 +338,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_build_journey",
-    "Define the buyer journey stages for content strategy. Comes with 4 sensible defaults (First Touch, Context & Meaning, Validation & Proof, Decision Support) that can be customized. Three modes: 'interview' presents defaults and asks for customization; 'record' writes stages to strategy.yaml (no answers = write defaults); 'view' returns current stages. Use AFTER messaging is complete (Session 3) as the first step of content strategy (Session 4).",
+    "Define buyer journey stages for content strategy — the path from awareness to purchase. Ships with 4 proven defaults (First Touch, Context & Meaning, Validation & Proof, Decision Support) that can be customized per brand. Mode 'interview' presents defaults for review. Mode 'record' writes stages (omit answers to accept defaults). Mode 'view' shows current stages. Part of Session 4 (content strategy). Returns stage definitions with buyer mindset, content goals, and tone shifts.",
     paramsShape,
     async (args) => handler(args as Params)
   );

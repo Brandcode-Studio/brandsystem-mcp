@@ -611,7 +611,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_build_matrix",
-    "Generate, view, or edit the messaging matrix — pre-computed message variants for each persona × journey stage combination. 'generate' reads strategy.yaml personas and journey_stages (required) plus messaging.yaml perspective and voice (optional, for deeper adaptation), synthesizes a MessagingVariant for every combination, and writes them to strategy.yaml messaging_matrix. 'view' returns the matrix as a readable grid with status and message previews. 'edit' updates a specific variant by ID (core_message, tone_shift, proof_points, status). Generated messages are meaningful drafts adapted to each persona's core_tension, the stage's buyer_mindset, and the brand's perspective worldview — not template fill-ins.",
+    "Generate persona x journey stage messaging variants — adapted core messages for every audience at every buying stage. Mode 'generate' creates variants using persona tensions, stage mindsets, and brand perspective. Mode 'view' shows the matrix as a grid. Mode 'edit' refines a specific variant by ID. Requires personas and journey stages in strategy.yaml. Returns variant grid with status tracking (Draft/Active/Retired).",
     paramsShape,
     async (args) => handler(args as Params)
   );

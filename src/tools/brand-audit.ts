@@ -147,7 +147,7 @@ function formatResults(results: AuditResult[]) {
 export function register(server: McpServer) {
   server.tool(
     "brand_audit",
-    "Validate the .brand/ directory against schema requirements. Checks file existence, schema validity, color completeness, typography, logo embedding, and confidence distribution. Use after brand_compile to verify the system is ready.",
+    "Validate the .brand/ directory for completeness and correctness. Checks file existence, YAML schema validity, primary color assignment, typography coverage, logo embedding (SVG well-formedness), and confidence distribution. Use after brand_compile to verify readiness, or anytime to diagnose issues. Returns pass/warn/fail for each check with actionable details.",
     async () => handler()
   );
 }

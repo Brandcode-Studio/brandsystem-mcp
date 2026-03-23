@@ -501,7 +501,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_build_personas",
-    "Build operational buyer personas through guided interview. Three modes: 'interview' returns 7 structured questions for a new persona; 'record' writes persona data to strategy.yaml (auto-generates ID, parses freeform text for objections/channels); 'list' shows all existing personas. Use AFTER messaging is defined (brand_compile_messaging). Personas drive the messaging matrix and content themes.",
+    "Build buyer personas through a guided 7-question interview — role, core tension, objections, information needs per journey stage, narrative emphasis, preferred channels, and decision authority. Mode 'interview' returns questions. Mode 'record' saves a persona (auto-generates ID like PER-001, parses freeform text). Mode 'list' shows all personas. Most brands need 3-5 personas. Part of Session 4. Returns persona data and total count.",
     paramsShape,
     async (args) => handler(args as Params)
   );

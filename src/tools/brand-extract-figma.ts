@@ -168,10 +168,7 @@ function inferRoleFromFigmaName(name: string): ColorEntry["role"] {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_figma",
-    `Extract brand identity from Figma. Two modes:
-- mode "plan": Returns instructions for which Figma MCP tools to call. Use this first.
-- mode "ingest": Processes Figma data you've collected. Pass variables, styles, and logo_svg.
-Figma data is more authoritative than web extraction — it will override web-sourced values.`,
+    "Extract brand identity from a Figma design file — colors, typography, and logo at higher accuracy than web extraction. Two-phase workflow: first call with mode='plan' to get instructions for which Figma MCP tools to call, then call with mode='ingest' to process the collected data. Figma-sourced values override web-extracted values. Use when the user has a Figma file URL or key. Returns merged identity data with high-confidence scores.",
     paramsShape,
     async (args) => {
       const parsed = args as Params;

@@ -366,7 +366,7 @@ async function triageHandler(input: TriageParams) {
 export function register(server: McpServer) {
   server.tool(
     "brand_feedback",
-    "Send feedback, bug reports, or feature suggestions to the brandsystem team directly from an agent session. Use this when you encounter an error, receive unexpected data, hit a UX friction point, or have an idea for how a tool could work better. Also use for praise — reporting what works well helps the team know what NOT to change. Include as much context as possible.",
+    "Report bugs, friction, feature ideas, data quality issues, or praise to the brandsystem team. Use when a tool returns an error, extraction misses data, the workflow feels harder than it should, or something works particularly well. Stored locally in ~/.brandsystem/feedback/ for developer triage. Include the tool_name and as much context as possible. Returns a feedback ID.",
     sendParamsShape,
     async (args) => sendHandler(args as SendParams)
   );

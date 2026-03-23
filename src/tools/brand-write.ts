@@ -629,7 +629,7 @@ const paramsShape = {
 export function register(server: McpServer) {
   server.tool(
     "brand_write",
-    "Load full brand context for content generation. Returns colors, typography, logo (with inline SVG/data URI), composition rules, anti-patterns, voice codex, and vocabulary — everything the LLM needs to generate on-brand content. Does NOT generate content itself; it provides the creation brief so YOU can generate. Always run brand_preflight after generating.",
+    "Load the full brand context for content creation — colors, typography, logo (inline SVG/data URI), composition rules, anti-patterns, voice codex, vocabulary rules, and content strategy. Use before generating any branded content: social graphics, web pages, blog posts, emails, presentations, or data viz. Specify content_type to get the right mix of visual and voice rules. Does NOT generate content — it provides the creation brief so you can generate on-brand. Always run brand_preflight on the output afterward. Returns a structured creation brief with all brand layers.",
     paramsShape,
     async (args) => handler(args as WriteParams)
   );

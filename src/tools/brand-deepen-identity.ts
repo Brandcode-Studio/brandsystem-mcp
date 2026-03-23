@@ -528,7 +528,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_deepen_identity",
-    "Capture visual identity beyond tokens — composition rules, patterns, illustration language, photography direction, signature moves, and anti-patterns. Two modes: 'interview' reads current state and returns structured questions for missing sections; 'record' writes answers to visual-identity.yaml for a specific section. Use AFTER core identity is populated (brand_start + extraction). Anti-patterns become hard compliance rules in preflight.",
+    "Define visual identity rules beyond colors and fonts — composition energy, pattern language, illustration style, photography direction, signature moves, and anti-patterns (hard compliance rules). Session 2 interview with 6 sections. Mode 'interview' returns structured questions for missing sections. Mode 'record' saves answers. Use after Session 1 (core identity extracted). Anti-patterns become enforceable rules in brand_preflight. Returns section completion status.",
     paramsShape,
     async (args) => handler(args as Params)
   );
