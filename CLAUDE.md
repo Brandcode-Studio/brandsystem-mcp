@@ -20,9 +20,9 @@ Build must pass before committing. The entry point is `src/index.ts` (stdio tran
 ```
 src/
   index.ts         # Stdio transport entry point
-  server.ts        # Creates McpServer, registers all 24 tools in priority order
-  tools/           # One file per tool (24 files). Each exports a register(server) function.
-  lib/             # Shared utilities (brand-dir, css-parser, dtcg-compiler, etc.)
+  server.ts        # Creates McpServer, registers all 27 tools in priority order
+  tools/           # One file per tool (27 files). Each exports a register(server) function.
+  lib/             # Shared utilities (brand-dir, css-parser, dtcg-compiler, content-scorer, etc.)
   types/           # TypeScript type definitions
   schemas/         # Zod schemas for validation
 bin/
@@ -38,7 +38,8 @@ Tools are registered in the order agents see them. Entry points first:
 4. Session 2 tools (deepen identity, ingest assets, preflight)
 5. Session 3 tools (extract messaging, compile messaging)
 6. Session 4 tools (personas, journey, themes, matrix)
-7. Cross-session utilities (write, export, feedback)
+7. Content scoring tools (audit-content, check-compliance, audit-drift)
+8. Cross-session utilities (write, export, feedback)
 
 ### Response Format
 

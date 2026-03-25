@@ -22,6 +22,9 @@ import { register as registerBuildThemes } from "./tools/brand-build-themes.js";
 import { register as registerExport } from "./tools/brand-export.js";
 import { register as registerSetLogo } from "./tools/brand-set-logo.js";
 import { register as registerFeedback } from "./tools/brand-feedback.js";
+import { register as registerAuditContent } from "./tools/brand-audit-content.js";
+import { register as registerCheckCompliance } from "./tools/brand-check-compliance.js";
+import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -57,6 +60,11 @@ export function createServer(): McpServer {
   registerBuildJourney(server);
   registerBuildThemes(server);
   registerBuildMatrix(server);
+
+  // ── Content scoring ──
+  registerAuditContent(server);   // Score content against brand identity
+  registerCheckCompliance(server); // Binary pass/fail gate
+  registerAuditDrift(server);     // Batch drift detection
 
   // ── Cross-session utilities ──
   registerWrite(server);       // Load brand context for content gen

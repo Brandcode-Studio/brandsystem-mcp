@@ -526,9 +526,21 @@ async function handler(input: WriteParams) {
     }
   }
 
-  instructions.push(
-    "After generating, immediately run brand_preflight to validate the output."
-  );
+  if (needsVisual(ct)) {
+    instructions.push(
+      "After generating, run brand_preflight to validate visual compliance."
+    );
+  }
+  if (needsVoice(ct)) {
+    instructions.push(
+      "After generating, run brand_check_compliance to verify voice rules and never-say words."
+    );
+  }
+  if (!needsVisual(ct) && !needsVoice(ct)) {
+    instructions.push(
+      "After generating, run brand_check_compliance to validate the output."
+    );
+  }
 
   // ── Degradation warnings ──
 
