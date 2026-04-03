@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import * as cheerio from "cheerio";
@@ -659,7 +659,8 @@ const paramsShape = {
     ),
 };
 
-type Params = { html: string; mode?: "check" | "rules" };
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 async function handler(input: Params) {
   const brandDir = new BrandDir(process.cwd());
@@ -711,6 +712,10 @@ export function register(server: McpServer) {
     "brand_preflight",
     "Check HTML/CSS against brand rules — catches off-brand colors, wrong fonts, missing logo, and anti-pattern violations (drop shadows, gradients, etc.). Pass an HTML string or file path. Mode 'check' (default) runs all compliance checks and returns pass/warn/fail per rule. Mode 'rules' lists all active preflight rules without checking content. Use after generating any visual content to validate brand compliance. Returns overall status and per-check details.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

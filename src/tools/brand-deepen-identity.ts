@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { SCHEMA_VERSION, type VisualIdentityData } from "../schemas/index.js";
 
 const SECTIONS = [
@@ -30,11 +30,8 @@ const paramsShape = {
     .describe("JSON string with structured answers for the section (required when mode='record')"),
 };
 
-type Params = {
-  mode: "interview" | "record";
-  section?: Section;
-  answers?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 // --- Interview question bank ---
 
@@ -530,6 +527,10 @@ export function register(server: McpServer) {
     "brand_deepen_identity",
     "Define visual identity rules beyond colors and fonts — composition energy, pattern language, illustration style, photography direction, signature moves, and anti-patterns (hard compliance rules). Session 2 interview with 6 sections. Mode 'interview' returns structured questions for missing sections. Mode 'record' saves answers. Use after Session 1 (core identity extracted). Anti-patterns become enforceable rules in brand_preflight. Returns section completion status.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import * as cheerio from "cheerio";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryColor, getTopChromaticCandidates } from "../lib/css-parser.js";
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";
 import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
@@ -16,7 +16,10 @@ const paramsShape = {
   logo_url: z.string().optional().describe("Direct URL to a logo SVG/PNG file (e.g. 'https://acme.com/logo.svg'). Use if automatic extraction misses the logo."),
 };
 
-async function handler(input: { url: string; logo_url?: string }) {
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
+
+async function handler(input: Params) {
   const brandDir = new BrandDir(process.cwd());
 
   if (!(await brandDir.exists())) {
@@ -508,6 +511,10 @@ export function register(server: McpServer) {
     "brand_extract_web",
     "Extract logo (SVG/PNG), colors, and fonts from any website URL. Parses HTML for logo candidates (inline SVG, img tags, favicons, Clearbit fallback), parses CSS for color values and font-family declarations, and confidence-scores everything. Use when the user provides a website URL or says 'scan my site.' Optionally pass logo_url to fetch a specific logo file directly. Returns all extracted colors with roles, fonts with frequency, logo preview data, and extraction quality score.",
     paramsShape,
-    async (args) => handler(args as { url: string; logo_url?: string })
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 
 const paramsShape = {
@@ -11,7 +11,8 @@ const paramsShape = {
   figma_file_key: z.string().optional().describe("Figma file key for design token extraction"),
 };
 
-type Params = { client_name: string; industry?: string; website_url?: string; figma_file_key?: string };
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 async function handler(input: Params) {
   const brandDir = new BrandDir(process.cwd());
@@ -66,6 +67,10 @@ export function register(server: McpServer) {
     "brand_init",
     "Initialize a .brand/ directory with empty config scaffold. Low-level tool — prefer brand_start instead, which calls this automatically and also presents extraction options. Only use brand_init directly if you need to set up the directory without running extraction. Returns list of created files.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

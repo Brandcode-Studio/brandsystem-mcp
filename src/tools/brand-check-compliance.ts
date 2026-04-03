@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFile } from "node:fs/promises";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { loadBrandContext, isHtmlContent } from "../lib/content-scorer.js";
 import * as cheerio from "cheerio";
 
@@ -114,11 +114,6 @@ interface ComplianceCheck {
   status: "pass" | "fail" | "warn";
   message: string;
   detail?: string;
-}
-
-interface CheckComplianceParams {
-  content: string;
-  strict: boolean;
 }
 
 async function handler(input: CheckComplianceParams) {
@@ -263,11 +258,18 @@ const paramsShape = {
     ),
 };
 
+const ParamsSchema = z.object(paramsShape);
+type CheckComplianceParams = z.infer<typeof ParamsSchema>;
+
 export function register(server: McpServer) {
   server.tool(
     "brand_check_compliance",
     "Quick pass/fail compliance gate — checks critical brand rules before publishing. Verifies on-palette colors, brand fonts, hard anti-pattern rules, and never-say words. Fast and binary: returns PASS or FAIL with specific failures listed. Use in production workflows and CI/CD pipelines as a publish gate. Enable strict mode to also check soft anti-patterns. For detailed scoring, use brand_audit_content instead.",
     paramsShape,
-    async (args) => handler(args as CheckComplianceParams),
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    },
   );
 }

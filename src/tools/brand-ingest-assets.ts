@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import type { AssetManifest } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import type { AssetManifestEntry } from "../types/index.js";
 
 const paramsShape = {
@@ -32,14 +32,8 @@ const paramsShape = {
     .describe('Asset type override (e.g. "illustration", "sticker", "pattern", "icon")'),
 };
 
-type Params = {
-  mode: "scan" | "tag";
-  file?: string;
-  description?: string;
-  usage?: string;
-  theme: "dark" | "light" | "both";
-  type?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 /** Files to exclude when listing assets in a directory */
 function isAssetFile(name: string): boolean {
@@ -278,6 +272,10 @@ export function register(server: McpServer) {
     "brand_ingest_assets",
     "Scan and catalog brand assets (illustrations, stickers, patterns, icons) in .brand/assets/. Mode 'scan' (default) inventories all asset directories and identifies files missing from MANIFEST.yaml. Mode 'tag' adds metadata to a specific file: description, usage context, and theme compatibility. Use after adding asset files to .brand/assets/ subdirectories. Returns directory summaries and untagged file lists.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

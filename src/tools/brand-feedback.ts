@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -107,18 +107,8 @@ const sendParamsShape = {
     .describe("Optional structured context about the session."),
 };
 
-type SendParams = {
-  category: "bug" | "friction" | "feature_request" | "data_quality" | "praise";
-  tool_name?: string;
-  summary: string;
-  detail?: string;
-  severity?: "blocks_workflow" | "degrades_experience" | "minor" | "suggestion";
-  context?: {
-    client?: string;
-    brand_name?: string;
-    error_message?: string;
-  };
-};
+const SendParamsSchema = z.object(sendParamsShape);
+type SendParams = z.infer<typeof SendParamsSchema>;
 
 async function sendHandler(input: SendParams) {
   await ensureFeedbackDir();
@@ -196,10 +186,8 @@ const reviewParamsShape = {
     .describe("Filter by status. Defaults to 'new'. Use 'quarantined' to see items flagged for potential prompt injection."),
 };
 
-type ReviewParams = {
-  filter_category?: "bug" | "friction" | "feature_request" | "data_quality" | "praise" | "all";
-  filter_status?: "new" | "quarantined" | "acknowledged" | "fixed" | "wontfix" | "all";
-};
+const ReviewParamsSchema = z.object(reviewParamsShape);
+type ReviewParams = z.infer<typeof ReviewParamsSchema>;
 
 async function reviewHandler(input: ReviewParams) {
   await ensureFeedbackDir();
@@ -317,11 +305,8 @@ const triageParamsShape = {
     .describe("Optional triage note explaining the decision."),
 };
 
-type TriageParams = {
-  feedback_id: string;
-  status: "acknowledged" | "fixed" | "wontfix";
-  note?: string;
-};
+const TriageParamsSchema = z.object(triageParamsShape);
+type TriageParams = z.infer<typeof TriageParamsSchema>;
 
 async function triageHandler(input: TriageParams) {
   await ensureFeedbackDir();
@@ -368,20 +353,32 @@ export function register(server: McpServer) {
     "brand_feedback",
     "Report bugs, friction, feature ideas, data quality issues, or praise to the brandsystem team. Use when a tool returns an error, extraction misses data, the workflow feels harder than it should, or something works particularly well. Stored locally in ~/.brandsystem/feedback/ for developer triage. Include the tool_name and as much context as possible. Returns a feedback ID.",
     sendParamsShape,
-    async (args) => sendHandler(args as SendParams)
+    async (args) => {
+      const parsed = safeParseParams(SendParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return sendHandler(parsed.data);
+    }
   );
 
   server.tool(
     "brand_feedback_review",
     "Review all agent feedback filed via brand_feedback. Shows summary stats (by category, severity, status) and individual items. Use this to triage feedback, spot patterns, and prioritize fixes. Filter by category or status.",
     reviewParamsShape,
-    async (args) => reviewHandler(args as ReviewParams)
+    async (args) => {
+      const parsed = safeParseParams(ReviewParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return reviewHandler(parsed.data);
+    }
   );
 
   server.tool(
     "brand_feedback_triage",
     "Update the status of a feedback item after review. Mark as 'acknowledged' (seen, will address), 'fixed' (resolved), or 'wontfix' (intentional, won't change). Add an optional triage note.",
     triageParamsShape,
-    async (args) => triageHandler(args as TriageParams)
+    async (args) => {
+      const parsed = safeParseParams(TriageParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return triageHandler(parsed.data);
+    }
   );
 }
