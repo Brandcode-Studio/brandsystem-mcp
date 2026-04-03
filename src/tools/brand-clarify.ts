@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import type { ColorEntry, ClarificationItem } from "../types/index.js";
 import type { NeedsClarificationData } from "../schemas/index.js";
 import type { CoreIdentityData } from "../schemas/index.js";
@@ -13,7 +13,8 @@ const paramsShape = {
   answer: z.string().describe("The user's answer: a hex color (#ff0000), a role name (primary, secondary, accent), a font name, 'yes'/'no', or natural language ('the purple one is accent, the dark one is neutral')"),
 };
 
-type Params = { id: string; answer: string };
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
 const VALID_ROLES = ["primary", "secondary", "accent", "neutral", "surface", "text", "action"] as const;
@@ -543,6 +544,10 @@ export function register(server: McpServer) {
     "brand_clarify",
     "Resolve an ambiguous brand value interactively. After brand_compile, some values need human confirmation — wrong primary color, unknown font, unassigned color roles. Pass the clarification item ID and the user's answer (hex color, role name, font name, or 'yes'/'no'). Supports natural language: 'the purple one is accent' or '#5544f2 is secondary'. Returns updated identity and remaining clarification count.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

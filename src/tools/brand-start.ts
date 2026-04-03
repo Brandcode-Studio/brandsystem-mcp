@@ -2,7 +2,7 @@ import { z } from "zod";
 import * as cheerio from "cheerio";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryColor, getTopChromaticCandidates } from "../lib/css-parser.js";
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";
@@ -22,7 +22,8 @@ const paramsShape = {
     .describe("'auto' (recommended): runs full pipeline in one call when website_url is provided. 'interactive': presents source menu for user to choose extraction method."),
 };
 
-type Params = { client_name: string; website_url?: string; industry?: string; mode?: "interactive" | "auto" };
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 interface SourceOption {
   key: string;
@@ -729,6 +730,10 @@ export function register(server: McpServer) {
     "brand_start",
     "Begin here. Creates a brand system from any website URL in under 60 seconds. Use when a user mentions brand identity, brand guidelines, logo extraction, brand system setup, design tokens, or brand colors. If .brand/ already exists, returns current status with actionable next steps. Set mode='auto' with a website_url to run the full pipeline (extract colors/fonts/logo, compile DTCG tokens, generate HTML report) in one call. Returns structured brand data: colors with roles, typography, logo (SVG/PNG), and confidence scores.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

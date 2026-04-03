@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFile } from "node:fs/promises";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import {
   loadBrandContext,
   scoreContent,
@@ -29,11 +29,6 @@ async function resolveContent(input: string): Promise<{ content: string; isHtml:
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
-
-interface AuditContentParams {
-  content: string;
-  depth: "quick" | "standard" | "deep";
-}
 
 async function handler(input: AuditContentParams) {
   const brandDir = new BrandDir(process.cwd());
@@ -128,11 +123,18 @@ const paramsShape = {
     ),
 };
 
+const ParamsSchema = z.object(paramsShape);
+type AuditContentParams = z.infer<typeof ParamsSchema>;
+
 export function register(server: McpServer) {
   server.tool(
     "brand_audit_content",
     "Score content against your brand identity — checks color/font compliance, voice alignment, anti-pattern violations, and message coverage. Use after generating any content to check how on-brand it is. Works progressively: Session 1 data gives token scores, Session 2 adds visual compliance, Session 3 adds voice and messaging scores. Returns a 0-100 score with per-dimension breakdown and specific issues. Different from brand_audit (which validates the .brand/ directory) and brand_preflight (which checks HTML compliance rules).",
     paramsShape,
-    async (args) => handler(args as AuditContentParams),
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    },
   );
 }

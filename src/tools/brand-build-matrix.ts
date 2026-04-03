@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import type { ContentStrategyData } from "../schemas/index.js";
 import type { MessagingData } from "../schemas/messaging.js";
 import type { MessagingVariant, Persona, JourneyStage } from "../types/index.js";
@@ -29,11 +29,8 @@ const paramsShape = {
     ),
 };
 
-type Params = {
-  mode: "generate" | "view" | "edit";
-  variant_id?: string;
-  answers?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 // ---------------------------------------------------------------------------
 // Variant ID generator
@@ -613,6 +610,10 @@ export function register(server: McpServer) {
     "brand_build_matrix",
     "Generate persona x journey stage messaging variants — adapted core messages for every audience at every buying stage. Mode 'generate' creates variants using persona tensions, stage mindsets, and brand perspective. Mode 'view' shows the matrix as a grid. Mode 'edit' refines a specific variant by ID. Requires personas and journey stages in strategy.yaml. Returns variant grid with status tracking (Draft/Active/Retired).",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

@@ -1,6 +1,32 @@
+import { z } from "zod";
 import type { McpResponseData } from "../types/index.js";
 
 const MAX_RESPONSE_CHARS = 50000;
+
+/**
+ * Safely parse tool args against a Zod schema. Returns either the parsed
+ * data or a structured MCP error response the caller can return directly.
+ */
+export function safeParseParams<T extends z.ZodTypeAny>(
+  schema: T,
+  args: unknown,
+): { success: true; data: z.infer<T> } | { success: false; response: ReturnType<typeof buildResponse> } {
+  const result = schema.safeParse(args);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  const issues = result.error.issues.map(
+    (i) => `${i.path.join(".")}: ${i.message}`,
+  );
+  return {
+    success: false,
+    response: buildResponse({
+      what_happened: `Invalid input: ${issues.join(", ")}`,
+      next_steps: ["Check the parameter types and try again"],
+      data: { error: "validation_failed", issues },
+    }),
+  };
+}
 
 export function buildResponse(input: McpResponseData): {
   content: Array<{ type: "text"; text: string }>;

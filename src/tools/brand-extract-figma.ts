@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
 import { resolveSvg } from "../lib/svg-resolver.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
@@ -26,13 +26,8 @@ const paramsShape = {
   logo_svg: z.string().optional().describe("Raw SVG of logo component (for ingest mode)"),
 };
 
-type Params = {
-  mode: "plan" | "ingest";
-  figma_file_key?: string;
-  variables?: Array<{ name: string; resolvedType: string; value?: string | number | boolean; collection?: string }>;
-  styles?: Array<{ name: string; type: string; fontFamily?: string; fontSize?: number; fontWeight?: number; lineHeight?: string | number }>;
-  logo_svg?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 async function handlePlan(figmaFileKey: string) {
   return buildResponse({
@@ -171,7 +166,9 @@ export function register(server: McpServer) {
     "Extract brand identity from a Figma design file — colors, typography, and logo at higher accuracy than web extraction. Two-phase workflow: first call with mode='plan' to get instructions for which Figma MCP tools to call, then call with mode='ingest' to process the collected data. Figma-sourced values override web-extracted values. Use when the user has a Figma file URL or key. Returns merged identity data with high-confidence scores.",
     paramsShape,
     async (args) => {
-      const parsed = args as Params;
+      const result = safeParseParams(ParamsSchema, args);
+      if (!result.success) return result.response;
+      const parsed = result.data;
       if (parsed.mode === "plan") {
         if (!parsed.figma_file_key || parsed.figma_file_key.trim() === "") {
           return buildResponse({

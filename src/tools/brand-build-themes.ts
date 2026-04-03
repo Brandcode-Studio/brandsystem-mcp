@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import type { ContentTheme, ContentStrategy } from "../types/index.js";
 
@@ -22,11 +22,8 @@ const paramsShape = {
     .describe("JSON string with theme data (required when mode='record')"),
 };
 
-type Params = {
-  mode: "interview" | "record" | "list";
-  theme_id?: string;
-  answers?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 // --- Interview questions ---
 
@@ -582,6 +579,10 @@ export function register(server: McpServer) {
     "brand_build_themes",
     "Define editorial content themes — the strategic pillars that organize what to write about. Each theme has a content intent (Brand Heat for awareness, Momentum for engagement, Conversion for pipeline), target personas, and proof points. Mode 'interview' guides through 5 questions per theme. Mode 'record' saves (auto-generates ID like THM-001). Mode 'list' shows all themes with intent distribution. Most brands need 3-5 themes balanced across all three intents. Returns theme data and balance analysis.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

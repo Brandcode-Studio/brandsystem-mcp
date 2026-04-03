@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import type { JourneyStage, ContentStrategy } from "../types/index.js";
 
@@ -20,10 +20,8 @@ const paramsShape = {
     ),
 };
 
-type Params = {
-  mode: "interview" | "record" | "view";
-  answers?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 // --- Default journey stages ---
 
@@ -340,6 +338,10 @@ export function register(server: McpServer) {
     "brand_build_journey",
     "Define buyer journey stages for content strategy — the path from awareness to purchase. Ships with 4 proven defaults (First Touch, Context & Meaning, Validation & Proof, Decision Support) that can be customized per brand. Mode 'interview' presents defaults for review. Mode 'record' writes stages (omit answers to accept defaults). Mode 'view' shows current stages. Part of Session 4 (content strategy). Returns stage definitions with buyer mindset, content goals, and tone shifts.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

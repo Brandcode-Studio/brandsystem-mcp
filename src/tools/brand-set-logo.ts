@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { sanitizeSvg, resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { fetchLogo } from "../lib/logo-extractor.js";
 import type { LogoSpec } from "../types/index.js";
@@ -13,12 +13,8 @@ const paramsShape = {
   type: z.enum(["wordmark", "logomark"]).default("wordmark").describe('Logo type: "wordmark" (text-based) or "logomark" (icon/symbol). Default: wordmark'),
 };
 
-type SetLogoInput = {
-  svg?: string;
-  url?: string;
-  data_uri?: string;
-  type: "wordmark" | "logomark";
-};
+const ParamsSchema = z.object(paramsShape);
+type SetLogoInput = z.infer<typeof ParamsSchema>;
 
 async function handler(input: SetLogoInput) {
   const brandDir = new BrandDir(process.cwd());
@@ -182,6 +178,10 @@ export function register(server: McpServer) {
     "brand_set_logo",
     "Add or replace a logo in the brand system. Accepts raw SVG markup, a URL to a logo file (SVG/PNG), or a base64 data URI. Use when brand_extract_web missed the logo, extracted the wrong image, or the user provides a logo directly. Sanitizes SVG, saves to .brand/assets/logo/, and updates core-identity.yaml with inline_svg and data_uri for portable embedding. Returns logo preview data.",
     paramsShape,
-    async (args) => handler(args as SetLogoInput)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

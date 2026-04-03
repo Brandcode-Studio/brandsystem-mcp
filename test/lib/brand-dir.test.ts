@@ -52,7 +52,13 @@ describe('BrandDir', () => {
 
   it('readCoreIdentity() returns data written by writeCoreIdentity()', async () => {
     await bd.scaffold();
-    const identity = { schema_version: '0.1.0', colors: [{ value: '#ff0000' }], typography: [], logo: [], spacing: null };
+    const identity = {
+      schema_version: '0.1.0',
+      colors: [{ name: 'Red', value: '#ff0000', role: 'primary', source: 'web', confidence: 'high' }],
+      typography: [],
+      logo: [],
+      spacing: null,
+    };
     await bd.writeCoreIdentity(identity as any);
     const result = await bd.readCoreIdentity();
     expect(result).toEqual(identity);
@@ -68,8 +74,11 @@ describe('BrandDir', () => {
 
   it('readClarifications() returns data written by writeClarifications()', async () => {
     await bd.scaffold();
-    const clarifications = { items: [{ question: 'What is the primary color?', status: 'open' }] };
-    await bd.writeClarifications(clarifications as any);
+    const clarifications = {
+      schema_version: '0.1.0',
+      items: [{ id: 'clarify-1', field: 'colors', question: 'What is the primary color?', source: 'web', priority: 'high' as const }],
+    };
+    await bd.writeClarifications(clarifications);
     const result = await bd.readClarifications();
     expect(result).toEqual(clarifications);
   });
@@ -93,6 +102,31 @@ describe('BrandDir', () => {
     await bd.writePolicy(policy);
     const result = await bd.readPolicy();
     expect(result).toEqual(policy);
+  });
+
+  it('writeAsset() rejects content over 10MB', async () => {
+    await bd.scaffold();
+    const huge = Buffer.alloc(10 * 1024 * 1024 + 1);
+    await expect(bd.writeAsset('logo/huge.svg', huge)).rejects.toThrow(/10MB limit/);
+  });
+
+  it('writeAsset() accepts content at exactly 10MB', async () => {
+    await bd.scaffold();
+    const exact = Buffer.alloc(10 * 1024 * 1024);
+    await expect(bd.writeAsset('logo/big.svg', exact)).resolves.toBeUndefined();
+  });
+
+  it('readCoreIdentity() throws on invalid YAML data', async () => {
+    await bd.scaffold();
+    // Write data that won't pass the schema
+    await bd.writeCoreIdentity({ colors: 'not-an-array' } as any);
+    await expect(bd.readCoreIdentity()).rejects.toThrow();
+  });
+
+  it('readConfig() throws on invalid YAML data', async () => {
+    await bd.scaffold();
+    await bd.writeConfig({ session: 'not-a-number' } as any);
+    await expect(bd.readConfig()).rejects.toThrow();
   });
 
   it('hasRuntime() returns false before writing, true after', async () => {

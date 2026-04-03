@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import type { ContentStrategyData } from "../schemas/index.js";
 import type { Persona } from "../types/index.js";
@@ -25,11 +25,8 @@ const paramsShape = {
     .describe("JSON string with persona fields (for record mode)"),
 };
 
-type Params = {
-  mode: "interview" | "record" | "list";
-  persona_id?: string;
-  answers?: string;
-};
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 // ─── Interview questions ─────────────────────────────────────────────────────
 
@@ -503,6 +500,10 @@ export function register(server: McpServer) {
     "brand_build_personas",
     "Build buyer personas through a guided 7-question interview — role, core tension, objections, information needs per journey stage, narrative emphasis, preferred channels, and decision authority. Mode 'interview' returns questions. Mode 'record' saves a persona (auto-generates ID like PER-001, parses freeform text). Mode 'list' shows all personas. Most brands need 3-5 personas. Part of Session 4. Returns persona data and total count.",
     paramsShape,
-    async (args) => handler(args as Params)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

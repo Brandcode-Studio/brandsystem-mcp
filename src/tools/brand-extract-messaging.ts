@@ -2,7 +2,7 @@ import { z } from "zod";
 import * as cheerio from "cheerio";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import { getVersion } from "../lib/version.js";
 import type { MessagingAuditResult } from "../types/index.js";
 
@@ -15,6 +15,9 @@ const paramsShape = {
     .optional()
     .describe("JSON array of additional page URLs to include (e.g. '[\"https://acme.com/about\", \"https://acme.com/services\"]'). Analyzes up to 10 pages."),
 };
+
+const ParamsSchema = z.object(paramsShape);
+type Params = z.infer<typeof ParamsSchema>;
 
 // ─── Stop words (filtered from vocabulary frequency) ─────────────────────────
 
@@ -553,7 +556,7 @@ function generateAuditMarkdown(
 
 // ─── Main handler ────────────────────────────────────────────────────────────
 
-async function handler(input: { url: string; pages?: string }) {
+async function handler(input: Params) {
   const brandDir = new BrandDir(process.cwd());
 
   if (!(await brandDir.exists())) {
@@ -704,6 +707,10 @@ export function register(server: McpServer) {
     "brand_extract_messaging",
     "Audit how a brand currently sounds on its website. Analyzes voice fingerprint (formality, jargon density, active voice %, hedging), vocabulary frequency (distinctive vs generic terms), claims (explicit with data, superlative/unqualified), AI-ism detection, and messaging gaps. Writes .brand/messaging-audit.md. Use when the user wants to understand their current brand voice before defining how it should sound. Returns structured analysis with scores and actionable findings.",
     paramsShape,
-    async (args) => handler(args as { url: string; pages?: string })
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }

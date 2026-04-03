@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, access, readdir, stat } from "node:fs/promi
 import { join, resolve } from "node:path";
 import { stringify, parse } from "yaml";
 import type { BrandConfigData, CoreIdentityData, NeedsClarificationData, VisualIdentityData, MessagingData, ContentStrategyData } from "../schemas/index.js";
-import { SCHEMA_VERSION } from "../schemas/index.js";
+import { SCHEMA_VERSION, BrandConfigSchema, CoreIdentitySchema, NeedsClarificationSchema, VisualIdentitySchema, MessagingSchema, ContentStrategySchema } from "../schemas/index.js";
 import type { AssetManifestEntry } from "../types/index.js";
 
 export interface AssetManifest {
@@ -73,9 +73,9 @@ export class BrandDir {
 
   // --- YAML helpers ---
 
-  private async readYaml<T>(filename: string): Promise<T> {
+  private async readYaml(filename: string): Promise<unknown> {
     const content = await readFile(this.path(filename), "utf-8");
-    return parse(content) as T;
+    return parse(content);
   }
 
   private async writeYaml(filename: string, data: unknown): Promise<void> {
@@ -87,9 +87,9 @@ export class BrandDir {
 
   // --- JSON helpers ---
 
-  private async readJson<T>(filename: string): Promise<T> {
+  private async readJson(filename: string): Promise<unknown> {
     const content = await readFile(this.path(filename), "utf-8");
-    return JSON.parse(content) as T;
+    return JSON.parse(content);
   }
 
   private async writeJson(filename: string, data: unknown): Promise<void> {
@@ -102,7 +102,8 @@ export class BrandDir {
   // --- Config ---
 
   async readConfig(): Promise<BrandConfigData> {
-    return this.readYaml<BrandConfigData>("brand.config.yaml");
+    const raw = await this.readYaml("brand.config.yaml");
+    return BrandConfigSchema.parse(raw);
   }
 
   async writeConfig(data: BrandConfigData): Promise<void> {
@@ -112,7 +113,8 @@ export class BrandDir {
   // --- Core Identity ---
 
   async readCoreIdentity(): Promise<CoreIdentityData> {
-    return this.readYaml<CoreIdentityData>("core-identity.yaml");
+    const raw = await this.readYaml("core-identity.yaml");
+    return CoreIdentitySchema.parse(raw);
   }
 
   async writeCoreIdentity(data: CoreIdentityData): Promise<void> {
@@ -122,7 +124,8 @@ export class BrandDir {
   // --- Tokens ---
 
   async readTokens(): Promise<Record<string, unknown>> {
-    return this.readJson<Record<string, unknown>>("tokens.json");
+    // TODO: add schema validation
+    return await this.readJson("tokens.json") as Record<string, unknown>;
   }
 
   async writeTokens(data: Record<string, unknown>): Promise<void> {
@@ -132,7 +135,8 @@ export class BrandDir {
   // --- Needs Clarification ---
 
   async readClarifications(): Promise<NeedsClarificationData> {
-    return this.readYaml<NeedsClarificationData>("needs-clarification.yaml");
+    const raw = await this.readYaml("needs-clarification.yaml");
+    return NeedsClarificationSchema.parse(raw);
   }
 
   async writeClarifications(data: NeedsClarificationData): Promise<void> {
@@ -142,7 +146,8 @@ export class BrandDir {
   // --- Visual Identity (Session 2) ---
 
   async readVisualIdentity(): Promise<VisualIdentityData> {
-    return this.readYaml<VisualIdentityData>("visual-identity.yaml");
+    const raw = await this.readYaml("visual-identity.yaml");
+    return VisualIdentitySchema.parse(raw);
   }
 
   async writeVisualIdentity(data: VisualIdentityData): Promise<void> {
@@ -171,7 +176,8 @@ export class BrandDir {
   // --- Messaging (Session 3) ---
 
   async readMessaging(): Promise<MessagingData> {
-    return this.readYaml<MessagingData>("messaging.yaml");
+    const raw = await this.readYaml("messaging.yaml");
+    return MessagingSchema.parse(raw);
   }
 
   async writeMessaging(data: MessagingData): Promise<void> {
@@ -190,7 +196,8 @@ export class BrandDir {
   // --- Content Strategy (Session 4) ---
 
   async readStrategy(): Promise<ContentStrategyData> {
-    return this.readYaml<ContentStrategyData>("strategy.yaml");
+    const raw = await this.readYaml("strategy.yaml");
+    return ContentStrategySchema.parse(raw);
   }
 
   async writeStrategy(data: ContentStrategyData): Promise<void> {
@@ -209,7 +216,8 @@ export class BrandDir {
   // --- Runtime + Policy ---
 
   async readRuntime(): Promise<Record<string, unknown>> {
-    return this.readJson<Record<string, unknown>>("brand-runtime.json");
+    // TODO: add schema validation
+    return await this.readJson("brand-runtime.json") as Record<string, unknown>;
   }
 
   async writeRuntime(data: unknown): Promise<void> {
@@ -217,7 +225,8 @@ export class BrandDir {
   }
 
   async readPolicy(): Promise<Record<string, unknown>> {
-    return this.readJson<Record<string, unknown>>("interaction-policy.json");
+    // TODO: add schema validation
+    return await this.readJson("interaction-policy.json") as Record<string, unknown>;
   }
 
   async writePolicy(data: unknown): Promise<void> {
@@ -263,6 +272,13 @@ export class BrandDir {
   // --- Assets ---
 
   async writeAsset(relativePath: string, content: string | Buffer): Promise<void> {
+    const MAX_ASSET_BYTES = 10 * 1024 * 1024; // 10 MB
+    const size = typeof content === "string" ? Buffer.byteLength(content, "utf-8") : content.length;
+    if (size > MAX_ASSET_BYTES) {
+      throw new Error(
+        `Asset "${relativePath}" is ${(size / 1024 / 1024).toFixed(1)}MB, exceeding the 10MB limit`
+      );
+    }
     await this.withLock(`asset:${relativePath}`, async () => {
       const fullPath = join(this.brandPath, "assets", relativePath);
       const resolved = resolve(fullPath);

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFile } from "node:fs/promises";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import {
   loadBrandContext,
   scoreContent,
@@ -199,11 +199,6 @@ function buildDriftReport(
 // Handler
 // ---------------------------------------------------------------------------
 
-interface AuditDriftParams {
-  items: string;
-  threshold: number;
-}
-
 async function handler(input: AuditDriftParams) {
   const brandDir = new BrandDir(process.cwd());
 
@@ -372,11 +367,18 @@ const paramsShape = {
     ),
 };
 
+const ParamsSchema = z.object(paramsShape);
+type AuditDriftParams = z.infer<typeof ParamsSchema>;
+
 export function register(server: McpServer) {
   server.tool(
     "brand_audit_drift",
     "Batch audit multiple content items to detect systematic brand drift. Scores each item against brand identity, computes corpus-level statistics (mean, median, stddev), and identifies recurring patterns across items (e.g., same off-palette color in 4/5 items). Writes a detailed drift report to .brand/drift-report.md. Use when reviewing a content corpus, auditing a website, or checking whether brand identity is being applied consistently across multiple pieces.",
     paramsShape,
-    async (args) => handler(args as AuditDriftParams),
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    },
   );
 }

@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse } from "../lib/response.js";
+import { buildResponse, safeParseParams } from "../lib/response.js";
 import type {
   CoreIdentityData,
   VisualIdentityData,
@@ -17,11 +17,6 @@ import { cleanColorName } from "../lib/color-namer.js";
 // ---------------------------------------------------------------------------
 
 type ExportTarget = "chat" | "code" | "team" | "email" | "claude-skill";
-
-interface ExportParams {
-  target: ExportTarget;
-  include_logo: boolean;
-}
 
 // ---------------------------------------------------------------------------
 // Data loading — graceful degradation for all layers
@@ -841,11 +836,18 @@ const paramsShape = {
     .describe("Embed logo SVG/data URI in the export. Set false to reduce file size. Default: true."),
 };
 
+const ParamsSchema = z.object(paramsShape);
+type ExportParams = z.infer<typeof ParamsSchema>;
+
 export function register(server: McpServer) {
   server.tool(
     "brand_export",
     "Generate portable brand files for any environment — Chat, Code, team sharing, or email. Target 'chat': self-contained markdown to upload to any AI conversation (Claude, ChatGPT, Gemini). Target 'code': MCP config + CLAUDE.md/.cursorrules snippet. Target 'team': clean brand guidelines for designers and writers. Target 'email': concise 500-word summary for Slack or email. Writes to .brand/exports/ and returns the full content. Use when the user wants to share their brand system or set up a new tool.",
     paramsShape,
-    async (args) => handler(args as ExportParams)
+    async (args) => {
+      const parsed = safeParseParams(ParamsSchema, args);
+      if (!parsed.success) return parsed.response;
+      return handler(parsed.data);
+    }
   );
 }
