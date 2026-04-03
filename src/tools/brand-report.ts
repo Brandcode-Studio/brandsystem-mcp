@@ -11,20 +11,11 @@ async function handler() {
   const brandDir = new BrandDir(process.cwd());
 
   if (!(await brandDir.exists())) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({
-            _metadata: {
-              what_happened: "No .brand/ directory found",
-              next_steps: ["Run brand_init first to create the brand system"],
-            },
-            error: "not_initialized",
-          }),
-        },
-      ],
-    };
+    return buildResponse({
+      what_happened: "No .brand/ directory found",
+      next_steps: ["Run brand_init first to create the brand system"],
+      data: { error: "not_initialized" },
+    });
   }
 
   const config = await brandDir.readConfig();

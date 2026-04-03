@@ -206,6 +206,33 @@ export class BrandDir {
     }
   }
 
+  // --- Runtime + Policy ---
+
+  async readRuntime(): Promise<Record<string, unknown>> {
+    return this.readJson<Record<string, unknown>>("brand-runtime.json");
+  }
+
+  async writeRuntime(data: unknown): Promise<void> {
+    await this.writeJson("brand-runtime.json", data);
+  }
+
+  async readPolicy(): Promise<Record<string, unknown>> {
+    return this.readJson<Record<string, unknown>>("interaction-policy.json");
+  }
+
+  async writePolicy(data: unknown): Promise<void> {
+    await this.writeJson("interaction-policy.json", data);
+  }
+
+  async hasRuntime(): Promise<boolean> {
+    try {
+      await access(this.path("brand-runtime.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // --- Asset scanning ---
 
   async listAssets(subdir: string): Promise<string[]> {

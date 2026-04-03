@@ -73,7 +73,7 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 | `brand_extract_web` | Extract logo (SVG/PNG), colors, and fonts from any website URL. |
 | `brand_extract_figma` | Extract from Figma design files (higher accuracy). Two-phase: plan then ingest. |
 | `brand_set_logo` | Add/replace logo via SVG markup, URL, or data URI. |
-| `brand_compile` | Generate DTCG design tokens and Visual Identity Manifest from extracted data. |
+| `brand_compile` | Generate DTCG design tokens, brand runtime contract, and interaction policy from extracted data. |
 | `brand_clarify` | Resolve ambiguous brand values interactively (color roles, font confirmations). |
 | `brand_audit` | Validate .brand/ directory for completeness and correctness. |
 | `brand_report` | Generate portable HTML brand report. Upload to any AI chat as instant guidelines. |
@@ -103,10 +103,19 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 | `brand_build_themes` | Define editorial content themes balanced across awareness, engagement, and conversion. |
 | `brand_build_matrix` | Generate messaging variants for every persona x journey stage combination. |
 
-### Cross-Session Utilities
+### Content Scoring
 
 | Tool | What it does |
 |------|-------------|
+| `brand_audit_content` | Score content against brand rules (0-100) across multiple dimensions. |
+| `brand_check_compliance` | Quick pass/fail compliance gate before publishing. |
+| `brand_audit_drift` | Detect systematic brand drift across multiple pieces of content. |
+
+### Runtime + Utilities
+
+| Tool | What it does |
+|------|-------------|
+| `brand_runtime` | Read the compiled brand runtime contract (single-document brand context for AI agents). |
 | `brand_write` | Load full brand context (visual + voice + strategy) for content generation. |
 | `brand_export` | Generate portable brand files for Chat, Code, team sharing, or email. |
 | `brand_feedback` | Report bugs, friction, or feature ideas to the brandsystem team. |
@@ -135,6 +144,8 @@ After running the full pipeline, your `.brand/` directory looks like this:
   brand.config.yaml              # Client name, industry, source URLs, session state
   core-identity.yaml             # Colors, typography, logos with confidence scores
   tokens.json                    # DTCG design tokens (compiled output)
+  brand-runtime.json             # Compiled runtime contract (single-doc brand context)
+  interaction-policy.json        # Enforceable rules (anti-patterns, voice, claims)
   needs-clarification.yaml       # Items requiring human review
   brand-report.html              # Portable HTML brand report
   visual-identity.yaml           # Session 2: composition, patterns, anti-patterns
@@ -158,6 +169,8 @@ After running the full pipeline, your `.brand/` directory looks like this:
 | `brand.config.yaml` | YAML | Project metadata: client name, industry, website URL, Figma file key, session number, schema version |
 | `core-identity.yaml` | YAML | All extracted brand data: colors (with roles and confidence), typography (with families and weights), logo specs (with inline SVG and data URIs), spacing |
 | `tokens.json` | JSON | [DTCG](https://tr.designtokens.org/format/) design tokens. Only includes values with medium+ confidence. Each token carries `$extensions` with source and confidence metadata |
+| `brand-runtime.json` | JSON | Single-document brand contract for AI agents. Merges all 4 session YAMLs into flat, fast-access format. Only medium+ confidence values. Compiled by `brand_compile`, read by `brand_runtime` |
+| `interaction-policy.json` | JSON | Enforceable rules engine. Visual anti-patterns, voice constraints (never-say, AI-ism patterns), and content claims policies. Used by preflight and scoring tools |
 | `needs-clarification.yaml` | YAML | Prioritized list of items the system could not resolve confidently: missing primary color, low-confidence values, unassigned roles |
 | `brand-report.html` | HTML | Self-contained brand report. Works offline, embeds all assets inline. Paste into any AI tool as brand guidelines |
 | `assets/logo/` | SVG/PNG | Extracted logo files. SVGs include inline path data in `core-identity.yaml` for portability |
@@ -198,10 +211,33 @@ Create `.cursor/mcp.json` in your project root:
 
 ### Windsurf
 
-Add via Windsurf MCP settings (Settings > MCP Servers > Add):
+Create `~/.codeium/windsurf/mcp_config.json`:
 
-- **Name:** brandsystem
-- **Command:** `npx -y @brandsystem/mcp`
+```json
+{
+  "mcpServers": {
+    "brandsystem": {
+      "command": "npx",
+      "args": ["-y", "@brandsystem/mcp"]
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Open Settings > Developer > Edit Config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "brandsystem": {
+      "command": "npx",
+      "args": ["-y", "@brandsystem/mcp"]
+    }
+  }
+}
+```
 
 ### Claude Chat (no MCP)
 
@@ -212,6 +248,52 @@ If you are using Claude Chat without MCP support:
 3. Say: "Use this as my brand guidelines for everything we create"
 
 The report HTML is self-contained and works as a standalone brand reference in any AI tool.
+
+---
+
+## Troubleshooting
+
+### "No .brand/ directory found"
+
+Every tool except `brand_start`, `brand_init`, and `brand_feedback` requires a `.brand/` directory. Run `brand_start` first.
+
+### Empty extraction (no colors or fonts found)
+
+This usually means the website loads CSS dynamically via JavaScript. `brand_extract_web` only parses static CSS from `<style>` blocks and linked stylesheets. Solutions:
+
+- **Try a different page** that uses more inline/linked CSS (e.g., the homepage, a blog post)
+- **Use Figma extraction** (`brand_extract_figma`) for higher accuracy
+- **Set values manually** using `brand_clarify` after extraction
+
+### Figma extraction fails
+
+`brand_extract_figma` doesn't connect to Figma directly. It works in two phases:
+
+1. **Plan** returns instructions for what data to fetch (variables, styles, logo)
+2. **Ingest** processes data you pass back from the Figma MCP tools
+
+Make sure you have a separate Figma MCP server connected (e.g., `@anthropics/figma-mcp`) and pass the fetched data to `brand_extract_figma` in ingest mode.
+
+### Logo not detected
+
+Web extraction looks for `<img>`, `<svg>`, and `<link rel="icon">` elements. If your logo is rendered via JavaScript or embedded as a CSS background, use `brand_set_logo` to add it manually with SVG markup, a URL, or a data URI.
+
+### "Response size exceeds 5K target" (console warning)
+
+This is a soft warning, not an error. Some tools (brand_write, brand_deepen_identity) return rich conversation guides that exceed 5K characters. The hard limit is 50K, which triggers truncation.
+
+### Server won't start
+
+```bash
+# Verify Node.js >= 18
+node --version
+
+# Test the server manually
+npx @brandsystem/mcp
+
+# Check for port conflicts (stdio transport shouldn't have any)
+# The server uses stdio, not HTTP -- it reads from stdin and writes to stdout
+```
 
 ---
 
@@ -364,14 +446,14 @@ npm start
 ```
 src/
   index.ts              # Entry point -- stdio transport
-  server.ts             # MCP server creation and tool registration (24 tools)
-  tools/                # One file per tool (24 files)
+  server.ts             # MCP server creation and tool registration (28 tools)
+  tools/                # One file per tool (26 files, 28 tools)
     brand-start.ts              # Entry point (Session 1)
     brand-status.ts             # Progress dashboard
     brand-extract-web.ts        # Website extraction
     brand-extract-figma.ts      # Figma extraction (plan/ingest)
     brand-set-logo.ts           # Manual logo add/replace
-    brand-compile.ts            # Token + VIM compilation
+    brand-compile.ts            # Token + VIM + runtime compilation
     brand-clarify.ts            # Interactive clarification
     brand-audit.ts              # Schema validation
     brand-report.ts             # HTML report generation
@@ -385,26 +467,41 @@ src/
     brand-build-journey.ts      # Session 4: buyer journey stages
     brand-build-themes.ts       # Session 4: editorial themes
     brand-build-matrix.ts       # Session 4: messaging matrix
+    brand-audit-content.ts      # Content scoring (0-100)
+    brand-check-compliance.ts   # Binary pass/fail compliance gate
+    brand-audit-drift.ts        # Batch drift detection
+    brand-runtime.ts            # Read compiled brand runtime contract
     brand-write.ts              # Content generation context loader
     brand-export.ts             # Portable brand file export
-    brand-feedback.ts           # Bug reports + feedback
+    brand-feedback.ts           # Bug reports + feedback (3 tools)
   lib/                  # Shared utilities
     brand-dir.ts        # .brand/ directory I/O (YAML, JSON, markdown, assets)
     confidence.ts       # Confidence scoring and source precedence
     css-parser.ts       # CSS color and font extraction
     dtcg-compiler.ts    # DTCG token compilation
+    color-namer.ts      # Human-readable color name generation
+    content-scorer.ts   # Brand compliance scoring engine
     logo-extractor.ts   # Logo candidate detection
     svg-resolver.ts     # SVG inlining and base64 encoding
     report-html.ts      # HTML report generation
     vim-generator.ts    # Visual Identity Manifest + system integration markdown
+    runtime-compiler.ts # Compile brand-runtime.json from 4 source YAMLs
+    interaction-policy-compiler.ts  # Compile interaction-policy.json (enforceable rules)
     response.ts         # Structured MCP response builder
+    version.ts          # Package version reader
   types/
     index.ts            # TypeScript type definitions
   schemas/
-    index.ts            # Zod schemas for validation
+    index.ts            # Zod schemas for validation (7 schema files)
 bin/
   brandsystem-mcp.mjs   # CLI entry point
+specs/
+  brand-runtime-schema.md         # Runtime contract documentation
+  interaction-policy-schema.md    # Interaction policy documentation
 test/
+  lib/                  # Library unit tests (9 files)
+  tools/                # Tool tests (2 files: export + smoke)
+  server.test.ts        # Server creation smoke test
 ```
 
 ---

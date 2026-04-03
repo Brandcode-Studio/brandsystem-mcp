@@ -20,8 +20,8 @@ Build must pass before committing. The entry point is `src/index.ts` (stdio tran
 ```
 src/
   index.ts         # Stdio transport entry point
-  server.ts        # Creates McpServer, registers all 27 tools in priority order
-  tools/           # One file per tool (27 files). Each exports a register(server) function.
+  server.ts        # Creates McpServer, registers all 28 tools in priority order
+  tools/           # One file per tool (26 files, 28 tools). Each exports a register(server) function.
   lib/             # Shared utilities (brand-dir, css-parser, dtcg-compiler, content-scorer, etc.)
   types/           # TypeScript type definitions
   schemas/         # Zod schemas for validation
@@ -39,7 +39,8 @@ Tools are registered in the order agents see them. Entry points first:
 5. Session 3 tools (extract messaging, compile messaging)
 6. Session 4 tools (personas, journey, themes, matrix)
 7. Content scoring tools (audit-content, check-compliance, audit-drift)
-8. Cross-session utilities (write, export, feedback)
+8. Runtime (brand_runtime -- read compiled runtime contract)
+9. Cross-session utilities (write, export, feedback)
 
 ### Response Format
 
@@ -64,6 +65,10 @@ Many tools include a `conversation_guide` in the data to help agents present res
 - `src/lib/svg-resolver.ts` -- SVG sanitization, inlining, base64 encoding
 - `src/lib/report-html.ts` -- HTML report generation
 - `src/lib/vim-generator.ts` -- Visual Identity Manifest markdown generation
+- `src/lib/runtime-compiler.ts` -- Compile brand-runtime.json from 4 source YAMLs
+- `src/lib/interaction-policy-compiler.ts` -- Compile interaction-policy.json (enforceable rules)
+- `src/lib/content-scorer.ts` -- Brand compliance scoring engine
+- `src/lib/color-namer.ts` -- Human-readable color name generation
 - `src/lib/response.ts` -- Structured MCP response builder
 
 ## How to Add a New Tool

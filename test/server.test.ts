@@ -8,10 +8,10 @@ describe('createServer', () => {
     expect(typeof server.tool).toBe('function');
   });
 
-  it('registers 15 tools (one register call per tool)', () => {
-    // createServer calls 15 register functions.
+  it('registers all tools without throwing', () => {
+    // createServer calls 28 register functions.
     // We verify it doesn't throw during registration, which confirms
-    // all 15 tool modules load and register successfully.
+    // all tool modules load and register successfully.
     expect(() => createServer()).not.toThrow();
   });
 });
