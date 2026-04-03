@@ -25,6 +25,7 @@ import { register as registerFeedback } from "./tools/brand-feedback.js";
 import { register as registerAuditContent } from "./tools/brand-audit-content.js";
 import { register as registerCheckCompliance } from "./tools/brand-check-compliance.js";
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
+import { register as registerRuntime } from "./tools/brand-runtime.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -65,6 +66,9 @@ export function createServer(): McpServer {
   registerAuditContent(server);   // Score content against brand identity
   registerCheckCompliance(server); // Binary pass/fail gate
   registerAuditDrift(server);     // Batch drift detection
+
+  // ── Runtime ──
+  registerRuntime(server);     // Read compiled brand runtime contract
 
   // ── Cross-session utilities ──
   registerWrite(server);       // Load brand context for content gen

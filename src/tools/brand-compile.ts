@@ -4,6 +4,8 @@ import { buildResponse } from "../lib/response.js";
 import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { needsClarification } from "../lib/confidence.js";
 import { generateVIM, generateSystemIntegration } from "../lib/vim-generator.js";
+import { compileRuntime } from "../lib/runtime-compiler.js";
+import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
 import type { ClarificationItem } from "../types/index.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 
@@ -111,25 +113,24 @@ async function handler() {
     nextSteps.push("Run brand_report to generate the portable brand identity report");
   }
 
-  // --- Session 2: VIM generation if visual-identity.yaml exists ---
+  // --- Read optional session data ---
   const hasVisual = await brandDir.hasVisualIdentity();
+  const hasMessaging = await brandDir.hasMessaging();
+  const hasStrategy = await brandDir.hasStrategy();
+  const visual = hasVisual ? await brandDir.readVisualIdentity() : null;
+  const messaging = hasMessaging ? await brandDir.readMessaging() : null;
+  const strategy = hasStrategy ? await brandDir.readStrategy() : null;
 
-  if (hasVisual) {
-    const visual = await brandDir.readVisualIdentity();
-
+  // --- Session 2: VIM generation if visual-identity.yaml exists ---
+  if (visual) {
     const vimMarkdown = generateVIM(config, identity, visual);
     await brandDir.writeMarkdown("visual-identity-manifest.md", vimMarkdown);
     filesWritten.push("visual-identity-manifest.md");
-
-    // Include messaging data if available for self-contained output
-    const hasMessaging = await brandDir.hasMessaging();
-    const messaging = hasMessaging ? await brandDir.readMessaging() : null;
 
     const integrationMarkdown = generateSystemIntegration(config, identity, visual, messaging);
     await brandDir.writeMarkdown("system-integration.md", integrationMarkdown);
     filesWritten.push("system-integration.md");
 
-    // Bump session to 2 if not already there
     if (config.session < 2) {
       config.session = 2;
       await brandDir.writeConfig(config);
@@ -140,15 +141,23 @@ async function handler() {
       "System Integration Guide written — paste the quick-setup block into CLAUDE.md or .cursorrules"
     );
 
-    // Check if Session 3 is needed
-    if (!hasMessaging) {
+    if (!messaging) {
       nextSteps.push("Ready for Session 3: run brand_extract_messaging to audit your voice, then brand_compile_messaging to define perspective + voice + brand story");
     }
   }
 
+  // --- Runtime + Interaction Policy compilation ---
+  const runtime = compileRuntime(config, identity, visual, messaging, strategy);
+  await brandDir.writeRuntime(runtime);
+  filesWritten.push("brand-runtime.json");
+
+  const policy = compileInteractionPolicy(config.schema_version, visual, messaging, strategy);
+  await brandDir.writePolicy(policy);
+  filesWritten.push("interaction-policy.json");
+
   // Session transition guidance
   const conversationGuide: Record<string, string> = {};
-  if (hasVisual && !(await brandDir.hasMessaging())) {
+  if (hasVisual && !hasMessaging) {
     conversationGuide.session_3_transition = [
       "Session 2 (Visual Identity) is complete. Now transition to Session 3.",
       "Tell the user: 'Your visual identity is locked in — composition, patterns, signature moves, and anti-patterns. Now let's capture how your brand *sounds*. This is where output goes from color-correct to distinctively yours.'",
@@ -179,6 +188,7 @@ async function handler() {
         high_priority: clarifications.filter((c) => c.priority === "high").length,
         items: clarifications.map((c) => `[${c.priority}] ${c.question}`),
       },
+      runtime_compiled: true,
       ...(hasVisual && { vim_generated: true }),
       ...(Object.keys(conversationGuide).length > 0 && { conversation_guide: conversationGuide }),
     },
@@ -188,7 +198,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_compile",
-    "Generate DTCG design tokens and a Visual Identity Manifest from extracted brand data. Transforms core-identity.yaml into standards-compliant tokens.json (colors, typography, spacing). Surfaces ambiguous values in needs-clarification.yaml for human review. When Session 2 data exists, also generates visual-identity-manifest.md and system-integration.md (CLAUDE.md/.cursorrules setup guide). Use after brand_extract_web or brand_extract_figma. Returns token counts, clarification items, and file list.",
+    "Generate DTCG design tokens, brand runtime, and interaction policy from extracted brand data. Transforms core-identity.yaml into tokens.json, brand-runtime.json (single-document brand contract for AI agents), and interaction-policy.json (enforceable rules). When Session 2+ data exists, also generates visual-identity-manifest.md and system-integration.md. Use after brand_extract_web or brand_extract_figma. Returns token counts, clarification items, and file list.",
     async () => handler()
   );
 }
