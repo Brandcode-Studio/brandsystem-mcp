@@ -35,7 +35,7 @@ Copy this into `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor), or Windsu
 
 Tell your AI tool:
 
-> Run brand_start for "Acme Corp" with website https://acme.com in auto mode
+> Run brand_start with client_name="Acme Corp", website_url="https://acme.com", and mode="auto"
 
 That single command extracts colors, fonts, and logo from the website, compiles DTCG tokens, and generates a portable HTML brand report -- all in under 60 seconds.
 
@@ -58,6 +58,12 @@ The AI now has your full brand context -- colors, typography, logo, anti-pattern
 **Session 4: Content Strategy** -- Build buyer personas, journey stages, editorial themes, and a persona x stage messaging matrix.
 
 Each session builds on the previous. Stop anywhere -- you get value immediately.
+
+### Two Ways To Use It
+
+**Local-first MCP flow** -- Start from a website or Figma file, build a `.brand/` directory locally, and use it immediately in chat or code tools with no account required.
+
+**Brandcode Studio-connected flow** -- Connect an existing hosted brand from Brandcode Studio, pull the packaged brand into `.brand/`, and keep it synced over time.
 
 ---
 
@@ -124,6 +130,14 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 | `brand_export` | Generate portable brand files for Chat, Code, team sharing, or email. |
 | `brand_feedback` | Report bugs, friction, or feature ideas to the brandsystem team. |
 
+### Brandcode Studio Connector
+
+| Tool | What it does |
+|------|-------------|
+| `brand_brandcode_connect` | Connect a local `.brand/` directory to a hosted Brandcode Studio brand and pull the current package. |
+| `brand_brandcode_sync` | Pull updates from a previously connected hosted brand using sync-token-aware delta behavior. |
+| `brand_brandcode_status` | Inspect the current Brandcode Studio connection, sync history, and local package summary. |
+
 ### Tool Flow
 
 Tools auto-chain -- each tool's response tells the LLM what to run next:
@@ -136,6 +150,18 @@ Session 4: brand_build_personas → brand_build_journey → brand_build_themes �
 ```
 
 `brand_status` can be called at any point. `brand_preflight` runs after any content generation.
+
+### CLI Connector Commands
+
+The npm package also ships a CLI entrypoint for the hosted-brand connector:
+
+```bash
+npx @brandsystem/mcp brandcode connect https://brandcode.studio/start/brands/pendium
+npx @brandsystem/mcp brandcode sync
+npx @brandsystem/mcp brandcode status
+```
+
+For protected hosted brands, add `--share-token=TOKEN`.
 
 ---
 
@@ -261,6 +287,8 @@ The report HTML is self-contained and works as a standalone brand reference in a
 
 Every tool except `brand_start`, `brand_init`, and `brand_feedback` requires a `.brand/` directory. Run `brand_start` first.
 
+If you are using the hosted-brand flow instead of local extraction, `brand_brandcode_connect` also scaffolds `.brand/` automatically on first connect.
+
 ### Empty extraction (no colors or fonts found)
 
 This usually means the website loads CSS dynamically via JavaScript. `brand_extract_web` only parses static CSS from `<style>` blocks and linked stylesheets. Solutions:
@@ -357,40 +385,40 @@ A Figma-sourced primary color will replace a web-extracted one. A manually confi
 
 ## The Bigger Picture
 
-brandsystem.app is a standalone product — it works for any brand, in any AI tool, with no external dependencies. But it's also the first-touch onramp into a larger system.
+`@brandsystem/mcp` now works in two complementary modes: as a standalone local MCP for portable brand creation, and as a connector into hosted Brandcode Studio brands when you want sync, packaging, and shared distribution.
 
-### Relationship to Brandcode
+### Relationship to Brandcode Studio
 
-[Brandcode](https://github.com/Brand-System/column-five-prototypes) is an end-to-end content system that governs everything from brand identity to production to measurement — and loops measurement insights back into the brand. brandsystem.app is the marketing-first entry point that creates the Brand OS, which naturally draws clients into operationalizing it within Brandcode.
+[Brandcode Studio](https://brandcode.studio) is the hosted system for managing, packaging, and distributing brand systems. `@brandsystem/mcp` is the portable runtime layer: it can create a `.brand/` directory from scratch, or it can connect to a hosted Studio brand and pull that brand into local tools.
 
 ```
                     ┌──────────────────────┐
-                    │   Brand OS Creation   │
-                    │  ★ brandsystem.app    │
+                    │  Brand OS Creation    │
+                    │ ★ @brandsystem/mcp    │
                     └──────────┬───────────┘
-                               │ creates
+                               │ creates or pulls
                                ▼
 ┌──────────────────────────────────────────────────┐
-│                   Brandcode                       │
+│                Brandcode Studio                   │
 │                                                   │
-│  Market Intelligence ──→ Brand Perspective         │
+│  Hosted brand packages ──→ Sync + distribution     │
 │         ▲                      │                  │
 │         │               Governance layer          │
-│         │          (claims, narratives, rules)     │
+│         │          (claims, narratives, rules)    │
 │         │                      │                  │
 │         │               Production engines        │
-│         │          (web, PDF, viz, copywriting)    │
+│         │          (web, PDF, viz, copywriting)   │
 │         │                      │                  │
 │         └──── Measurement ◄────┘                  │
 │               (performance → insights → loop)     │
 └──────────────────────────────────────────────────┘
 ```
 
-**brandsystem.app creates the Brand OS** — the first artifact of Brandcode. Colors, typography, voice, composition rules, messaging. This is valuable on its own: paste the report into any AI tool and get better brand compliance immediately.
+**`@brandsystem/mcp` creates or pulls the Brand OS** — colors, typography, voice, composition rules, messaging, and portable outputs that work immediately in any AI tool.
 
-**The pull into Brandcode comes naturally.** Once you have a Brand OS, the next questions are operational: What can we claim? How should different content types use this identity? How do we measure whether it's working? That's the Brandcode governance and production loop — Market Intelligence feeds new insights into the brand perspective, production creates governed content, measurement evaluates performance, and those insights loop back to evolve the Brand OS.
+**Brandcode Studio adds the hosted operational layer.** Once you want shared distribution, sync, governance-backed packages, and richer production workflows, the same brand can be managed centrally and pulled into local MCP sessions on demand.
 
-**You don't need the full loop.** brandsystem.app delivers standalone value at every session. The Brandcode ecosystem is there when you're ready to operationalize.
+**You don't need the hosted layer to get value.** The standalone local flow remains fully usable with no account required. The Studio connector is optional when you are ready for shared hosted brands.
 
 ### Progressive Depth
 
@@ -402,18 +430,19 @@ Each stage builds on the previous. Stop anywhere — you get value immediately.
 | **2. MCP depth** | Figma extraction, clarification, full audit | Session 1 with `brand_extract_figma` + `brand_clarify` |
 | **3. Visual identity** | Composition rules, patterns, anti-patterns, VIM | Session 2: `brand_deepen_identity` → `brand_compile` |
 | **4. Core messaging** | Voice profile, perspective, brand story | Session 3: `brand_extract_messaging` → `brand_compile_messaging` |
-| **5. Brandcode governance** | Claims, narratives, application rules, scoring, measurement | Operationalize the Brand OS within Brandcode |
-| **6. Full loop** | Market Intelligence → production → measurement → insights back into Brand OS | Brandcode end-to-end |
+| **5. Studio sync** | Hosted package pull, sync history, shared distribution | `brand_brandcode_connect` → `brand_brandcode_status` → `brand_brandcode_sync` |
+| **6. Brandcode governance** | Claims, narratives, application rules, scoring, measurement | Operationalize the Brand OS within Brandcode Studio |
+| **7. Full loop** | Market Intelligence → production → measurement → insights back into Brand OS | Brandcode end-to-end |
 
-Stages 1–4 are brandsystem.app. Open source, fully portable, no dependencies.
+Stages 1–4 are the standalone local MCP flow. Open source, fully portable, no account required.
 
-Stages 5–6 are the full Brandcode ecosystem — where the Brand OS becomes operational. Available through [Column Five Media](https://columnfivemedia.com).
+Stages 5–7 are the hosted Brandcode ecosystem — where the Brand OS becomes shared, synced, and operational. Available through [Brandcode Studio](https://brandcode.studio) and [Column Five Media](https://columnfivemedia.com).
 
 ### What's Portable
 
 | Artifact | Portable? | Owned By |
 |----------|-----------|----------|
-| brandsystem.app (tools) | Fully — open source, any brand | MIT license |
+| `@brandsystem/mcp` (tools) | Fully — open source, any brand | MIT license |
 | `.brand/` directory (outputs) | Fully — works in any tool | Client |
 | Brandcode framework (schema + workflows) | Yes — universal | Open |
 | Client claims, narratives, rules | Per-instance | Client |
@@ -450,8 +479,9 @@ npm start
 ```
 src/
   index.ts              # Entry point -- stdio transport
-  server.ts             # MCP server creation and tool registration (28 tools)
-  tools/                # One file per tool (26 files, 28 tools)
+  cli.ts                # CLI entry point for brandcode connect/sync/status
+  server.ts             # MCP server creation and tool registration (29 tools)
+  tools/                # One file per tool
     brand-start.ts              # Entry point (Session 1)
     brand-status.ts             # Progress dashboard
     brand-extract-web.ts        # Website extraction
@@ -475,9 +505,14 @@ src/
     brand-check-compliance.ts   # Binary pass/fail compliance gate
     brand-audit-drift.ts        # Batch drift detection
     brand-runtime.ts            # Read compiled brand runtime contract
+    brand-brandcode-connect.ts  # Hosted brand connect
+    brand-brandcode-sync.ts     # Hosted brand sync
+    brand-brandcode-status.ts   # Hosted brand status
     brand-write.ts              # Content generation context loader
     brand-export.ts             # Portable brand file export
-    brand-feedback.ts           # Bug reports + feedback (3 tools)
+    brand-feedback.ts           # Bug reports + feedback
+  connectors/
+    brandcode/                  # Hosted brand client, persistence, and URL resolution
   lib/                  # Shared utilities
     brand-dir.ts        # .brand/ directory I/O (YAML, JSON, markdown, assets)
     confidence.ts       # Confidence scoring and source precedence
