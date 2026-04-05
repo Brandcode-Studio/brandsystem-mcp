@@ -1,0 +1,12 @@
+schema_version: "0.1.0"
+items:
+  - id: "clarify-1"
+    field: "colors.accent"
+    question: "Gold accent color has medium confidence. Is #f5a623 correct?"
+    source: web
+    priority: medium
+  - id: "clarify-2"
+    field: "spacing"
+    question: "No spacing system detected. What is your base spacing unit?"
+    source: compilation
+    priority: low

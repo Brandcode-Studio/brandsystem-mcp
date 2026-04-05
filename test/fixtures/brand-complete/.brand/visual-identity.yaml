@@ -1,0 +1,24 @@
+schema_version: "0.1.0"
+session: 2
+composition:
+  energy: "balanced, structured"
+  negative_space: "minimum 30%"
+  grid: "8px base, 12-column"
+  layout_preference: "structured symmetry"
+patterns: null
+illustration:
+  style: "flat"
+  function: "explanatory"
+  assets: []
+photography: null
+signature:
+  description: "Clean geometric forms with bold typography"
+  elements:
+    - "Oversized section numbers"
+    - "Duotone color blocking"
+anti_patterns:
+  - rule: "No drop shadows"
+    severity: hard
+  - rule: "No italicized body text"
+    severity: soft
+positioning_context: "Modern technology brand focused on clarity"

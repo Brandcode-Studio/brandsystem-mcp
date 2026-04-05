@@ -1,0 +1,39 @@
+schema_version: "0.1.0"
+colors:
+  - name: "Navy Blue"
+    value: "#2a4494"
+    role: primary
+    source: web
+    confidence: confirmed
+  - name: "Coral Red"
+    value: "#e8523f"
+    role: secondary
+    source: web
+    confidence: high
+  - name: "Gold"
+    value: "#f5a623"
+    role: accent
+    source: web
+    confidence: medium
+typography:
+  - name: "Heading"
+    family: "Inter"
+    weight: 700
+    size: "32px"
+    source: web
+    confidence: high
+  - name: "Body"
+    family: "Inter"
+    weight: 400
+    size: "16px"
+    source: web
+    confidence: high
+logo:
+  - type: wordmark
+    source: web
+    confidence: high
+    variants:
+      - name: default
+        file: logo/logo-wordmark.svg
+        inline_svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50"><rect width="200" height="50" fill="#2a4494" rx="4"/><text x="100" y="32" fill="white" font-family="Inter" font-size="20" text-anchor="middle">Fixture Brand</text></svg>'
+spacing: null
