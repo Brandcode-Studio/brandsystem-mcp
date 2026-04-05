@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { getVersion } from "../lib/version.js";
+import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES } from "../lib/url-validator.js";
 import { ERROR_CODES, type MessagingAuditResult } from "../types/index.js";
 
 // ─── Parameters ──────────────────────────────────────────────────────────────
@@ -597,12 +598,12 @@ async function handler(input: Params) {
   const allUrls = urls.slice(0, 10);
   const fetchResults = await Promise.allSettled(
     allUrls.map(async (pageUrl) => {
-      const resp = await fetch(pageUrl, {
+      const resp = await safeFetch(pageUrl, {
         signal: AbortSignal.timeout(15000),
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
       if (!resp.ok) return { url: pageUrl, text: "" };
-      const html = await resp.text();
+      const html = await readResponseWithLimit(resp, MAX_HTML_BYTES);
       const $ = cheerio.load(html);
       const text = extractTextContent($);
       return { url: pageUrl, text };
