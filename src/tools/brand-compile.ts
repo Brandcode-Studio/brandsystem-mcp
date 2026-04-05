@@ -9,7 +9,7 @@ import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js"
 import { ERROR_CODES, type ClarificationItem } from "../types/index.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 
-async function handler() {
+async function handler(server: McpServer) {
   const brandDir = new BrandDir(process.cwd());
 
   if (!(await brandDir.exists())) {
@@ -155,6 +155,9 @@ async function handler() {
   await brandDir.writePolicy(policy);
   filesWritten.push("interaction-policy.json");
 
+  // Notify subscribed resource clients that runtime + policy have changed
+  server.sendResourceListChanged();
+
   // Session transition guidance
   let conversationGuide: { instruction: string; conditionals?: Record<string, string> } | null = null;
   if (hasVisual && !hasMessaging) {
@@ -205,6 +208,6 @@ export function register(server: McpServer) {
   server.tool(
     "brand_compile",
     "Generate DTCG design tokens, brand runtime, and interaction policy from extracted brand data. Transforms core-identity.yaml into tokens.json, brand-runtime.json (single-document brand contract for AI agents), and interaction-policy.json (enforceable rules). When Session 2+ data exists, also generates visual-identity-manifest.md and system-integration.md. Use after brand_extract_web or brand_extract_figma. Returns token counts, clarification items, and file list.",
-    async () => handler()
+    async () => handler(server)
   );
 }

@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
+import { BrandDir } from "./lib/brand-dir.js";
+import { registerResources } from "./resources/brand-resources.js";
 import { register as registerInit } from "./tools/brand-init.js";
 import { register as registerStatus } from "./tools/brand-status.js";
 import { register as registerExtractWeb } from "./tools/brand-extract-web.js";
@@ -74,6 +76,10 @@ export function createServer(): McpServer {
   registerWrite(server);       // Load brand context for content gen
   registerExport(server);      // Generate portable brand files
   registerFeedback(server);    // Bug reports + feature ideas
+
+  // ── Resources (read-only, subscribable brand data) ──
+  const brandDir = new BrandDir(process.cwd());
+  registerResources(server, brandDir);
 
   return server;
 }
