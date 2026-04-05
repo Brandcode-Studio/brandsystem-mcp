@@ -14,7 +14,7 @@ import { homedir } from "node:os";
 
 const FEEDBACK_DIR = join(homedir(), ".brandsystem", "feedback");
 const MAX_FEEDBACK_FILES = 100; // hard cap on total files
-const MAX_FEEDBACK_PER_HOUR = 10;
+const MAX_FEEDBACK_PER_MINUTE = 5; // burst protection
 
 async function ensureFeedbackDir(): Promise<void> {
   await mkdir(FEEDBACK_DIR, { recursive: true });
@@ -28,17 +28,20 @@ async function checkFeedbackRateLimit(): Promise<string | null> {
   try {
     const files = await readdir(FEEDBACK_DIR);
     if (files.length >= MAX_FEEDBACK_FILES) {
-      return `Feedback limit reached (${MAX_FEEDBACK_FILES} files). Delete old feedback files to continue.`;
+      return `Feedback limit reached (${MAX_FEEDBACK_FILES} files). Delete old feedback files in ~/.brandsystem/feedback/ to continue.`;
     }
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    // Burst protection: max 5 files in the last minute
+    const oneMinuteAgo = Date.now() - 60 * 1000;
     let recentCount = 0;
+    const fs = await import("node:fs");
     for (const file of files) {
-      // Filenames start with YYYY-MM-DD, but check mtime for hourly rate
-      const { mtimeMs } = await import("node:fs").then(fs => fs.statSync(join(FEEDBACK_DIR, file)));
-      if (mtimeMs > oneHourAgo) recentCount++;
+      try {
+        const { mtimeMs } = fs.statSync(join(FEEDBACK_DIR, file));
+        if (mtimeMs > oneMinuteAgo) recentCount++;
+      } catch { continue; }
     }
-    if (recentCount >= MAX_FEEDBACK_PER_HOUR) {
-      return `Rate limit: max ${MAX_FEEDBACK_PER_HOUR} feedback entries per hour.`;
+    if (recentCount >= MAX_FEEDBACK_PER_MINUTE) {
+      return `Rate limit: max ${MAX_FEEDBACK_PER_MINUTE} feedback entries per minute. Try again shortly.`;
     }
     return null;
   } catch {
