@@ -28,6 +28,9 @@ import { register as registerAuditContent } from "./tools/brand-audit-content.js
 import { register as registerCheckCompliance } from "./tools/brand-check-compliance.js";
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 import { register as registerRuntime } from "./tools/brand-runtime.js";
+import { register as registerBrandcodeConnect } from "./tools/brand-brandcode-connect.js";
+import { register as registerBrandcodeSync } from "./tools/brand-brandcode-sync.js";
+import { register as registerBrandcodeStatus } from "./tools/brand-brandcode-status.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -71,6 +74,11 @@ export function createServer(): McpServer {
 
   // ── Runtime ──
   registerRuntime(server);     // Read compiled brand runtime contract
+
+  // ── Brandcode Studio connector ──
+  registerBrandcodeConnect(server);  // Connect to hosted brand
+  registerBrandcodeSync(server);     // Sync with hosted brand
+  registerBrandcodeStatus(server);   // Inspect connection status
 
   // ── Cross-session utilities ──
   registerWrite(server);       // Load brand context for content gen
