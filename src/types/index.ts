@@ -365,6 +365,9 @@ export const ERROR_CODES = {
   INVALID_ITEMS: "invalid_items",
   EMPTY_ITEMS: "empty_items",
   ALL_EMPTY: "all_empty",
+
+  // Rate limiting
+  RATE_LIMITED: "rate_limited",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

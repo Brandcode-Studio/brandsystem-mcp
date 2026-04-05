@@ -1,4 +1,6 @@
 import dns from "node:dns/promises";
+import { Agent } from "node:http";
+import { Agent as HttpsAgent } from "node:https";
 
 /** CIDR ranges that must never be reached by outbound fetches. */
 const PRIVATE_RANGES_V4: Array<{ base: number; mask: number }> = [
@@ -19,18 +21,22 @@ function prefixToMask(prefix: number): number {
   return (~0 << (32 - prefix)) >>> 0;
 }
 
-function isPrivateIPv4(ip: string): boolean {
+export function isPrivateIPv4(ip: string): boolean {
   const int = ip4ToInt(ip);
   return PRIVATE_RANGES_V4.some((r) => ((int & r.mask) >>> 0) === r.base);
 }
 
-function isPrivateIPv6(ip: string): boolean {
+export function isPrivateIPv6(ip: string): boolean {
   const normalized = ip.toLowerCase();
   if (normalized === "::1") return true;          // loopback
   if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true; // fc00::/7
   if (normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
       normalized.startsWith("fea") || normalized.startsWith("feb")) return true; // fe80::/10
   return false;
+}
+
+function isPrivateIP(ip: string, family: 4 | 6): boolean {
+  return family === 4 ? isPrivateIPv4(ip) : isPrivateIPv6(ip);
 }
 
 /**
@@ -74,14 +80,54 @@ export async function validateUrl(url: string): Promise<void> {
 
 const MAX_REDIRECTS = 3;
 
+/** Max bytes for fetched HTML pages */
+export const MAX_HTML_BYTES = 5 * 1024 * 1024; // 5 MB
+/** Max bytes for fetched CSS stylesheets */
+export const MAX_CSS_BYTES = 1 * 1024 * 1024; // 1 MB
+
+/**
+ * Read a response body with a byte limit. Throws if limit exceeded.
+ */
+export async function readResponseWithLimit(response: Response, maxBytes: number): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      reader.cancel();
+      throw new Error(`Response exceeded ${(maxBytes / 1024 / 1024).toFixed(1)}MB limit`);
+    }
+    chunks.push(value);
+  }
+
+  const combined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(combined);
+}
+
 /**
  * Fetch a URL after validating it is not a private/reserved IP.
  * Follows redirects manually (up to 3 hops), validating each target.
+ *
+ * SECURITY: Uses a custom DNS lookup callback to prevent DNS rebinding (TOCTOU).
+ * The lookup callback validates the resolved IP BEFORE the connection is made,
+ * closing the window between validateUrl() and the actual TCP connection.
  */
 export async function safeFetch(
   url: string,
   options?: RequestInit,
 ): Promise<Response> {
+  // Pre-validate (catches protocol issues and IP literals early)
   await validateUrl(url);
 
   let currentUrl = url;

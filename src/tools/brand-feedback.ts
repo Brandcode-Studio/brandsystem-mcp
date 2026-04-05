@@ -13,9 +13,37 @@ import { homedir } from "node:os";
 // and is always readable by Claude in future sessions.
 
 const FEEDBACK_DIR = join(homedir(), ".brandsystem", "feedback");
+const MAX_FEEDBACK_FILES = 100; // hard cap on total files
+const MAX_FEEDBACK_PER_HOUR = 10;
 
 async function ensureFeedbackDir(): Promise<void> {
   await mkdir(FEEDBACK_DIR, { recursive: true });
+}
+
+/**
+ * Rate limit: max 10 feedback files per hour, max 100 total.
+ * Prevents disk exhaustion from a malicious agent flooding feedback.
+ */
+async function checkFeedbackRateLimit(): Promise<string | null> {
+  try {
+    const files = await readdir(FEEDBACK_DIR);
+    if (files.length >= MAX_FEEDBACK_FILES) {
+      return `Feedback limit reached (${MAX_FEEDBACK_FILES} files). Delete old feedback files to continue.`;
+    }
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    let recentCount = 0;
+    for (const file of files) {
+      // Filenames start with YYYY-MM-DD, but check mtime for hourly rate
+      const { mtimeMs } = await import("node:fs").then(fs => fs.statSync(join(FEEDBACK_DIR, file)));
+      if (mtimeMs > oneHourAgo) recentCount++;
+    }
+    if (recentCount >= MAX_FEEDBACK_PER_HOUR) {
+      return `Rate limit: max ${MAX_FEEDBACK_PER_HOUR} feedback entries per hour.`;
+    }
+    return null;
+  } catch {
+    return null; // if we can't check, allow the write
+  }
 }
 
 // ── Input sanitization ──────────────────────────────────────────
@@ -152,6 +180,15 @@ async function readBrandContext(): Promise<{
 
 async function sendHandler(input: SendParams) {
   await ensureFeedbackDir();
+
+  const rateLimitMsg = await checkFeedbackRateLimit();
+  if (rateLimitMsg) {
+    return buildResponse({
+      what_happened: rateLimitMsg,
+      next_steps: ["Try again later or review existing feedback files"],
+      data: { error: ERROR_CODES.RATE_LIMITED },
+    });
+  }
 
   const id = randomUUID();
   const timestamp = new Date().toISOString();

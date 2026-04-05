@@ -10,7 +10,7 @@ import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography, needsClarification } from "../lib/confidence.js";
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
-import { safeFetch } from "../lib/url-validator.js";
+import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
 import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { generateReportHTML, generateBrandInstructions } from "../lib/report-html.js";
 import { ERROR_CODES, type ColorEntry, type TypographyEntry, type LogoSpec, type CoreIdentity, type ClarificationItem } from "../types/index.js";
@@ -168,7 +168,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
         data: { error: ERROR_CODES.AUTO_FETCH_FAILED, status: response.status, fallback: "interactive" },
       });
     }
-    html = await response.text();
+    html = await readResponseWithLimit(response, MAX_HTML_BYTES);
   } catch (err) {
     return buildResponse({
       what_happened: `Auto mode: failed to fetch ${url}. Falling back to interactive mode.`,
@@ -209,7 +209,8 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
         signal: AbortSignal.timeout(5000),
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
-      allCSS += (await resp.text()) + "\n";
+      const cssText = await readResponseWithLimit(resp, MAX_CSS_BYTES);
+      allCSS += cssText + "\n";
     } catch {
       // Skip failed stylesheets
     }
