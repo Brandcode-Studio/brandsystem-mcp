@@ -9,6 +9,7 @@ import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
+import { safeFetch } from "../lib/url-validator.js";
 import { ERROR_CODES, type ColorEntry, type TypographyEntry, type LogoSpec, type CoreIdentity } from "../types/index.js";
 
 const paramsShape = {
@@ -40,7 +41,7 @@ async function handler(input: Params) {
 
   let html: string;
   try {
-    const response = await fetch(input.url, {
+    const response = await safeFetch(input.url, {
       signal: AbortSignal.timeout(15000),
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
@@ -95,7 +96,7 @@ async function handler(input: Params) {
 
   for (const sheetUrl of stylesheetUrls.slice(0, 5)) {
     try {
-      const resp = await fetch(sheetUrl, {
+      const resp = await safeFetch(sheetUrl, {
         signal: AbortSignal.timeout(5000),
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });

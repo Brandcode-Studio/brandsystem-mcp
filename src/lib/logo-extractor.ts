@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { getVersion } from "./version.js";
+import { safeFetch } from "./url-validator.js";
 
 export interface ExtractedLogo {
   url: string;
@@ -238,7 +239,7 @@ export async function fetchClearbitLogo(domain: string): Promise<ExtractedLogo |
   const url = `https://logo.clearbit.com/${cleanDomain}`;
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       signal: AbortSignal.timeout(5000),
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
@@ -289,7 +290,7 @@ export async function probeCommonLogoPaths(baseUrl: string): Promise<ExtractedLo
   for (const path of paths) {
     try {
       const url = `${base}${path}`;
-      const response = await fetch(url, {
+      const response = await safeFetch(url, {
         signal: AbortSignal.timeout(3000),
         method: "HEAD",
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
@@ -322,7 +323,7 @@ export async function fetchGoogleFavicon(domain: string): Promise<ExtractedLogo 
   const url = `https://www.google.com/s2/favicons?domain=${cleanDomain}&sz=256`;
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       signal: AbortSignal.timeout(5000),
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
@@ -358,7 +359,7 @@ export async function fetchAndEncodeLogo(
   if (url.startsWith("inline:")) return null;
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
@@ -390,7 +391,7 @@ export async function fetchLogo(
   if (url.startsWith("inline:")) return null;
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
