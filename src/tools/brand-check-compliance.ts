@@ -97,11 +97,16 @@ function countOccurrences(text: string, pattern: string): number {
 // ---------------------------------------------------------------------------
 
 async function resolveContent(input: string): Promise<{ content: string; isHtml: boolean }> {
+  // File path must be within cwd to prevent arbitrary file reads
   if (/\.(html?|md|txt)$/i.test(input.trim()) && !input.includes("\n") && input.length < 500) {
-    try {
-      const content = await readFile(input.trim(), "utf-8");
-      return { content, isHtml: /\.html?$/i.test(input.trim()) || isHtmlContent(content) };
-    } catch { /* not a file */ }
+    const { resolve } = await import("node:path");
+    const resolvedPath = resolve(process.cwd(), input.trim());
+    if (resolvedPath.startsWith(resolve(process.cwd()))) {
+      try {
+        const content = await readFile(resolvedPath, "utf-8");
+        return { content, isHtml: /\.html?$/i.test(input.trim()) || isHtmlContent(content) };
+      } catch { /* not a file */ }
+    }
   }
   return { content: input, isHtml: isHtmlContent(input) };
 }
