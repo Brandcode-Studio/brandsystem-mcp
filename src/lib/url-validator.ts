@@ -186,7 +186,12 @@ async function pinnedRequest(url: string, options?: RequestInit): Promise<Respon
       path: `${parsed.pathname}${parsed.search}`,
       method,
       headers: Object.fromEntries(headers.entries()),
-      lookup(_hostname, _requestOptions, callback) {
+      lookup(_hostname, requestOptions, callback) {
+        if (typeof requestOptions === "object" && requestOptions?.all) {
+          callback(null, [{ address: resolved.address, family: resolved.family }]);
+          return;
+        }
+
         callback(null, resolved.address, resolved.family);
       },
       signal: options?.signal ?? undefined,

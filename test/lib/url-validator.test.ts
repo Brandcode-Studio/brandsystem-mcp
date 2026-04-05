@@ -259,6 +259,21 @@ describe("safeFetch", () => {
     expect(callback).toHaveBeenCalledWith(null, "93.184.216.34", 4);
   });
 
+  it("returns the array lookup shape when Node requests all addresses", async () => {
+    mockLookup.mockResolvedValue([{ address: "2606:4700:20::681a:a58", family: 6 }] as any);
+
+    const requestSpy = mockTransportRequest(https, [makeResponse("ok", 200)]);
+
+    await safeFetch("https://boothbeacon.org");
+
+    const requestOptions = requestSpy.mock.calls[0][0] as {
+      lookup: (hostname: string, options: unknown, callback: (err: Error | null, addresses: Array<{ address: string; family: number }>) => void) => void;
+    };
+    const callback = vi.fn();
+    requestOptions.lookup("boothbeacon.org", { all: true }, callback);
+    expect(callback).toHaveBeenCalledWith(null, [{ address: "2606:4700:20::681a:a58", family: 6 }]);
+  });
+
   it("uses the http transport for plain http URLs", async () => {
     mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as any);
 
