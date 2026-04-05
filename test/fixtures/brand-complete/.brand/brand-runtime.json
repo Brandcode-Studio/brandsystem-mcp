@@ -1,0 +1,35 @@
+{
+  "version": "0.1.0",
+  "client_name": "Fixture Brand",
+  "compiled_at": "2026-01-15T12:00:00.000Z",
+  "sessions_completed": 2,
+  "identity": {
+    "colors": {
+      "primary": "#2a4494",
+      "secondary": "#e8523f",
+      "accent": "#f5a623"
+    },
+    "typography": {
+      "Heading": "Inter",
+      "Body": "Inter"
+    },
+    "logo": {
+      "type": "wordmark",
+      "has_svg": true
+    }
+  },
+  "visual": {
+    "composition": {
+      "energy": "balanced, structured",
+      "grid": "8px base, 12-column",
+      "layout": "structured symmetry"
+    },
+    "signature": {
+      "description": "Clean geometric forms with bold typography",
+      "elements": ["Oversized section numbers", "Duotone color blocking"]
+    },
+    "anti_patterns": ["No drop shadows"]
+  },
+  "voice": null,
+  "strategy": null
+}

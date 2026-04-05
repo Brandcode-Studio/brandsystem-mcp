@@ -1,4 +1,5 @@
 node_modules/
 dist/
 .brand/
+!test/fixtures/**/.brand/
 *.tsbuildinfo
