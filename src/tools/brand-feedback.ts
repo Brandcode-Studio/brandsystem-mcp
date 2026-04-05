@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES } from "../types/index.js";
+import { BrandDir } from "../lib/brand-dir.js";
 import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -70,10 +71,29 @@ function screenForInjection(text: string): string[] {
 
 const sendParamsShape = {
   category: z
-    .enum(["bug", "friction", "feature_request", "data_quality", "praise"])
+    .enum(["bug", "friction", "feature_request", "data_quality", "praise", "agent_signal"])
     .describe(
-      "Type of feedback. 'bug': something is broken. 'friction': it works but is harder than it should be. 'feature_request': a tool or capability that should exist. 'data_quality': extraction results seem wrong or incomplete. 'praise': something that works well and should be preserved."
+      "Type of feedback. 'bug': something is broken. 'friction': it works but is harder than it should be. 'feature_request': a tool or capability that should exist. 'data_quality': extraction results seem wrong or incomplete. 'praise': something that works well and should be preserved. 'agent_signal': structured signal from an agent about tool usage (requires signal, tool_used, signal_context)."
     ),
+  signal: z
+    .enum(["positive", "negative", "suggestion"])
+    .optional()
+    .describe("Signal type. Required when category is 'agent_signal'. 'positive': tool worked well, 'negative': tool failed or gave poor results, 'suggestion': improvement idea."),
+  tool_used: z
+    .string()
+    .max(255)
+    .optional()
+    .describe("Which tool triggered this signal (e.g. 'brand_extract_web'). Required when category is 'agent_signal'."),
+  signal_context: z
+    .string()
+    .max(2000)
+    .optional()
+    .describe("What the agent was trying to do when this signal occurred. Required when category is 'agent_signal'."),
+  outcome: z
+    .string()
+    .max(2000)
+    .optional()
+    .describe("What happened as a result. Optional for positive signals."),
   tool_name: z
     .string()
     .max(255)
@@ -111,12 +131,32 @@ const sendParamsShape = {
 const SendParamsSchema = z.object(sendParamsShape);
 type SendParams = z.infer<typeof SendParamsSchema>;
 
+/** Try to read brand context from .brand/config for auto-population. */
+async function readBrandContext(): Promise<{
+  brand_name?: string;
+  session?: number;
+  schema_version?: string;
+} | null> {
+  try {
+    const brandDir = new BrandDir(process.cwd());
+    const config = await brandDir.readConfig();
+    return {
+      brand_name: config.client_name,
+      session: config.session,
+      schema_version: config.schema_version,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function sendHandler(input: SendParams) {
   await ensureFeedbackDir();
 
   const id = randomUUID();
   const timestamp = new Date().toISOString();
   const severity = input.severity || "suggestion";
+  const isAgentSignal = input.category === "agent_signal";
 
   // Sanitize all free-text fields
   const cleanSummary = sanitize(input.summary);
@@ -125,12 +165,18 @@ async function sendHandler(input: SendParams) {
   const cleanErrorMsg = input.context?.error_message
     ? sanitize(input.context.error_message)
     : undefined;
+  const cleanToolUsed = input.tool_used ? sanitize(input.tool_used) : null;
+  const cleanSignalContext = input.signal_context ? sanitize(input.signal_context) : null;
+  const cleanOutcome = input.outcome ? sanitize(input.outcome) : null;
 
   // Screen for injection attempts
-  const allText = [cleanSummary, cleanDetail, cleanErrorMsg].filter(Boolean).join(" ");
+  const allText = [cleanSummary, cleanDetail, cleanErrorMsg, cleanSignalContext, cleanOutcome].filter(Boolean).join(" ");
   const injectionFlags = screenForInjection(allText);
 
-  const feedback = {
+  // Auto-populate brand context for agent signals
+  const brandContext = isAgentSignal ? await readBrandContext() : null;
+
+  const feedback: Record<string, unknown> = {
     id,
     timestamp,
     category: input.category,
@@ -148,6 +194,17 @@ async function sendHandler(input: SendParams) {
     }),
   };
 
+  // Add agent_signal-specific fields
+  if (isAgentSignal) {
+    feedback.signal = input.signal || null;
+    feedback.tool_used = cleanToolUsed;
+    feedback.signal_context = cleanSignalContext;
+    feedback.outcome = cleanOutcome;
+    if (brandContext) {
+      feedback.brand_context = brandContext;
+    }
+  }
+
   // Filename: timestamp-category-shortid for easy sorting
   const shortId = id.split("-")[0];
   const datePrefix = timestamp.slice(0, 10);
@@ -159,8 +216,12 @@ async function sendHandler(input: SendParams) {
     "utf-8"
   );
 
+  const whatHappened = isAgentSignal
+    ? `Agent signal recorded: ${input.signal || "unknown"} for ${cleanToolUsed || "unknown tool"}`
+    : `Feedback received and saved as ${filename}`;
+
   return buildResponse({
-    what_happened: `Feedback received and saved as ${filename}`,
+    what_happened: whatHappened,
     next_steps: [
       "The brandsystem team reviews agent feedback to prioritize improvements.",
       "Use brand_feedback_review to see all feedback and triage items.",
@@ -169,6 +230,11 @@ async function sendHandler(input: SendParams) {
       feedbackId: id,
       category: input.category,
       severity,
+      ...(isAgentSignal && {
+        signal: input.signal,
+        tool_used: cleanToolUsed,
+        ...(brandContext && { brand_context: brandContext }),
+      }),
       stored_at: join(FEEDBACK_DIR, filename),
     },
   });
@@ -178,7 +244,7 @@ async function sendHandler(input: SendParams) {
 
 const reviewParamsShape = {
   filter_category: z
-    .enum(["bug", "friction", "feature_request", "data_quality", "praise", "all"])
+    .enum(["bug", "friction", "feature_request", "data_quality", "praise", "agent_signal", "all"])
     .optional()
     .describe("Filter by category. Defaults to 'all'."),
   filter_status: z
@@ -252,6 +318,7 @@ async function reviewHandler(input: ReviewParams) {
       feature_request: allItems.filter((i) => i.category === "feature_request").length,
       data_quality: allItems.filter((i) => i.category === "data_quality").length,
       praise: allItems.filter((i) => i.category === "praise").length,
+      agent_signal: allItems.filter((i) => i.category === "agent_signal").length,
     },
     by_severity: {
       blocks_workflow: allItems.filter((i) => i.severity === "blocks_workflow").length,
@@ -352,7 +419,7 @@ async function triageHandler(input: TriageParams) {
 export function register(server: McpServer) {
   server.tool(
     "brand_feedback",
-    "Report bugs, friction, feature ideas, data quality issues, or praise to the brandsystem team. Use when a tool returns an error, extraction misses data, the workflow feels harder than it should, or something works particularly well. Stored locally in ~/.brandsystem/feedback/ for developer triage. Include the tool_name and as much context as possible. Returns a feedback ID.",
+    "Report bugs, friction, feature ideas, data quality issues, praise, or structured agent signals to the brandsystem team. Use when a tool returns an error, extraction misses data, the workflow feels harder than it should, or something works particularly well. For structured agent telemetry, use category='agent_signal' with signal, tool_used, and signal_context fields — brand context is auto-populated from .brand/config. Stored locally in ~/.brandsystem/feedback/ for developer triage. Returns a feedback ID.",
     sendParamsShape,
     async (args) => {
       const parsed = safeParseParams(SendParamsSchema, args);

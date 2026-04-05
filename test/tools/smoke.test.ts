@@ -80,6 +80,36 @@ describe("tools that need no .brand/ dir", () => {
     expectValidMetadata(json);
   });
 
+  it("brand_feedback accepts agent_signal category", async () => {
+    const json = await callAndParse("brand_feedback", {
+      category: "agent_signal",
+      signal: "positive",
+      tool_used: "brand_extract_web",
+      signal_context: "Extracting brand from example.com",
+      outcome: "Colors and fonts extracted successfully",
+      summary: "Extraction worked well for simple static site",
+    });
+    expectValidMetadata(json);
+    const meta = json._metadata as Record<string, unknown>;
+    expect(meta.what_happened).toContain("Agent signal recorded");
+    expect(meta.what_happened).toContain("positive");
+    expect(meta.what_happened).toContain("brand_extract_web");
+  });
+
+  it("brand_feedback accepts agent_signal with negative signal", async () => {
+    const json = await callAndParse("brand_feedback", {
+      category: "agent_signal",
+      signal: "negative",
+      tool_used: "brand_compile",
+      signal_context: "Compiling tokens after extraction",
+      outcome: "Missing primary color despite extraction finding colors",
+      summary: "Token compilation dropped extracted colors",
+    });
+    expectValidMetadata(json);
+    expect(json.signal).toBe("negative");
+    expect(json.tool_used).toBe("brand_compile");
+  });
+
   it("brand_feedback_review returns success", async () => {
     const json = await callAndParse("brand_feedback_review", {});
     expectValidMetadata(json);

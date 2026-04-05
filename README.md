@@ -1,4 +1,6 @@
-[![CI](https://github.com/zk-xyz/brandsystem-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/zk-xyz/brandsystem-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/Brand-System/brandsystem-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Brand-System/brandsystem-mcp/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@brandsystem/mcp)](https://www.npmjs.com/package/@brandsystem/mcp)
+[![Node](https://img.shields.io/node/v/@brandsystem/mcp)](https://www.npmjs.com/package/@brandsystem/mcp)
 
 # @brandsystem/mcp
 
@@ -359,7 +361,7 @@ brandsystem.app is a standalone product — it works for any brand, in any AI to
 
 ### Relationship to Brandcode
 
-[Brandcode](https://github.com/zk-xyz/column-five-prototypes) is an end-to-end content system that governs everything from brand identity to production to measurement — and loops measurement insights back into the brand. brandsystem.app is the marketing-first entry point that creates the Brand OS, which naturally draws clients into operationalizing it within Brandcode.
+[Brandcode](https://github.com/Brand-System/column-five-prototypes) is an end-to-end content system that governs everything from brand identity to production to measurement — and loops measurement insights back into the brand. brandsystem.app is the marketing-first entry point that creates the Brand OS, which naturally draws clients into operationalizing it within Brandcode.
 
 ```
                     ┌──────────────────────┐

@@ -512,7 +512,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_web",
-    "Extract logo (SVG/PNG), colors, and fonts from any website URL. Parses HTML for logo candidates (inline SVG, img tags, favicons, Clearbit fallback), parses CSS for color values and font-family declarations, and confidence-scores everything. Use when the user provides a website URL or says 'scan my site.' Optionally pass logo_url to fetch a specific logo file directly. Returns all extracted colors with roles, fonts with frequency, logo preview data, and extraction quality score.",
+    "Extract brand colors, fonts, and logo from any website URL — get brand identity from a live site. Use when asked 'extract brand from URL', 'get brand colors from website', 'scan my site', or when the user provides a website URL. Parses HTML for logo candidates (SVG, img, favicons, Clearbit fallback) and CSS for colors and font-family declarations. Confidence-scores everything. Pass logo_url to fetch a specific logo directly. Returns colors with roles, fonts with frequency, logo preview data, and extraction quality score.",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

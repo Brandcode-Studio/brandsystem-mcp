@@ -636,7 +636,7 @@ type WriteParams = z.infer<typeof ParamsSchema>;
 export function register(server: McpServer) {
   server.tool(
     "brand_write",
-    "Load the full brand context for content creation — colors, typography, logo (inline SVG/data URI), composition rules, anti-patterns, voice codex, vocabulary rules, and content strategy. Use before generating any branded content: social graphics, web pages, blog posts, emails, presentations, or data viz. Specify content_type to get the right mix of visual and voice rules. Does NOT generate content — it provides the creation brief so you can generate on-brand. Always run brand_preflight on the output afterward. Returns a structured creation brief with all brand layers.",
+    "Generate on-brand content — load full brand context (colors, typography, logo, voice, strategy) before creating any branded output. Use when asked 'generate on-brand content', 'write something in our brand voice', 'load brand context for writing', or before creating social graphics, web pages, blog posts, emails, presentations, or data viz. Specify content_type for the right mix of visual and voice rules. Does NOT generate content itself — provides the creation brief so you can generate on-brand. Run brand_preflight on output afterward. Returns a structured creation brief with all brand layers.",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

@@ -130,7 +130,7 @@ type AuditContentParams = z.infer<typeof ParamsSchema>;
 export function register(server: McpServer) {
   server.tool(
     "brand_audit_content",
-    "Score content against your brand identity — checks color/font compliance, voice alignment, anti-pattern violations, and message coverage. Use after generating any content to check how on-brand it is. Works progressively: Session 1 data gives token scores, Session 2 adds visual compliance, Session 3 adds voice and messaging scores. Returns a 0-100 score with per-dimension breakdown and specific issues. Different from brand_audit (which validates the .brand/ directory) and brand_preflight (which checks HTML compliance rules). NOT for brand directory validation — use brand_audit. NOT for HTML/CSS rule checking — use brand_preflight.",
+    "Check if content is on-brand — score any text or markup 0-100 for brand compliance. Checks color/font usage, voice alignment, anti-pattern violations, and message coverage. Use when asked 'is this on-brand?', 'brand compliance score', 'check brand alignment', or after generating any content. Works progressively: Session 1 scores tokens, Session 2 adds visual compliance, Session 3 adds voice and messaging. Returns 0-100 score with per-dimension breakdown and specific issues. NOT for .brand/ directory validation (use brand_audit) or HTML/CSS rule checking (use brand_preflight).",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

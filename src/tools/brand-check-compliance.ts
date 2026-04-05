@@ -265,7 +265,7 @@ type CheckComplianceParams = z.infer<typeof ParamsSchema>;
 export function register(server: McpServer) {
   server.tool(
     "brand_check_compliance",
-    "Quick pass/fail compliance gate — checks critical brand rules before publishing. Verifies on-palette colors, brand fonts, hard anti-pattern rules, and never-say words. Fast and binary: returns PASS or FAIL with specific failures listed. Use in production workflows and CI/CD pipelines as a publish gate. Enable strict mode to also check soft anti-patterns. For detailed scoring, use brand_audit_content instead. NOT for scoring content quality — use brand_audit_content. NOT for HTML/CSS rule checking — use brand_preflight.",
+    "Check if content is on-brand — fast pass/fail gate for brand compliance before publishing. Use when asked 'is this on-brand?', 'brand compliance gate', 'can I publish this?', or in CI/CD pipelines. Verifies on-palette colors, brand fonts, anti-pattern rules, and never-say words. Returns PASS or FAIL with specific failures. Enable strict mode for soft anti-patterns. For detailed 0-100 scoring, use brand_audit_content. NOT for HTML/CSS rule checking (use brand_preflight).",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
