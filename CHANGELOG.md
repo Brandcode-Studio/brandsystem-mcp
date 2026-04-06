@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.3 (2026-04-05)
+
+### Improved
+- Full architecture alignment audit across all 34 tools. Every tool description, what_happened, next_steps, and conversation_guide now accurately reflects the current architecture (runtime + policy + connector).
+- `brand_start`: description, auto-mode response, existing-brand guidance, and interactive-mode conversation guide all updated to mention runtime, interaction policy, and Brandcode Studio connector.
+- `brand_status`: quickstart text mentions runtime + policy outputs and connector option. Getting-started guide lists connector tools. Status output shows runtime artifact and Brandcode Studio connection sections.
+- `brand_audit`: now validates existence of brand-runtime.json and interaction-policy.json alongside tokens.json.
+- `brand_brandcode_connect`: response field renamed from `brand_name` to `client_name` for consistency.
+- `llms.txt`: added connector capability and portability description.
+- `CLAUDE.md`: added Architecture Alignment Checklist (28 checks across 4 scenarios) referenced from "How to Add a New Tool" to prevent future drift.
+
 ## 0.3.2 (2026-04-05)
 
 - Harden outbound fetches against DNS rebinding by pinning requests to the validated IP address on every hop.
