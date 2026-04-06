@@ -885,7 +885,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_compile_messaging",
-    "Define how a brand should sound — perspective (worldview, positioning), voice codex (tone descriptors, anchor vocabulary, never-say list, AI-ism detection), and brand story (origin, tension, resolution). Session 3 guided interview with 3 sections. Mode 'interview' returns structured questions. Mode 'record' saves answers to messaging.yaml. Completing all 3 sections generates brand-story.md and updates system-integration.md with voice rules. Use after Session 2 (visual identity). Returns section status and remaining gaps.",
+    "Define how a brand should sound — Session 3 guided interview for brand voice, messaging, and story. Use when the user says 'define brand voice', 'brand messaging', 'brand story', 'how should my brand sound?', or 'start Session 3'. Covers perspective (worldview, positioning), voice codex (tone, anchor vocabulary, never-say list, AI-ism detection), and brand story (origin, tension, resolution). Mode 'interview' returns structured questions. Mode 'record' saves to messaging.yaml. Adds voice constraints and tone rules to the brand runtime. Use after brand_extract_messaging (optional voice audit). Returns section status.",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

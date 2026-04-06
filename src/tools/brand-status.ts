@@ -194,11 +194,11 @@ async function handler() {
       nextSteps.push("Run brand_extract_web with your website URL");
     }
   } else if (!hasVisual) {
-    nextSteps.push("Run brand_deepen_identity to start Session 2 — capture composition, patterns, and anti-patterns");
+    nextSteps.push("Run brand_deepen_identity to start Session 2 — adds anti-pattern rules, composition guidelines, and visual identity to the runtime");
   } else if (!hasMessaging) {
-    nextSteps.push("Run brand_extract_messaging to audit your current voice, then brand_compile_messaging for Session 3");
+    nextSteps.push("Run brand_extract_messaging to audit your current website voice (optional but recommended), then brand_compile_messaging to define perspective, voice codex, and brand story (Session 3)");
   } else if (!hasStrategy) {
-    nextSteps.push("Run brand_build_personas to start Session 4 — define your target audiences and content strategy");
+    nextSteps.push("Run brand_build_personas to start Session 4 — define target audiences, then brand_build_journey, brand_build_themes, brand_build_matrix");
   } else {
     nextSteps.push("Run brand_write to generate audience-targeted content using your full brand system");
   }

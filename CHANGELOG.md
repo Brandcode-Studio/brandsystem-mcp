@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.8 (2026-04-06)
+
+### Fixed
+- **Session 3 tool discoverability:** Agents guessed `brand_voice` and `brand_messaging` (which don't exist) instead of the real tools `brand_extract_messaging` and `brand_compile_messaging`. Added natural language trigger phrases ("define brand voice", "brand messaging", "brand story", "start Session 3") to both tool descriptions so agents find the right tool on first attempt.
+- **brand_status next step specificity:** When Session 3 is the next step, status now shows exact tool names and the recommended order (`brand_extract_messaging` then `brand_compile_messaging`) instead of a generic suggestion.
+
 ## 0.3.7 (2026-04-06)
 
 ### Fixed

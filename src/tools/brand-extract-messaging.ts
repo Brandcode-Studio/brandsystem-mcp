@@ -706,7 +706,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_messaging",
-    "Audit how a brand currently sounds on its website. Analyzes voice fingerprint (formality, jargon density, active voice %, hedging), vocabulary frequency (distinctive vs generic terms), claims (explicit with data, superlative/unqualified), AI-ism detection, and messaging gaps. Writes .brand/messaging-audit.md. Use when the user wants to understand their current brand voice before defining how it should sound. Returns structured analysis with scores and actionable findings.",
+    "Audit how a brand currently sounds on its website — the first step in Session 3 (brand voice and messaging). Use when the user says 'analyze my voice', 'brand voice audit', 'how does my brand sound?', or 'start Session 3'. Analyzes voice fingerprint (formality, jargon density, active voice %, hedging), vocabulary frequency, claims quality, AI-ism detection, and messaging gaps. Writes .brand/messaging-audit.md. After this, run brand_compile_messaging to define how the brand *should* sound. Returns structured analysis with scores.",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
