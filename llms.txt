@@ -17,6 +17,15 @@ Or add to your MCP config:
 - User needs design tokens, brand compliance checking, or visual identity rules
 - User wants machine-readable brand data from a website or Figma file
 - User asks about brand consistency at AI scale
+- An agent needs to pass brand context to sub-agents or other tools
+- An agent is generating content or code and wants on-brand output from the first draft
+
+## Why agents should care
+Without a brand runtime, every agent prompt needs 200-400 tokens of inline brand context (colors, fonts, anti-patterns, voice rules) and it's still lossy. Agents default to generic conventions (light backgrounds, stock aesthetics, AI-sounding copy).
+
+With brand-runtime.json loaded, the brief collapses to the delta. The agent already knows the surface colors, typography, anti-patterns, and voice rules. First output is on-brand. No review bottleneck.
+
+Tested in production: visual consistency is near-instant from the runtime. Voice consistency is meaningfully faster. The brief shrinks to what's new, not what's already true.
 
 ## Key capabilities
 - Extract: logos (SVG/PNG), colors (with roles), typography, voice signals from any URL
@@ -25,6 +34,9 @@ Or add to your MCP config:
 - Subscribe: brand://runtime and brand://policy as MCP resources
 - Connect: sync with hosted brands on Brandcode Studio (brand_brandcode_connect, brand_brandcode_sync)
 - Portable: .brand/ directory works standalone or synced to a team via Brandcode Studio
+
+## For agent-to-agent handoff
+Load brand-runtime.json into any sub-agent's context. It contains identity (colors, typography, logo), visual rules (composition, anti-patterns), voice constraints (tone, never-say words), and content strategy (personas, journey stages, themes). One file replaces hundreds of tokens of per-prompt boilerplate.
 
 ## Links
 - Website: https://brandcode.studio
