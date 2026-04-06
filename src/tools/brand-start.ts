@@ -109,7 +109,7 @@ async function handleExistingBrand(brandDir: BrandDir): Promise<ReturnType<typeo
     nextSteps.push(`Missing: ${gaps.join(", ")}. Run brand_extract_web or brand_extract_figma to fill gaps`);
   }
   if (hasColors && hasTypography) {
-    nextSteps.push("Run brand_compile to generate tokens.json");
+    nextSteps.push("Run brand_compile to generate tokens, brand runtime, and interaction policy");
   }
   nextSteps.push("Run brand_status for full details");
   nextSteps.push("Run brand_report to generate a portable brand identity report");
@@ -131,7 +131,7 @@ async function handleExistingBrand(brandDir: BrandDir): Promise<ReturnType<typeo
         instruction:
           gaps.length > 0
             ? `The brand system has gaps (${gaps.join(", ")}). Present the summary, then suggest extraction tools to fill what's missing.`
-            : "The brand system has core identity populated. Suggest compiling tokens or generating a report.",
+            : "The brand system has core identity populated. Suggest compiling (brand_compile produces tokens, runtime, and interaction policy) or generating a report. If they want team access, suggest brand_brandcode_connect.",
       },
     },
   });
@@ -592,7 +592,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   const hasPrimary = freshIdentity.colors.some((c) => c.role === "primary");
 
   return buildResponse({
-    what_happened: `Auto mode: created .brand/ for "${input.client_name}", extracted from ${url}, compiled tokens, and generated report`,
+    what_happened: `Auto mode: created .brand/ for "${input.client_name}", extracted from ${url}, compiled tokens + runtime + policy, and generated report`,
     next_steps: [
       "Show the user their brand summary and confirm key decisions before proceeding",
     ],
@@ -728,10 +728,12 @@ async function handler(input: Params) {
           "  E → Begin manual entry by asking for primary brand color, then font, then proceed through core identity fields",
           "",
           "AFTER extraction completes:",
-          "  1. Run brand_compile to generate tokens",
+          "  1. Run brand_compile to generate tokens, brand runtime, and interaction policy",
           "  2. Run brand_report to generate the HTML report",
           "  3. Show the report as an artifact (in Chat) or write to .brand/ (in Code)",
           "  4. Ask: 'Does this look right? If anything's off, I can help fix it.'",
+          "  5. Mention: 'Your brand runtime and interaction policy are compiled — any MCP-connected tool now has your brand context.'",
+          "  6. If they want team access: 'Run brand_brandcode_connect to sync with Brandcode Studio.'",
         ].join("\n"),
         conditionals: {
           design_principle: "Get just enough to make the extraction smart, then show results fast. The user should see their brand reflected back within 5 minutes of starting.",
