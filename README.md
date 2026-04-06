@@ -327,6 +327,19 @@ npx @brandsystem/mcp
 # The server uses stdio, not HTTP -- it reads from stdin and writes to stdout
 ```
 
+### Reporting feedback
+
+Use `brand_feedback` to report bugs, friction, or ideas:
+
+```
+brand_feedback with category="bug", summary="Logo SVG has empty gradient stops",
+  detail="The extractor found the SVG structure but <linearGradient> stops have no
+  stop-color attributes. Logo renders as a black rectangle.",
+  tool_name="brand_extract_web", severity="degrades_experience"
+```
+
+For agent telemetry, use `category="agent_signal"` with `signal`, `tool_used`, and `signal_context`. Brand context is auto-populated from `.brand/config`.
+
 ---
 
 ## How It Works

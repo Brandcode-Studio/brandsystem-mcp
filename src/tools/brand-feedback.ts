@@ -138,10 +138,17 @@ const sendParamsShape = {
     .describe("One-line summary of the feedback."),
   detail: z
     .string()
-    .max(2000)
+    .max(10000)
     .optional()
     .describe(
-      "Full context: what the agent was trying to do, what happened, what was expected, and any suggested fix."
+      "Full context: what the agent was trying to do, what happened, what was expected, and any suggested fix. Use this for the complete feedback body — up to 10,000 characters."
+    ),
+  message: z
+    .string()
+    .max(10000)
+    .optional()
+    .describe(
+      "Alias for 'detail'. Full feedback body — what happened, what was expected, reproduction steps, suggested fix. Either 'message' or 'detail' can be used; if both provided, they are concatenated."
     ),
   severity: z
     .enum(["blocks_workflow", "degrades_experience", "minor", "suggestion"])
@@ -200,7 +207,9 @@ async function sendHandler(input: SendParams) {
 
   // Sanitize all free-text fields
   const cleanSummary = sanitize(input.summary);
-  const cleanDetail = input.detail ? sanitize(input.detail) : null;
+  // Merge detail + message (agents may use either or both)
+  const rawDetail = [input.detail, input.message].filter(Boolean).join("\n\n");
+  const cleanDetail = rawDetail ? sanitize(rawDetail) : null;
   const cleanToolName = input.tool_name ? sanitize(input.tool_name) : null;
   const cleanErrorMsg = input.context?.error_message
     ? sanitize(input.context.error_message)

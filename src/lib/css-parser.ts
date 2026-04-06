@@ -223,6 +223,23 @@ export function extractFromCSS(cssText: string): {
     },
   });
 
+  // Consolidate alpha variants: #rrggbbaa colors fold into their #rrggbb parent
+  // e.g., #f48fb133, #f48fb11a, #f48fb166 all merge into #f48fb1's frequency
+  for (const [hex, color] of colorMap) {
+    if (hex.length === 9) { // 8-char hex = #rrggbbaa
+      const baseHex = hex.slice(0, 7); // strip alpha
+      const parent = colorMap.get(baseHex);
+      if (parent) {
+        parent.frequency += color.frequency;
+        colorMap.delete(hex);
+      } else {
+        // No parent exists — promote the base color and drop the alpha variant
+        colorMap.set(baseHex, { ...color, value: baseHex });
+        colorMap.delete(hex);
+      }
+    }
+  }
+
   // Sort with priority: css-variable > structural > computed, then by frequency
   const sourceWeight = (t: string) => t === "css-variable" ? 100 : t === "structural" ? 50 : 0;
   const colors = Array.from(colorMap.values()).sort(
