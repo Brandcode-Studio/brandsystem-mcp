@@ -456,17 +456,38 @@ async function handleRecord(brandDir: BrandDir, section: Section, answersRaw: st
   // Write back
   await brandDir.writeVisualIdentity(visual);
 
+  // Verify the write succeeded by checking file existence
+  const writeVerified = await brandDir.hasVisualIdentity();
+
   // Check remaining gaps
   const missing = getMissingSections(visual);
 
+  // Bump session counter when all sections complete
+  if (missing.length === 0) {
+    try {
+      const config = await brandDir.readConfig();
+      if (config.session < 2) {
+        config.session = 2;
+        await brandDir.writeConfig(config);
+      }
+    } catch {
+      // Non-fatal: session counter bump failed but visual identity is saved
+    }
+  }
+
   const nextSteps: string[] = [];
+  if (!writeVerified) {
+    nextSteps.push(
+      "WARNING: visual-identity.yaml write could not be verified. Check that the working directory contains your .brand/ folder."
+    );
+  }
   if (missing.length > 0) {
     nextSteps.push(
       `${missing.length} section(s) remaining: ${missing.join(", ")}. Continue the interview or call brand_deepen_identity mode='interview' to get questions.`
     );
   } else {
     nextSteps.push(
-      "All 6 visual identity sections are now populated. Run brand_compile to generate the full Visual Identity Manifest."
+      "All 6 visual identity sections complete. Run brand_compile to update the runtime with visual rules, anti-patterns, and composition guidelines."
     );
   }
 

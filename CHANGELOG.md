@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.7 (2026-04-06)
+
+### Fixed
+- **Session 2 persistence verification:** `brand_deepen_identity` now verifies the `visual-identity.yaml` write succeeded by checking file existence after writing. If the write fails (e.g., wrong working directory), the response warns the agent immediately instead of returning silent success.
+- **Session counter auto-bump:** `brand_deepen_identity` now bumps `brand.config.yaml` session to 2 when all 6 visual identity sections are complete. Previously the counter only bumped during `brand_compile`, creating a gap where Session 2 data existed but the system still reported Session 1.
+- **Feedback smoke test cleanup:** Tests now clean up feedback files after each run, preventing the rate limiter from blocking subsequent test executions.
+
 ## 0.3.6 (2026-04-06)
 
 ### Fixed

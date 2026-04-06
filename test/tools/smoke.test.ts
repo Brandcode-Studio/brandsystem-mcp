@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../../src/server.js";
+import { readdir, unlink } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 // ---------------------------------------------------------------------------
 // Setup: create a real MCP client ↔ server pair over in-memory transport.
@@ -72,6 +75,21 @@ describe("tool registration", () => {
 // ---------------------------------------------------------------------------
 
 describe("tools that need no .brand/ dir", () => {
+  // Clean up feedback files created by these smoke tests to avoid hitting the rate limiter
+  afterAll(async () => {
+    const feedbackDir = join(homedir(), ".brandsystem", "feedback");
+    try {
+      const files = await readdir(feedbackDir);
+      for (const file of files) {
+        // Only delete files created in the last 60 seconds (test artifacts)
+        const { mtimeMs } = await import("node:fs").then(fs => fs.statSync(join(feedbackDir, file)));
+        if (Date.now() - mtimeMs < 60_000) {
+          await unlink(join(feedbackDir, file)).catch(() => {});
+        }
+      }
+    } catch { /* dir doesn't exist, fine */ }
+  });
+
   it("brand_feedback returns success", async () => {
     const json = await callAndParse("brand_feedback", {
       category: "bug",
