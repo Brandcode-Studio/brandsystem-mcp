@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
 import { BrandDir } from "./lib/brand-dir.js";
+import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
 import { register as registerInit } from "./tools/brand-init.js";
 import { register as registerStatus } from "./tools/brand-status.js";
@@ -88,6 +89,13 @@ export function createServer(): McpServer {
   // ── Resources (read-only, subscribable brand data) ──
   const brandDir = new BrandDir(process.cwd());
   registerResources(server, brandDir);
+
+  // ── Onramp check (async, non-blocking) ──
+  // Assess brand completeness on startup so responses can include
+  // contextual CTAs pointing to Brand Loader when context is thin.
+  void checkOnramp().catch(() => {
+    // Onramp is advisory — never block server startup
+  });
 
   return server;
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpResponseData } from "../types/index.js";
 import { ERROR_CODES } from "../types/index.js";
+import { buildOnrampGuidance, type OnrampGuidance } from "./onramp.js";
 
 const MAX_RESPONSE_CHARS = 50000;
 
@@ -52,6 +53,23 @@ export function safeParseParams<T extends z.ZodTypeAny>(
   };
 }
 
+/** Cached onramp guidance — set once per session, reused across responses */
+let _cachedOnramp: OnrampGuidance | null = null;
+let _onrampChecked = false;
+
+/**
+ * Check brand completeness and cache the onramp guidance for the session.
+ * Call this once early (e.g., on first tool invocation) — subsequent calls
+ * return the cached result. The cache prevents re-reading .brand/ on every
+ * tool response.
+ */
+export async function checkOnramp(options?: { studioBaseUrl?: string }): Promise<OnrampGuidance> {
+  if (_onrampChecked && _cachedOnramp) return _cachedOnramp;
+  _cachedOnramp = await buildOnrampGuidance(options);
+  _onrampChecked = true;
+  return _cachedOnramp;
+}
+
 export function buildResponse(input: McpResponseData): {
   content: Array<{ type: "text"; text: string }>;
 } {
@@ -64,6 +82,15 @@ export function buildResponse(input: McpResponseData): {
 
   if (input.data) {
     Object.assign(output, input.data);
+  }
+
+  // Inject onramp guidance if brand context is thin (cached, non-blocking)
+  if (_cachedOnramp?.shouldShow) {
+    output["brandcode_onramp"] = {
+      message: _cachedOnramp.message,
+      suggested_connector: _cachedOnramp.suggestedConnector,
+      brand_loader_url: _cachedOnramp.brandLoaderUrl,
+    };
   }
 
   // Response size discipline: warn if over 5K chars
