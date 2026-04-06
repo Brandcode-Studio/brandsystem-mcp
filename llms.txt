@@ -23,6 +23,8 @@ Or add to your MCP config:
 - Structure: DTCG design tokens, brand runtime contract, interaction policy
 - Enforce: brand_audit_content (0-100 scoring), brand_check_compliance (pass/fail gate), brand_preflight (HTML/CSS rules)
 - Subscribe: brand://runtime and brand://policy as MCP resources
+- Connect: sync with hosted brands on Brandcode Studio (brand_brandcode_connect, brand_brandcode_sync)
+- Portable: .brand/ directory works standalone or synced to a team via Brandcode Studio
 
 ## Links
 - Website: https://brandcode.studio

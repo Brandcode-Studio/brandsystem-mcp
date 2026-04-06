@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
 import { ERROR_CODES, type Confidence } from "../types/index.js";
+import { readConnectorConfig } from "../connectors/brandcode/persistence.js";
 
 async function handler() {
   const brandDir = new BrandDir(process.cwd());
@@ -18,7 +19,7 @@ async function handler() {
           what_is_brandsystem: "brandsystem extracts and manages brand identity (logo, colors, fonts, voice, visual rules) so AI tools produce on-brand output. It creates a .brand/ directory with structured YAML, DTCG tokens, and a portable HTML report.",
           quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, compiles DTCG tokens, and generates a portable brand report — all in one call.",
           session_overview: {
-            "Session 1 — Core Identity": "brand_start → brand_extract_web → brand_compile → brand_report. Extracts colors, fonts, logo. Produces tokens.json and brand-report.html.",
+            "Session 1 — Core Identity": "brand_start → brand_extract_web → brand_compile → brand_report. Extracts colors, fonts, logo. Produces tokens.json, brand-runtime.json, interaction-policy.json, and brand-report.html.",
             "Session 2 — Visual Identity": "brand_deepen_identity (interview). Captures composition rules, patterns, illustration style, anti-patterns. Produces visual-identity-manifest.md.",
             "Session 3 — Messaging": "brand_extract_messaging → brand_compile_messaging (interview). Defines perspective, voice codex, brand story. Produces messaging.yaml and brand-story.md.",
             "Session 4 — Content Strategy": "brand_build_personas → brand_build_journey → brand_build_themes → brand_build_matrix. Creates audience personas, journey stages, editorial themes, and a messaging matrix.",
@@ -45,6 +46,9 @@ async function handler() {
             "brand_build_themes — Define editorial content themes",
             "brand_build_matrix — Generate persona x stage messaging variants",
             "brand_feedback — Report bugs, friction, or feature ideas",
+            "brand_brandcode_connect — Connect to a hosted brand on Brandcode Studio",
+            "brand_brandcode_sync — Sync local .brand/ with hosted brand",
+            "brand_brandcode_status — Check Brandcode Studio connection status",
           ],
         },
       },
@@ -156,6 +160,30 @@ async function handler() {
     if (strategy.themes.length > 0) {
       lines.push(`  Balance:     Heat ${heat} / Momentum ${momentum} / Conversion ${conversion}`);
     }
+  }
+
+  // Check runtime artifacts
+  const hasRuntime = await brandDir.hasRuntime();
+  lines.push("");
+  lines.push("── Runtime Artifacts ─────────────────");
+  lines.push(`brand-runtime.json:       ${hasRuntime ? "✓ Compiled" : "○ Not compiled — run brand_compile"}`);
+  try {
+    await brandDir.readPolicy();
+    lines.push(`interaction-policy.json:  ✓ Compiled`);
+  } catch {
+    lines.push(`interaction-policy.json:  ○ Not compiled — run brand_compile`);
+  }
+
+  // Check Brandcode Studio connection
+  const connectorConfig = await readConnectorConfig(process.cwd());
+  lines.push("");
+  lines.push("── Brandcode Studio ─────────────────");
+  if (connectorConfig) {
+    lines.push(`Connected:  ✓ ${connectorConfig.slug}`);
+    lines.push(`Remote:     ${connectorConfig.brandUrl}`);
+  } else {
+    lines.push(`Connected:  ○ Not connected`);
+    lines.push(`  Run brand_brandcode_connect to sync with a hosted brand on Brandcode Studio`);
   }
 
   const nextSteps: string[] = [];
