@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse, safeParseParams } from "../lib/response.js";
+import { buildResponse, safeParseParams, parseAnswers } from "../lib/response.js";
 import type { ContentStrategyData } from "../schemas/index.js";
 import type { MessagingData } from "../schemas/messaging.js";
 import { ERROR_CODES } from "../types/index.js";
@@ -440,13 +440,13 @@ async function handleView(brandDir: BrandDir) {
 // Edit mode
 // ---------------------------------------------------------------------------
 
-async function handleEdit(brandDir: BrandDir, variantId: string, answersRaw: string) {
+async function handleEdit(brandDir: BrandDir, variantId: string, answersRaw: string | Record<string, unknown>) {
   let answers: Record<string, unknown>;
   try {
-    answers = JSON.parse(answersRaw);
+    answers = parseAnswers(answersRaw);
   } catch {
     return buildResponse({
-      what_happened: "Failed to parse answers — invalid JSON",
+      what_happened: "Failed to parse answers — provide a JSON object or JSON-encoded string",
       next_steps: ["Provide answers as a valid JSON string with keys: core_message, tone_shift, proof_points, status"],
       data: { error: ERROR_CODES.INVALID_JSON },
     });

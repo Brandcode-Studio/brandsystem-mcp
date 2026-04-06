@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse, safeParseParams } from "../lib/response.js";
+import { buildResponse, safeParseParams, parseAnswers } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import { ERROR_CODES } from "../types/index.js";
 import type { JourneyStage, ContentStrategy } from "../types/index.js";
@@ -157,7 +157,7 @@ async function handleInterview(brandDir: BrandDir) {
 
 // --- Record mode ---
 
-async function handleRecord(brandDir: BrandDir, answersRaw?: string) {
+async function handleRecord(brandDir: BrandDir, answersRaw?: string | Record<string, unknown>) {
   // Parse answers if provided
   let stages: JourneyStage[];
 
@@ -167,10 +167,10 @@ async function handleRecord(brandDir: BrandDir, answersRaw?: string) {
   } else {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(answersRaw);
+      parsed = parseAnswers(answersRaw);
     } catch {
       return buildResponse({
-        what_happened: "Failed to parse answers -- invalid JSON",
+        what_happened: "Failed to parse answers -- provide a JSON object or JSON-encoded string",
         next_steps: ["Provide answers as a valid JSON string (array of stage objects or a single stage object)"],
         data: { error: ERROR_CODES.INVALID_JSON, raw: answersRaw },
       });

@@ -5,6 +5,29 @@ import { ERROR_CODES } from "../types/index.js";
 const MAX_RESPONSE_CHARS = 50000;
 
 /**
+ * Parse an answers parameter that may arrive as a JSON string, a plain object,
+ * or natural language. MCP clients differ in how they serialize tool args:
+ * some send {"answers": "{\"key\":\"val\"}"} (string), others send
+ * {"answers": {"key":"val"}} (object). This helper handles both gracefully.
+ */
+export function parseAnswers(raw: unknown): Record<string, unknown> {
+  // Already an object (MCP client sent it properly)
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  // JSON string
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{")) {
+      return JSON.parse(trimmed);
+    }
+    // Plain text — wrap in a single "text" key so the handler can process it
+    return { text: trimmed };
+  }
+  throw new Error("answers must be a JSON object or a JSON-encoded string");
+}
+
+/**
  * Safely parse tool args against a Zod schema. Returns either the parsed
  * data or a structured MCP error response the caller can return directly.
  */

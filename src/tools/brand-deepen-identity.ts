@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse, safeParseParams } from "../lib/response.js";
+import { buildResponse, safeParseParams, parseAnswers } from "../lib/response.js";
 import { SCHEMA_VERSION, type VisualIdentityData } from "../schemas/index.js";
 import { ERROR_CODES } from "../types/index.js";
 
@@ -308,13 +308,13 @@ async function handleInterview(brandDir: BrandDir) {
 
 // --- Record mode ---
 
-async function handleRecord(brandDir: BrandDir, section: Section, answersRaw: string) {
+async function handleRecord(brandDir: BrandDir, section: Section, answersRaw: string | Record<string, unknown>) {
   let answers: Record<string, unknown>;
   try {
-    answers = JSON.parse(answersRaw);
+    answers = parseAnswers(answersRaw);
   } catch {
     return buildResponse({
-      what_happened: "Failed to parse answers — invalid JSON",
+      what_happened: "Failed to parse answers — provide a JSON object or JSON-encoded string",
       next_steps: [
         "Provide answers as a valid JSON string",
         "If this keeps happening, run brand_feedback to report the issue.",

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.9 (2026-04-06)
+
+### Fixed
+- **Flexible answers parsing across all interview tools.** All 6 interview/record tools (`brand_compile_messaging`, `brand_deepen_identity`, `brand_build_personas`, `brand_build_journey`, `brand_build_themes`, `brand_build_matrix`) now accept answers as a JSON object, a JSON-encoded string, or plain text. MCP clients differ in how they serialize args — some send `{"answers": "{\"key\":\"val\"}"}` (string), others send `{"answers": {"key":"val"}}` (object). The new `parseAnswers()` helper handles both, eliminating the `invalid_json` errors agents were hitting.
+
 ## 0.3.8 (2026-04-06)
 
 ### Fixed
