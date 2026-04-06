@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.12 (2026-04-06)
+
+### Added
+- **Figma import artifact in extraction response.** `brand_extract_figma` ingest mode now returns a `brandcode_figma_import_v1` artifact alongside the extraction data. This artifact can be pasted or uploaded directly into Brandcode Studio Brand Loader, eliminating the manual transport seam between MCP extraction and Studio onboarding.
+- Plan mode response now notes the artifact interop so agents know what's coming after ingest.
+- Next steps updated to mention runtime + policy outputs and the Brand Loader import path.
+
 ## 0.3.11 (2026-04-06)
 
 ### Fixed

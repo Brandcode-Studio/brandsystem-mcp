@@ -46,6 +46,7 @@ async function handlePlan(figmaFileKey: string) {
         "styles: array of { name, type, fontFamily, fontSize, fontWeight, lineHeight }",
         "logo_svg: raw SVG string of the logo component (optional)",
       ],
+      brandcode_import_note: "After ingest, the response includes a brandcode_figma_import_v1 artifact that can be pasted directly into Brandcode Studio Brand Loader for hosted brand creation.",
     },
   });
 }
@@ -126,15 +127,48 @@ async function handleIngest(input: Params) {
 
   await brandDir.writeCoreIdentity({ ...identity, colors, typography, logo: logos });
 
+  // Build the brandcode_figma_import_v1 artifact for Brand Loader interop
+  const config = await brandDir.readConfig();
+  const figmaImportArtifact = {
+    kind: "brandcode_figma_import_v1" as const,
+    source: {
+      tool: "brandsystem-mcp",
+      mode: "extraction" as const,
+    },
+    figma: {
+      url: null,
+      fileKey: input.figma_file_key ?? null,
+      nodeId: null,
+      documentName: config.client_name ?? null,
+      editorType: "unknown" as const,
+    },
+    extraction: {
+      colors: colors.map(c => ({ name: c.name, value: c.value, role: c.role, confidence: c.confidence })),
+      typography: typography.map(t => ({ name: t.name, family: t.family, weight: t.weight, confidence: t.confidence })),
+      logo: logos.length > 0 ? { type: logos[0].type, has_svg: !!logos[0].variants[0]?.inline_svg } : null,
+      figma_file_key: input.figma_file_key ?? null,
+      client_name: config.client_name ?? null,
+    },
+    _metadata: {
+      what_happened: `Extracted from Figma: ${colorCount} colors, ${typeCount} typography${input.logo_svg ? ", 1 logo" : ""}`,
+      next_steps: [
+        "Run brand_compile to generate tokens + runtime + policy",
+        "Or paste/upload this artifact into Brandcode Studio Brand Loader",
+      ],
+    },
+  };
+
   return buildResponse({
     what_happened: `Ingested Figma data: ${colorCount} colors, ${typeCount} typography entries${input.logo_svg ? ", 1 logo" : ""}`,
     next_steps: [
-      "Run brand_compile to generate tokens.json",
+      "Run brand_compile to generate tokens, runtime, and interaction policy",
       "Run brand_status to see the full picture",
+      "To import into Brandcode Studio: paste or upload the brandcode_figma_import_v1 artifact into Brand Loader",
     ],
     data: {
       ingested: { colors: colorCount, typography: typeCount, logo: input.logo_svg ? 1 : 0 },
       total: { colors: colors.length, typography: typography.length, logos: logos.length },
+      brandcode_figma_import_artifact: figmaImportArtifact,
     },
   });
 }
