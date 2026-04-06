@@ -144,7 +144,7 @@ async function handler(input: Params) {
       "Run brand_brandcode_sync later to pull updates",
     ],
     data: {
-      brand_name: pullResult.brand.name,
+      client_name: pullResult.brand.name,
       slug: resolved.slug,
       sync_mode: "first_sync",
       sync_token: pullResult.brand.syncToken,

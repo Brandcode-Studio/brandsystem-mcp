@@ -102,7 +102,9 @@ Many tools include a `conversation_guide` in the data to help agents present res
 
 2. Import and register in `src/server.ts` in the appropriate section.
 
-3. Tool description must include:
+3. Run the Architecture Alignment Checklist (below) before committing.
+
+4. Tool description must include:
    - WHAT the tool does (one sentence)
    - WHEN to use it (trigger words/conditions)
    - What it RETURNS (output format hint)
@@ -116,6 +118,63 @@ Tool descriptions are the #1 thing agents read to decide whether to call a tool.
 - Include trigger phrases (what the user might say that should invoke this tool)
 - End with what the tool returns
 - Be under 300 characters for the first sentence (some clients truncate)
+
+## Architecture Alignment Checklist
+
+Run this checklist when adding a new tool, changing tool behavior, or making architecture changes that affect what the MCP produces or how users interact with it.
+
+### Current Architecture (as of v0.3.2)
+
+The MCP has three operating lanes:
+1. **Local self-contained** — extract from website/Figma, compile to `.brand/` directory
+2. **Brandcode Studio connector** — connect/sync/status with hosted brands
+3. **Content enforcement** — score, compliance gate, preflight, drift detection
+
+Session 1 outputs: `brand.config.yaml`, `core-identity.yaml`, `tokens.json`, `brand-runtime.json`, `interaction-policy.json`, `needs-clarification.yaml`, `brand-report.html`
+
+MCP resources: `brand://runtime` and `brand://policy` (subscribable)
+
+The canonical field for the brand name is `client_name` (not `brand_name`).
+
+### When adding a new tool
+
+- [ ] Description starts with a verb and includes trigger phrases
+- [ ] Description mentions what it returns
+- [ ] Description includes NOT-for disambiguation if it overlaps with existing tools
+- [ ] If the tool produces compiled output, it delegates to the canonical compiler (runtime-compiler.ts, interaction-policy-compiler.ts, dtcg-compiler.ts) rather than reimplementing
+- [ ] If the tool has a `what_happened` message, it accurately describes what was written
+- [ ] If the tool has `next_steps`, they reference the current architecture (including connector path when relevant)
+- [ ] If the tool has `conversation_guide`, it mentions runtime/policy artifacts and the Brandcode Studio option where appropriate
+- [ ] Tool is registered in `src/server.ts` in the correct section
+- [ ] Tool is listed in `brand_status` getting-started guide
+- [ ] Tool is covered by at least one smoke test in `test/tools/smoke.test.ts`
+
+### When changing compiled output format
+
+- [ ] `brand_start` auto mode produces the same artifacts as `brand_compile`
+- [ ] `brand_status` session descriptions match actual outputs
+- [ ] `brand_audit` checks for new output files
+- [ ] `llms.txt` Key Capabilities section is updated
+- [ ] `README.md` .brand/ directory listing is updated
+- [ ] `CHANGELOG.md` documents the change
+- [ ] MCP resources (brand-resources.ts) serve the new format if applicable
+- [ ] Integration tests verify the new output
+
+### When changing the connector
+
+- [ ] `brand_status` connector section reflects the change
+- [ ] `brand_start` conversation_guide mentions the updated connector flow
+- [ ] `brand_brandcode_connect`, `brand_brandcode_sync`, `brand_brandcode_status` descriptions are consistent
+- [ ] `llms.txt` connector capability line is current
+- [ ] Connector types in `src/connectors/brandcode/types.ts` match the API contract
+
+### Common drift patterns to watch for
+
+1. **Duplicated compile logic** — any tool that reimplements token/runtime/policy generation instead of calling the canonical compiler
+2. **Stale Session 1 description** — "Produces tokens.json and brand-report.html" should be "Produces tokens.json, brand-runtime.json, interaction-policy.json, and brand-report.html"
+3. **Missing connector mention** — entry tools (brand_start, brand_status) should mention the connector path as an option
+4. **Field name inconsistency** — `client_name` is canonical, not `brand_name`
+5. **next_steps that skip the current session** — after Session 1, tools should mention Session 2 OR Brandcode Studio connector, not just Session 2
 
 ## Commit Style
 

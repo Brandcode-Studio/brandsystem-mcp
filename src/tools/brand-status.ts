@@ -17,7 +17,7 @@ async function handler() {
         error: ERROR_CODES.NOT_FOUND,
         getting_started: {
           what_is_brandsystem: "brandsystem extracts and manages brand identity (logo, colors, fonts, voice, visual rules) so AI tools produce on-brand output. It creates a .brand/ directory with structured YAML, DTCG tokens, and a portable HTML report.",
-          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, compiles DTCG tokens, and generates a portable brand report — all in one call.",
+          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, compiles DTCG tokens + brand runtime + interaction policy, and generates a portable brand report — all in one call. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
           session_overview: {
             "Session 1 — Core Identity": "brand_start → brand_extract_web → brand_compile → brand_report. Extracts colors, fonts, logo. Produces tokens.json, brand-runtime.json, interaction-policy.json, and brand-report.html.",
             "Session 2 — Visual Identity": "brand_deepen_identity (interview). Captures composition rules, patterns, illustration style, anti-patterns. Produces visual-identity-manifest.md.",

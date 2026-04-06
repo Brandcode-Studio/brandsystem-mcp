@@ -37,11 +37,13 @@ async function handler() {
     }
   }
 
-  try {
-    await access(join(brandDir.brandPath, "tokens.json"));
-    results.push({ check: "File: tokens.json", status: "pass", detail: "exists" });
-  } catch {
-    results.push({ check: "File: tokens.json", status: "warn", detail: "missing — run brand_compile" });
+  for (const compiledFile of ["tokens.json", "brand-runtime.json", "interaction-policy.json"]) {
+    try {
+      await access(join(brandDir.brandPath, compiledFile));
+      results.push({ check: `File: ${compiledFile}`, status: "pass", detail: "exists" });
+    } catch {
+      results.push({ check: `File: ${compiledFile}`, status: "warn", detail: "missing — run brand_compile" });
+    }
   }
 
   try {
