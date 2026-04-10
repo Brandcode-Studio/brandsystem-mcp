@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.18 (2026-04-10)
+
+### Improved
+- **Extraction quality scoring recalibrated (I7).** Replaced the simple point accumulation with weighted scoring: colors 35%, fonts 20%, logo 20%, role assignment 15%, primary identification 10%. Zero colors now gets a specific "JavaScript-applied styles" remediation message. Role assignment rate factors into the score (brands with many unknown-role colors get penalized). MEDIUM score now includes specific gap identification with remediation steps.
+
 ## 0.3.17 (2026-04-10)
 
 ### Improved

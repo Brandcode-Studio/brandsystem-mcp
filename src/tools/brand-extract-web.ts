@@ -394,77 +394,100 @@ async function handler(input: Params) {
     firstLogo?.variants[0]?.inline_svg || firstLogo?.variants[0]?.data_uri
   );
 
-  // --- Extraction quality scoring ---
+  // --- Extraction quality scoring (I7: recalibrated) ---
+  // Weighted scoring: colors (35%), fonts (20%), logo (20%), roles (15%), primary (10%)
+  // Total: 10 points. Each category contributes proportionally.
   let qualityPoints = 0;
   const qualityReasons: string[] = [];
 
-  // Logo: +3 if inline SVG found
-  const hasInlineSvgLogo = logos.some((l) =>
-    l.variants.some((v) => v.inline_svg)
-  );
-  // Check for empty gradient stops in SVG logos (renders as black rectangle)
+  // Colors: 0-3.5 points (35% weight) — the most important signal
+  if (colors.length >= 6) {
+    qualityPoints += 3.5;
+    qualityReasons.push(`${colors.length} colors extracted (strong palette)`);
+  } else if (colors.length >= 3) {
+    qualityPoints += 2.5;
+    qualityReasons.push(`${colors.length} colors extracted`);
+  } else if (colors.length >= 1) {
+    qualityPoints += 1;
+    qualityReasons.push(`Only ${colors.length} color(s) extracted — try a different page or Figma`);
+  } else {
+    qualityReasons.push("No colors extracted — site may use runtime CSS (JavaScript-applied styles). Try Figma extraction or provide colors manually.");
+  }
+
+  // Fonts: 0-2 points (20% weight)
+  if (typography.length >= 2) {
+    qualityPoints += 2;
+    qualityReasons.push(`${typography.length} fonts extracted`);
+  } else if (typography.length === 1) {
+    qualityPoints += 1;
+    qualityReasons.push(`Only 1 font extracted`);
+  } else {
+    qualityReasons.push("No fonts extracted");
+  }
+
+  // Logo: 0-2 points (20% weight)
+  const hasInlineSvgLogo = logos.some((l) => l.variants.some((v) => v.inline_svg));
   const logoHasEmptyGradient = logos.some((l) =>
     l.variants.some((v) => v.inline_svg && hasEmptyGradientStops(v.inline_svg))
   );
 
   if (hasInlineSvgLogo && !logoHasEmptyGradient) {
-    qualityPoints += 3;
-    qualityReasons.push("Logo found with inline SVG");
+    qualityPoints += 2;
+    qualityReasons.push("Logo found with clean inline SVG");
   } else if (hasInlineSvgLogo && logoHasEmptyGradient) {
-    qualityPoints += 1; // found but broken
+    qualityPoints += 0.5;
     qualityReasons.push("Logo SVG found but has empty gradient stops (may render as black). Provide the correct logo via brand_set_logo.");
   } else if (logoFound) {
-    qualityReasons.push("Logo found but not as inline SVG");
-  }
-
-  // Colors: +2 if 4+, +1 if 2-3
-  if (colors.length >= 4) {
-    qualityPoints += 2;
-    qualityReasons.push(`${colors.length} colors extracted`);
-  } else if (colors.length >= 2) {
     qualityPoints += 1;
-    qualityReasons.push(`Only ${colors.length} colors extracted`);
+    qualityReasons.push("Logo found (raster, not SVG)");
   } else {
-    qualityReasons.push("Fewer than 2 colors extracted");
+    qualityReasons.push("No logo found — try providing a direct URL via brand_set_logo");
   }
 
-  // Fonts: +2 if 3+, +1 if 1-2
-  if (typography.length >= 3) {
-    qualityPoints += 2;
-    qualityReasons.push(`${typography.length} fonts extracted`);
-  } else if (typography.length >= 1) {
-    qualityPoints += 1;
-    qualityReasons.push(`Only ${typography.length} font(s) extracted`);
-  } else {
-    qualityReasons.push("No fonts extracted");
+  // Role assignment: 0-1.5 points (15% weight) — how many colors got semantic roles
+  const roledColors = colors.filter((c) => c.role !== "unknown").length;
+  const roleRate = colors.length > 0 ? roledColors / colors.length : 0;
+  if (roleRate >= 0.6) {
+    qualityPoints += 1.5;
+    qualityReasons.push(`${roledColors}/${colors.length} colors have semantic roles (${Math.round(roleRate * 100)}%)`);
+  } else if (roleRate >= 0.3) {
+    qualityPoints += 0.75;
+    qualityReasons.push(`${roledColors}/${colors.length} colors have roles — ${colors.length - roledColors} are unknown`);
+  } else if (colors.length > 0) {
+    qualityReasons.push(`Most colors have unknown roles — CSS variable names may not contain role keywords`);
   }
 
-  // Primary color candidate: +1
+  // Primary color: 0-1 point (10% weight)
   if (suggestedPrimary) {
     qualityPoints += 1;
     qualityReasons.push("Primary color candidate identified");
+  } else if (colors.length > 0) {
+    qualityReasons.push("No primary color identified — user should confirm which color is primary");
   }
 
-  // Surface and text roles detected: +1
-  const hasSurfaceRole = colors.some((c) => c.role === "surface");
-  const hasTextRole = colors.some((c) => c.role === "text");
-  if (hasSurfaceRole && hasTextRole) {
-    qualityPoints += 1;
-    qualityReasons.push("Both surface and text color roles detected");
-  }
+  // Round to 1 decimal
+  qualityPoints = Math.round(qualityPoints * 10) / 10;
 
-  // Score mapping
+  // Score mapping with specific remediation
   let qualityScore: "HIGH" | "MEDIUM" | "LOW";
   let qualityRecommendation: string;
-  if (qualityPoints >= 8) {
+  if (qualityPoints >= 7) {
     qualityScore = "HIGH";
-    qualityRecommendation = "Strong extraction. Ready to confirm and compile.";
-  } else if (qualityPoints >= 5) {
+    qualityRecommendation = "Strong extraction. Confirm the details and compile.";
+  } else if (qualityPoints >= 4) {
     qualityScore = "MEDIUM";
-    qualityRecommendation = "Decent extraction but some gaps. Consider Figma extraction for higher accuracy.";
+    const gaps: string[] = [];
+    if (colors.length < 3) gaps.push("more colors (try a different page URL)");
+    if (!logoFound) gaps.push("a logo (brand_set_logo)");
+    if (roleRate < 0.3 && colors.length > 0) gaps.push("color role confirmation (brand_clarify)");
+    qualityRecommendation = gaps.length > 0
+      ? `Usable but could improve with: ${gaps.join(", ")}. Consider Figma extraction for higher accuracy.`
+      : "Decent extraction. Consider Figma extraction for higher accuracy.";
   } else {
     qualityScore = "LOW";
-    qualityRecommendation = "Limited extraction. Try a different page URL, connect to Figma, or add your brand assets manually.";
+    qualityRecommendation = colors.length === 0
+      ? "This site likely uses JavaScript-applied styles that static CSS parsing can't reach. Try: (1) a different page URL, (2) Figma extraction via brand_extract_figma, or (3) manual input via brand_set_logo and brand_clarify."
+      : "Limited extraction. Try a different page URL, connect to Figma, or add your brand assets manually.";
   }
 
   const extractionQuality = {

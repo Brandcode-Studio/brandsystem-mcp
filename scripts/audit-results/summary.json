@@ -1,15 +1,15 @@
 {
   "version": "0.3.12",
-  "date": "2026-04-10T04:37:59.087Z",
+  "date": "2026-04-10T04:55:00.315Z",
   "brands_tested": 10,
   "totals": {
-    "colors": 76,
-    "fonts": 49,
-    "logos": 9
+    "colors": 87,
+    "fonts": 57,
+    "logos": 10
   },
-  "avg_quality": "7.0",
-  "avg_duration_ms": 824,
-  "logo_detection_rate": 90,
+  "avg_quality": "7.2",
+  "avg_duration_ms": 830,
+  "logo_detection_rate": 100,
   "issues": [
     {
       "brand": "Notion",
@@ -22,22 +22,6 @@
     {
       "brand": "Superhuman",
       "issue": "9/14 colors have unknown role (>50%)"
-    },
-    {
-      "brand": "Loom",
-      "issue": "Zero colors extracted"
-    },
-    {
-      "brand": "Loom",
-      "issue": "Zero fonts extracted"
-    },
-    {
-      "brand": "Loom",
-      "issue": "No logo found"
-    },
-    {
-      "brand": "Loom",
-      "issue": "No brand-runtime.json generated"
     }
   ],
   "results": [
@@ -46,7 +30,7 @@
       "url": "https://linear.app",
       "category": "SaaS",
       "css_pattern": "Tailwind/CSS-in-JS",
-      "duration_ms": 949,
+      "duration_ms": 997,
       "error": null,
       "extraction_quality": {
         "score": "MEDIUM",
@@ -147,7 +131,7 @@
       "url": "https://stripe.com",
       "category": "Fintech",
       "css_pattern": "Custom CSS",
-      "duration_ms": 1251,
+      "duration_ms": 809,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -279,7 +263,7 @@
       "url": "https://notion.so",
       "category": "Productivity",
       "css_pattern": "CSS modules",
-      "duration_ms": 1724,
+      "duration_ms": 1715,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -445,7 +429,7 @@
       "url": "https://vercel.com",
       "category": "Developer tools",
       "css_pattern": "Tailwind/CSS vars",
-      "duration_ms": 630,
+      "duration_ms": 728,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -601,7 +585,7 @@
       "url": "https://figma.com",
       "category": "Design",
       "css_pattern": "Custom/complex",
-      "duration_ms": 734,
+      "duration_ms": 661,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -708,7 +692,7 @@
       "url": "https://basecamp.com",
       "category": "Project mgmt",
       "css_pattern": "Traditional CSS",
-      "duration_ms": 499,
+      "duration_ms": 495,
       "error": null,
       "extraction_quality": {
         "score": "LOW",
@@ -773,7 +757,7 @@
       "url": "https://arc.net",
       "category": "Browser",
       "css_pattern": "Modern CSS",
-      "duration_ms": 498,
+      "duration_ms": 380,
       "error": null,
       "extraction_quality": {
         "score": "MEDIUM",
@@ -880,7 +864,7 @@
       "url": "https://superhuman.com",
       "category": "Email",
       "css_pattern": "Custom",
-      "duration_ms": 828,
+      "duration_ms": 681,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -1028,7 +1012,7 @@
       "url": "https://cal.com",
       "category": "Scheduling",
       "css_pattern": "Tailwind",
-      "duration_ms": 733,
+      "duration_ms": 1145,
       "error": null,
       "extraction_quality": {
         "score": "MEDIUM",
@@ -1160,24 +1144,150 @@
       "url": "https://loom.com",
       "category": "Video",
       "css_pattern": "Mixed",
-      "duration_ms": 395,
+      "duration_ms": 686,
       "error": null,
-      "extraction_quality": null,
-      "extraction_summary": null,
-      "colors": [],
-      "fonts": [],
-      "logo_found": false,
-      "clarifications": null,
+      "extraction_quality": {
+        "score": "HIGH",
+        "points": 9,
+        "reasons": [
+          "Logo found with inline SVG",
+          "11 colors extracted",
+          "8 fonts extracted",
+          "Primary color candidate identified",
+          "Both surface and text color roles detected"
+        ],
+        "recommendation": "Strong extraction. Ready to confirm and compile."
+      },
+      "extraction_summary": {
+        "colors": 11,
+        "typography": 8,
+        "logos": 1,
+        "tokens": 11,
+        "stylesheets_parsed": 4
+      },
+      "colors": [
+        {
+          "name": "thd color violet 60 (scale: violet, representative)",
+          "hex": "#af59e1",
+          "role": "primary",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color blue 60 (scale: blue, representative)",
+          "hex": "#357de8",
+          "role": "unknown",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color white",
+          "hex": "#ffffff",
+          "role": "surface",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color green 60 (scale: green, representative)",
+          "hex": "#6a9a23",
+          "role": "unknown",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color grey 60 (scale: grey, representative)",
+          "hex": "#7d818a",
+          "role": "neutral",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color yellow 60 (scale: yellow, representative)",
+          "hex": "#c77b00",
+          "role": "unknown",
+          "confidence": "high"
+        },
+        {
+          "name": "thd shadow",
+          "hex": "#000000",
+          "role": "text",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color record",
+          "hex": "#ff613d",
+          "role": "unknown",
+          "confidence": "high"
+        },
+        {
+          "name": "thd color button ol",
+          "hex": "#a3c3f1",
+          "role": "action",
+          "confidence": "high"
+        },
+        {
+          "name": "Border",
+          "hex": "#999999",
+          "role": "border",
+          "confidence": "low"
+        },
+        {
+          "name": "Blue",
+          "hex": "#3b82f6",
+          "role": "unknown",
+          "confidence": "low"
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Charlie Display",
+          "confidence": "high"
+        },
+        {
+          "family": "Charlie Text",
+          "confidence": "high"
+        },
+        {
+          "family": "Roboto",
+          "confidence": "low"
+        },
+        {
+          "family": "Helvetica Neue",
+          "confidence": "low"
+        },
+        {
+          "family": "Arial",
+          "confidence": "low"
+        },
+        {
+          "family": "Noto Sans",
+          "confidence": "low"
+        },
+        {
+          "family": "Apple Color Emoji",
+          "confidence": "low"
+        },
+        {
+          "family": "Noto Color Emoji",
+          "confidence": "low"
+        }
+      ],
+      "logo_found": true,
+      "clarifications": {
+        "total": 9,
+        "high_priority": 0
+      },
       "files_written": [
         "assets",
+        "brand-report.html",
+        "brand-runtime.json",
         "brand.config.yaml",
         "core-identity.yaml",
-        "assets/logo"
+        "interaction-policy.json",
+        "needs-clarification.yaml",
+        "tokens.json",
+        "assets/logo",
+        "assets/logo/logo-selector-svg.svg"
       ],
-      "token_count": 0,
-      "runtime_sessions": null,
-      "has_runtime": false,
-      "has_policy": false
+      "token_count": 11,
+      "runtime_sessions": 1,
+      "has_runtime": true,
+      "has_policy": true
     }
   ]
 }

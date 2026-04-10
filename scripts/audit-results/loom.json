@@ -3,22 +3,148 @@
   "url": "https://loom.com",
   "category": "Video",
   "css_pattern": "Mixed",
-  "duration_ms": 395,
+  "duration_ms": 686,
   "error": null,
-  "extraction_quality": null,
-  "extraction_summary": null,
-  "colors": [],
-  "fonts": [],
-  "logo_found": false,
-  "clarifications": null,
+  "extraction_quality": {
+    "score": "HIGH",
+    "points": 9,
+    "reasons": [
+      "Logo found with inline SVG",
+      "11 colors extracted",
+      "8 fonts extracted",
+      "Primary color candidate identified",
+      "Both surface and text color roles detected"
+    ],
+    "recommendation": "Strong extraction. Ready to confirm and compile."
+  },
+  "extraction_summary": {
+    "colors": 11,
+    "typography": 8,
+    "logos": 1,
+    "tokens": 11,
+    "stylesheets_parsed": 4
+  },
+  "colors": [
+    {
+      "name": "thd color violet 60 (scale: violet, representative)",
+      "hex": "#af59e1",
+      "role": "primary",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color blue 60 (scale: blue, representative)",
+      "hex": "#357de8",
+      "role": "unknown",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color white",
+      "hex": "#ffffff",
+      "role": "surface",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color green 60 (scale: green, representative)",
+      "hex": "#6a9a23",
+      "role": "unknown",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color grey 60 (scale: grey, representative)",
+      "hex": "#7d818a",
+      "role": "neutral",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color yellow 60 (scale: yellow, representative)",
+      "hex": "#c77b00",
+      "role": "unknown",
+      "confidence": "high"
+    },
+    {
+      "name": "thd shadow",
+      "hex": "#000000",
+      "role": "text",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color record",
+      "hex": "#ff613d",
+      "role": "unknown",
+      "confidence": "high"
+    },
+    {
+      "name": "thd color button ol",
+      "hex": "#a3c3f1",
+      "role": "action",
+      "confidence": "high"
+    },
+    {
+      "name": "Border",
+      "hex": "#999999",
+      "role": "border",
+      "confidence": "low"
+    },
+    {
+      "name": "Blue",
+      "hex": "#3b82f6",
+      "role": "unknown",
+      "confidence": "low"
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Charlie Display",
+      "confidence": "high"
+    },
+    {
+      "family": "Charlie Text",
+      "confidence": "high"
+    },
+    {
+      "family": "Roboto",
+      "confidence": "low"
+    },
+    {
+      "family": "Helvetica Neue",
+      "confidence": "low"
+    },
+    {
+      "family": "Arial",
+      "confidence": "low"
+    },
+    {
+      "family": "Noto Sans",
+      "confidence": "low"
+    },
+    {
+      "family": "Apple Color Emoji",
+      "confidence": "low"
+    },
+    {
+      "family": "Noto Color Emoji",
+      "confidence": "low"
+    }
+  ],
+  "logo_found": true,
+  "clarifications": {
+    "total": 9,
+    "high_priority": 0
+  },
   "files_written": [
     "assets",
+    "brand-report.html",
+    "brand-runtime.json",
     "brand.config.yaml",
     "core-identity.yaml",
-    "assets/logo"
+    "interaction-policy.json",
+    "needs-clarification.yaml",
+    "tokens.json",
+    "assets/logo",
+    "assets/logo/logo-selector-svg.svg"
   ],
-  "token_count": 0,
-  "runtime_sessions": null,
-  "has_runtime": false,
-  "has_policy": false
+  "token_count": 11,
+  "runtime_sessions": 1,
+  "has_runtime": true,
+  "has_policy": true
 }
