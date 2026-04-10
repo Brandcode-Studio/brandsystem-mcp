@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.15 (2026-04-10)
+
+### Fixed
+- **Font extraction cap raised from 5 to 8.** Every brand was returning exactly 5 fonts due to a hardcoded `.slice(0, 5)`. Raised to 8 and added filtering for CSS variable references (e.g., `var(--font-family-graphik)` no longer appears as a font name).
+- **Logo gradient stop detection (I4).** SVGs with `<linearGradient>` or `<radialGradient>` stops missing `stop-color` attributes are now flagged. The extraction quality score is reduced and the response warns: "Logo SVG has empty gradient stops (may render as black)." Addresses Mira's Booth Beacon logo bug.
+
 ## 0.3.14 (2026-04-10)
 
 ### Improved

@@ -276,8 +276,9 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
     colors = mergeColor(colors, entry);
   }
 
+  const cleanedFonts = extractedFonts.filter(f => !f.family.startsWith("var("));
   let typography = [...identity.typography];
-  for (const ef of extractedFonts.slice(0, 5)) {
+  for (const ef of cleanedFonts.slice(0, 8)) {
     const entry: TypographyEntry = {
       name: ef.family,
       family: ef.family,

@@ -5,7 +5,7 @@ import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryColor, getTopChromaticCandidates } from "../lib/css-parser.js";
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";
-import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
+import { resolveSvg, resolveImage, hasEmptyGradientStops } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
@@ -168,8 +168,11 @@ async function handler(input: Params) {
     colors = mergeColor(colors, entry);
   }
 
+  // Keep top 8 fonts by frequency (was 5, which silently capped extraction)
+  // Filter out CSS variable references (e.g., "var(--font-family-graphik)")
+  const cleanedFonts = extractedFonts.filter(f => !f.family.startsWith("var("));
   let typography = [...identity.typography];
-  for (const ef of extractedFonts.slice(0, 5)) {
+  for (const ef of cleanedFonts.slice(0, 8)) {
     const entry: TypographyEntry = {
       name: ef.family,
       family: ef.family,
@@ -399,9 +402,17 @@ async function handler(input: Params) {
   const hasInlineSvgLogo = logos.some((l) =>
     l.variants.some((v) => v.inline_svg)
   );
-  if (hasInlineSvgLogo) {
+  // Check for empty gradient stops in SVG logos (renders as black rectangle)
+  const logoHasEmptyGradient = logos.some((l) =>
+    l.variants.some((v) => v.inline_svg && hasEmptyGradientStops(v.inline_svg))
+  );
+
+  if (hasInlineSvgLogo && !logoHasEmptyGradient) {
     qualityPoints += 3;
     qualityReasons.push("Logo found with inline SVG");
+  } else if (hasInlineSvgLogo && logoHasEmptyGradient) {
+    qualityPoints += 1; // found but broken
+    qualityReasons.push("Logo SVG found but has empty gradient stops (may render as black). Provide the correct logo via brand_set_logo.");
   } else if (logoFound) {
     qualityReasons.push("Logo found but not as inline SVG");
   }

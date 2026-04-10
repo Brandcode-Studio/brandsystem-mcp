@@ -96,9 +96,30 @@ export function sanitizeSvg(svg: string): string {
  * Convert SVG content to inline string + base64 data URI.
  * Used for embedding logos in core-identity.yaml so they work in Chat artifacts.
  */
+/**
+ * Check if an SVG has gradient stops without stop-color attributes.
+ * These render as black rectangles. Returns true if the logo needs review.
+ */
+export function hasEmptyGradientStops(svgContent: string): boolean {
+  const $ = cheerio.load(svgContent, { xml: true });
+  let hasEmpty = false;
+  $("lineargradient stop, radialgradient stop, linearGradient stop, radialGradient stop").each((_i, el) => {
+    const stopColor = $(el).attr("stop-color");
+    const style = $(el).attr("style") || "";
+    // stop-color can be in attribute or inline style
+    if (!stopColor && !style.includes("stop-color")) {
+      hasEmpty = true;
+      return false; // break
+    }
+  });
+  return hasEmpty;
+}
+
 export function resolveSvg(svgContent: string): {
   inline_svg: string;
   data_uri: string;
+  needs_review?: boolean;
+  review_reason?: string;
 } {
   // Sanitize SVG to remove dangerous elements/attributes
   const sanitized = sanitizeSvg(svgContent);
@@ -120,7 +141,17 @@ export function resolveSvg(svgContent: string): {
   const base64 = Buffer.from(cleaned, "utf-8").toString("base64");
   const data_uri = `data:image/svg+xml;base64,${base64}`;
 
-  return { inline_svg: cleaned, data_uri };
+  // Check for empty gradient stops (renders as black rectangle)
+  const emptyGradients = hasEmptyGradientStops(cleaned);
+
+  return {
+    inline_svg: cleaned,
+    data_uri,
+    ...(emptyGradients && {
+      needs_review: true,
+      review_reason: "SVG has gradient stops without stop-color attributes. The logo may render as a solid black shape. Provide the logo directly via brand_set_logo with the correct SVG, or check the original source file.",
+    }),
+  };
 }
 
 /**
