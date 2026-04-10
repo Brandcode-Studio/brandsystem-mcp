@@ -107,6 +107,28 @@ async function handler(input: Params) {
     }
   }
 
+  // Extract inline styles from key semantic elements (catches page builders like
+  // Elementor, Squarespace, Wix where brand colors are inline, not in CSS vars)
+  const inlineStyleSelectors = [
+    "body", "header", "nav", "footer", "[class*=hero]", "[class*=banner]",
+    "h1", "h2", "h3", "a", "button", "[class*=btn]", "[class*=cta]",
+    "section", "[class*=elementor-section]", "[class*=sqs-block]",
+  ];
+  const inlineCSS: string[] = [];
+  for (const sel of inlineStyleSelectors) {
+    $(sel).each((i, el) => {
+      if (i >= 10) return false; // cap per selector
+      const style = $(el).attr("style");
+      if (style) {
+        // Wrap inline styles in a synthetic rule so the CSS parser can handle them
+        inlineCSS.push(`${sel} { ${style} }`);
+      }
+    });
+  }
+  if (inlineCSS.length > 0) {
+    allCSS += "\n/* inline styles from HTML elements */\n" + inlineCSS.join("\n") + "\n";
+  }
+
   const { colors: extractedColors, fonts: extractedFonts } = extractFromCSS(allCSS);
 
   // Get top chromatic candidates BEFORE promotion (for confirmation flow)

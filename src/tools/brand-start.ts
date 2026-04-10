@@ -218,6 +218,26 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
     }
   }
 
+  // Extract inline styles from key semantic elements (catches page builders)
+  const inlineStyleSelectors = [
+    "body", "header", "nav", "footer", "[class*=hero]", "[class*=banner]",
+    "h1", "h2", "h3", "a", "button", "[class*=btn]", "[class*=cta]",
+    "section", "[class*=elementor-section]", "[class*=sqs-block]",
+  ];
+  const inlineCSS: string[] = [];
+  for (const sel of inlineStyleSelectors) {
+    $(sel).each((i, el) => {
+      if (i >= 10) return false;
+      const style = $(el).attr("style");
+      if (style) {
+        inlineCSS.push(`${sel} { ${style} }`);
+      }
+    });
+  }
+  if (inlineCSS.length > 0) {
+    allCSS += "\n/* inline styles */\n" + inlineCSS.join("\n") + "\n";
+  }
+
   const { colors: extractedColors, fonts: extractedFonts } = extractFromCSS(allCSS);
 
   // Get top chromatic candidates BEFORE promotion (for confirmation flow)

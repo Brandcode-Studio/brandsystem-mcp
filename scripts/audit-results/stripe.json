@@ -3,37 +3,38 @@
   "url": "https://stripe.com",
   "category": "Fintech",
   "css_pattern": "Custom CSS",
-  "duration_ms": 1423,
+  "duration_ms": 1157,
   "error": null,
   "extraction_quality": {
     "score": "HIGH",
-    "points": 8,
+    "points": 9,
     "reasons": [
       "Logo found with inline SVG",
       "12 colors extracted",
-      "5 fonts extracted",
+      "4 fonts extracted",
+      "Primary color candidate identified",
       "Both surface and text color roles detected"
     ],
     "recommendation": "Strong extraction. Ready to confirm and compile."
   },
   "extraction_summary": {
     "colors": 12,
-    "typography": 5,
+    "typography": 4,
     "logos": 1,
     "tokens": 12,
     "stylesheets_parsed": 6
   },
   "colors": [
     {
-      "name": "cardBackground",
-      "hex": "#ffffff",
-      "role": "surface",
+      "name": "suite color",
+      "hex": "#ff6118",
+      "role": "primary",
       "confidence": "high"
     },
     {
-      "name": "suite color",
-      "hex": "#ff6118",
-      "role": "unknown",
+      "name": "cardBackground",
+      "hex": "#ffffff",
+      "role": "surface",
       "confidence": "high"
     },
     {
@@ -43,27 +44,15 @@
       "confidence": "high"
     },
     {
-      "name": "hds color core neutral 990",
-      "hex": "#061b31",
-      "role": "neutral",
-      "confidence": "high"
-    },
-    {
-      "name": "suite color",
-      "hex": "#ea2261",
-      "role": "unknown",
-      "confidence": "high"
-    },
-    {
       "name": "suite color",
       "hex": "#ffcc55",
       "role": "unknown",
       "confidence": "high"
     },
     {
-      "name": "hds color shadow xs bottom",
-      "hex": "#003b89",
-      "role": "text",
+      "name": "suite color",
+      "hex": "#ea2261",
+      "role": "unknown",
       "confidence": "high"
     },
     {
@@ -79,20 +68,32 @@
       "confidence": "high"
     },
     {
-      "name": "hds color core brand 200",
-      "hex": "#b9b9f9",
-      "role": "primary",
-      "confidence": "high"
-    },
-    {
       "name": "stop color",
       "hex": "#fb76fa",
       "role": "unknown",
       "confidence": "medium"
     },
     {
+      "name": "agentic box shadow",
+      "hex": "#000000",
+      "role": "text",
+      "confidence": "medium"
+    },
+    {
+      "name": "closeButtonFill",
+      "hex": "#cad2d9",
+      "role": "action",
+      "confidence": "medium"
+    },
+    {
       "name": "suite color",
       "hex": "#f44bcc",
+      "role": "unknown",
+      "confidence": "medium"
+    },
+    {
+      "name": "stop color",
+      "hex": "#ec8fff",
       "role": "unknown",
       "confidence": "medium"
     }
@@ -113,15 +114,11 @@
     {
       "family": "SourceCodePro",
       "confidence": "low"
-    },
-    {
-      "family": "Roboto",
-      "confidence": "low"
     }
   ],
   "logo_found": true,
   "clarifications": {
-    "total": 3,
+    "total": 2,
     "high_priority": 0
   },
   "files_written": [

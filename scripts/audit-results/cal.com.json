@@ -3,7 +3,7 @@
   "url": "https://cal.com",
   "category": "Scheduling",
   "css_pattern": "Tailwind",
-  "duration_ms": 1908,
+  "duration_ms": 848,
   "error": null,
   "extraction_quality": {
     "score": "MEDIUM",
@@ -32,15 +32,15 @@
       "confidence": "high"
     },
     {
-      "name": "token b0fc30d9 714a 4075 bf2f ce4a3cb5f664",
-      "hex": "#0099ff",
-      "role": "primary",
+      "name": "framer text color",
+      "hex": "#000000",
+      "role": "text",
       "confidence": "high"
     },
     {
-      "name": "framer link current text color",
-      "hex": "#111111",
-      "role": "text",
+      "name": "token b0fc30d9 714a 4075 bf2f ce4a3cb5f664",
+      "hex": "#0099ff",
+      "role": "primary",
       "confidence": "high"
     },
     {

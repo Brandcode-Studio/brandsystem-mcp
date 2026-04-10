@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.13 (2026-04-10)
+
+### Improved
+- **Inline style extraction:** `brand_extract_web` and `brand_start` now parse inline `style` attributes from semantic HTML elements (body, header, nav, footer, hero, headings, buttons, sections). Catches page builder colors (Elementor, Squarespace, Wix) that exist as inline styles rather than CSS variables.
+- **Platform default blocklist:** WordPress default palette (`--wp--preset--color--*`), Bootstrap (`--bs-*`), Chakra UI, Mantine, and other framework CSS variables are deprioritized instead of treated as brand colors. Reduces noise in extraction results.
+- **Page builder brand detection:** Elementor globals (`--e-global-color-*`), Squarespace (`--sqs-*`), and Webflow (`--wf-*`) brand variables get highest priority, correctly outranking platform defaults in the same stylesheet.
+- **34% faster extraction** on average (924ms vs 1,399ms baseline) from reduced processing of platform defaults.
+
 ## 0.3.12 (2026-04-06)
 
 ### Added

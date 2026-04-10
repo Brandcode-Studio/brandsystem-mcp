@@ -108,6 +108,40 @@ function normalizeToHex(value: string): string | null {
   return null;
 }
 
+// ── Platform default blocklist ──────────────────────────────────
+// CSS custom property patterns that are framework/CMS defaults, not brand colors.
+// These get deprioritized (confidence: low) rather than filtered entirely,
+// since occasionally a brand does use a platform default as their actual color.
+
+const PLATFORM_DEFAULT_PATTERNS = [
+  /^--wp--preset--color--/,         // WordPress default palette
+  /^--wp-admin-theme-color/,        // WordPress admin
+  /^--wp-block-synced-color/,       // WordPress block editor
+  /^--swiper-theme-color/,          // Swiper.js
+  /^--bs-/,                         // Bootstrap
+  /^--chakra-/,                     // Chakra UI
+  /^--mantine-/,                    // Mantine
+  /^--tw-/,                         // Tailwind internal
+  /^--fa-/,                         // Font Awesome
+];
+
+// Page builder brand variable patterns (higher priority than platform defaults)
+const PAGE_BUILDER_BRAND_PATTERNS = [
+  /^--e-global-color-/,             // Elementor globals (actual brand)
+  /^--sqs-/,                        // Squarespace brand variables
+  /^--wf-/,                         // Webflow
+  /^--color-brand/,                 // Common brand token pattern
+  /^--brand-/,                      // Generic brand prefix
+];
+
+function isPlatformDefault(property: string): boolean {
+  return PLATFORM_DEFAULT_PATTERNS.some(p => p.test(property));
+}
+
+function isPageBuilderBrand(property: string): boolean {
+  return PAGE_BUILDER_BRAND_PATTERNS.some(p => p.test(property));
+}
+
 // ── Structural selector detection ────────────────────────────────
 // Colors found in these selectors are the brand's structural colors (chrome).
 // Colors only in content selectors are likely from showcased content.
@@ -153,16 +187,24 @@ export function extractFromCSS(cssText: string): {
 
       const property = node.property;
 
-      // CSS custom properties that look like colors (HIGHEST priority — always brand)
+      // CSS custom properties that look like colors
       if (property.startsWith("--")) {
         const raw = csstree.generate(node.value);
         const hex = normalizeToHex(raw);
         if (hex && hex !== "#00000000") {
+          // Determine source type based on platform detection
+          const isPlatform = isPlatformDefault(property);
+          const isBuilderBrand = isPageBuilderBrand(property);
+          // Page builder brand vars get highest priority, platform defaults get deprioritized
+          const sourceType = isBuilderBrand ? "css-variable" as const
+            : isPlatform ? "computed" as const  // demote platform defaults to computed level
+            : "css-variable" as const;
+
           const existing = colorMap.get(hex);
           if (existing) {
-            existing.frequency++;
-            // CSS variables are always brand colors — upgrade to css-variable
-            if (existing.source_type !== "css-variable") {
+            existing.frequency += isPlatform ? 0 : 1; // don't boost frequency for platform defaults
+            // Upgrade source type only if new source is higher priority
+            if (existing.source_type !== "css-variable" && sourceType === "css-variable") {
               existing.source_type = "css-variable";
               existing.property = property;
             }
@@ -170,8 +212,8 @@ export function extractFromCSS(cssText: string): {
             colorMap.set(hex, {
               value: hex,
               property,
-              frequency: 1,
-              source_type: "css-variable",
+              frequency: isPlatform ? 0 : 1,
+              source_type: sourceType,
               selector_context: currentSelector,
             });
           }
