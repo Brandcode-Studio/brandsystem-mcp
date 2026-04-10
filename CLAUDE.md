@@ -20,8 +20,8 @@ Build must pass before committing. The entry point is `src/index.ts` (stdio tran
 ```
 src/
   index.ts         # Stdio transport entry point
-  server.ts        # Creates McpServer, registers all 28 tools in priority order
-  tools/           # One file per tool (29 files, 31 tools). Each exports a register(server) function.
+  server.ts        # Creates McpServer, registers all 34 tools in priority order
+  tools/           # One file per tool (32 files, 34 tools). Each exports a register(server) function.
   lib/             # Shared utilities (brand-dir, css-parser, dtcg-compiler, content-scorer, etc.)
   types/           # TypeScript type definitions
   schemas/         # Zod schemas for validation
@@ -60,6 +60,7 @@ Many tools include a `conversation_guide` in the data to help agents present res
 - `src/lib/brand-dir.ts` -- All `.brand/` directory I/O (read/write YAML, JSON, markdown, assets)
 - `src/lib/css-parser.ts` -- CSS color and font extraction from raw CSS text
 - `src/lib/dtcg-compiler.ts` -- Compile CoreIdentity into DTCG-format tokens.json
+- `src/lib/design-synthesis.ts` -- Generate design-synthesis.json + DESIGN.md from evidence/current brand state
 - `src/lib/confidence.ts` -- Confidence scoring, source precedence, merge logic
 - `src/lib/logo-extractor.ts` -- Logo candidate detection from HTML
 - `src/lib/svg-resolver.ts` -- SVG sanitization, inlining, base64 encoding
@@ -130,7 +131,7 @@ The MCP has three operating lanes:
 2. **Brandcode Studio connector** — connect/sync/status with hosted brands
 3. **Content enforcement** — score, compliance gate, preflight, drift detection
 
-Session 1 outputs: `brand.config.yaml`, `core-identity.yaml`, `tokens.json`, `brand-runtime.json`, `interaction-policy.json`, `needs-clarification.yaml`, `brand-report.html`
+Session 1 outputs: `brand.config.yaml`, `core-identity.yaml`, `extraction-evidence.json` (optional), `design-synthesis.json`, `DESIGN.md`, `tokens.json`, `brand-runtime.json`, `interaction-policy.json`, `needs-clarification.yaml`, `brand-report.html`
 
 MCP resources: `brand://runtime` and `brand://policy` (subscribable)
 
@@ -151,7 +152,7 @@ The canonical field for the brand name is `client_name` (not `brand_name`).
 
 ### When changing compiled output format
 
-- [ ] `brand_start` auto mode produces the same artifacts as `brand_compile`
+- [ ] `brand_start` auto mode produces the same artifacts as `brand_compile`, including `design-synthesis.json` and `DESIGN.md`
 - [ ] `brand_status` session descriptions match actual outputs
 - [ ] `brand_audit` checks for new output files
 - [ ] `llms.txt` Key Capabilities section is updated
@@ -171,7 +172,7 @@ The canonical field for the brand name is `client_name` (not `brand_name`).
 ### Common drift patterns to watch for
 
 1. **Duplicated compile logic** — any tool that reimplements token/runtime/policy generation instead of calling the canonical compiler
-2. **Stale Session 1 description** — "Produces tokens.json and brand-report.html" should be "Produces tokens.json, brand-runtime.json, interaction-policy.json, and brand-report.html"
+2. **Stale Session 1 description** — "Produces tokens.json and brand-report.html" should be "Produces design-synthesis.json, DESIGN.md, tokens.json, brand-runtime.json, interaction-policy.json, and brand-report.html"
 3. **Missing connector mention** — entry tools (brand_start, brand_status) should mention the connector path as an option
 4. **Field name inconsistency** — `client_name` is canonical, not `brand_name`
 5. **next_steps that skip the current session** — after Session 1, tools should mention Session 2 OR Brandcode Studio connector, not just Session 2

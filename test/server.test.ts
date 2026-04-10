@@ -9,7 +9,7 @@ describe('createServer', () => {
   });
 
   it('registers all tools without throwing', () => {
-    // createServer calls 28 register functions.
+    // createServer calls 34 register functions.
     // We verify it doesn't throw during registration, which confirms
     // all tool modules load and register successfully.
     expect(() => createServer()).not.toThrow();

@@ -135,6 +135,15 @@ export class BrandDir {
     await this.writeJson("tokens.json", data);
   }
 
+  async hasTokens(): Promise<boolean> {
+    try {
+      await access(this.path("tokens.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // --- Needs Clarification ---
 
   async readClarifications(): Promise<NeedsClarificationData> {
@@ -262,6 +271,53 @@ export class BrandDir {
   async hasRuntime(): Promise<boolean> {
     try {
       await access(this.path("brand-runtime.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // --- Extraction evidence ---
+
+  async readExtractionEvidence<T = unknown>(): Promise<T> {
+    return this.readJson("extraction-evidence.json") as Promise<T>;
+  }
+
+  async writeExtractionEvidence(data: unknown): Promise<void> {
+    await this.writeJson("extraction-evidence.json", data);
+  }
+
+  async hasExtractionEvidence(): Promise<boolean> {
+    try {
+      await access(this.path("extraction-evidence.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // --- Design synthesis artifacts ---
+
+  async readDesignSynthesis<T = unknown>(): Promise<T> {
+    return this.readJson("design-synthesis.json") as Promise<T>;
+  }
+
+  async writeDesignSynthesis(data: unknown): Promise<void> {
+    await this.writeJson("design-synthesis.json", data);
+  }
+
+  async hasDesignSynthesis(): Promise<boolean> {
+    try {
+      await access(this.path("design-synthesis.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async hasDesignMarkdown(): Promise<boolean> {
+    try {
+      await access(this.path("DESIGN.md"));
       return true;
     } catch {
       return false;

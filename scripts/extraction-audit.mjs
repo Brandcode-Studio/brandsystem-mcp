@@ -57,7 +57,9 @@ async function runExtraction(brand) {
       },
     });
 
-    const text = response.content[0]?.text;
+    // Handle multi-content responses (visual extraction returns image + text)
+    const textBlock = response.content.find(c => c.type === "text");
+    const text = textBlock?.text;
     result = text ? JSON.parse(text) : null;
   } catch (err) {
     error = err.message || String(err);

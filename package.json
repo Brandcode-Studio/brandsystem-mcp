@@ -1,6 +1,6 @@
 {
   "name": "@brandsystem/mcp",
-  "version": "0.3.18",
+  "version": "0.4.0",
   "description": "MCP server for brand identity extraction, management, and AI enforcement. Extract logos, colors, fonts, voice from any website. Enforce brand guidelines in Claude, ChatGPT, Cursor, and any MCP-compatible tool.",
   "type": "module",
   "main": "dist/index.js",
@@ -27,13 +27,14 @@
     "@modelcontextprotocol/sdk": "^1.27.0",
     "cheerio": "^1.0.0",
     "css-tree": "^3.1.0",
+    "puppeteer-core": "^24.40.0",
     "yaml": "^2.7.0",
     "zod": "^3.25.0",
     "zod-to-json-schema": "^3.24.0"
   },
   "devDependencies": {
     "@types/css-tree": "^2.3.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.19.17",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },

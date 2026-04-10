@@ -189,6 +189,22 @@ describe("brand_compile", () => {
     // Session-1-only has no visual identity → empty visual_rules
     expect(policy.visual_rules).toHaveLength(0);
   });
+
+  it("produces design-synthesis.json and DESIGN.md", async () => {
+    const synthesisRaw = await readFile(
+      join(tmpDir, ".brand", "design-synthesis.json"),
+      "utf-8",
+    );
+    const markdown = await readFile(
+      join(tmpDir, ".brand", "DESIGN.md"),
+      "utf-8",
+    );
+
+    const synthesis = JSON.parse(synthesisRaw);
+    expect(synthesis.brand.client_name).toBe("Fixture Brand");
+    expect(markdown).toContain("# DESIGN.md");
+    expect(markdown).toContain("## 2. Color Palette and Roles");
+  });
 });
 
 // ---------------------------------------------------------------------------

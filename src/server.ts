@@ -16,6 +16,8 @@ import { register as registerDeepenIdentity } from "./tools/brand-deepen-identit
 import { register as registerIngestAssets } from "./tools/brand-ingest-assets.js";
 import { register as registerPreflight } from "./tools/brand-preflight.js";
 import { register as registerExtractMessaging } from "./tools/brand-extract-messaging.js";
+import { register as registerExtractSite } from "./tools/brand-extract-site.js";
+import { register as registerGenerateDesignMd } from "./tools/brand-generate-designmd.js";
 import { register as registerWrite } from "./tools/brand-write.js";
 import { register as registerCompileMessaging } from "./tools/brand-compile-messaging.js";
 import { register as registerBuildJourney } from "./tools/brand-build-journey.js";
@@ -29,6 +31,7 @@ import { register as registerAuditContent } from "./tools/brand-audit-content.js
 import { register as registerCheckCompliance } from "./tools/brand-check-compliance.js";
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 import { register as registerRuntime } from "./tools/brand-runtime.js";
+import { register as registerExtractVisual } from "./tools/brand-extract-visual.js";
 import { register as registerBrandcodeConnect } from "./tools/brand-brandcode-connect.js";
 import { register as registerBrandcodeSync } from "./tools/brand-brandcode-sync.js";
 import { register as registerBrandcodeStatus } from "./tools/brand-brandcode-status.js";
@@ -44,7 +47,10 @@ export function createServer(): McpServer {
   registerStatus(server);      // #2: "What can I do?" / resume point
 
   // ── Session 1: Core Identity ──
-  registerExtractWeb(server);  // Extract from website
+  registerExtractWeb(server);  // Extract from website (CSS parsing)
+  registerExtractVisual(server); // Extract from website (headless Chrome + vision)
+  registerExtractSite(server); // Extract from website (multi-page rendered crawl)
+  registerGenerateDesignMd(server); // Generate design-synthesis.json + DESIGN.md
   registerExtractFigma(server);// Extract from Figma
   registerSetLogo(server);     // Add/replace logo manually
   registerCompile(server);     // Generate tokens + VIM

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { compileDTCG } from '../../src/lib/dtcg-compiler.js';
 import type { CoreIdentityData } from '../../src/schemas/index.js';
+import type { DesignSynthesisFile } from '../../src/lib/design-synthesis.js';
 
 function makeIdentity(overrides: Partial<CoreIdentityData> = {}): CoreIdentityData {
   return {
@@ -14,6 +15,72 @@ function makeIdentity(overrides: Partial<CoreIdentityData> = {}): CoreIdentityDa
 }
 
 describe('compileDTCG', () => {
+  const synthesis: DesignSynthesisFile = {
+    schema_version: '0.4.0',
+    generated_at: '2026-04-10T00:00:00.000Z',
+    source: 'evidence',
+    brand: { client_name: 'Acme', website_url: 'https://acme.test' },
+    evidence: {
+      pages_sampled: 1,
+      screenshots_analyzed: 1,
+      page_types: ['home'],
+      viewports: ['desktop'],
+      computed_elements: 3,
+      css_custom_properties: 4,
+    },
+    colors: {
+      brand: [],
+      semantic: [],
+      additional: [],
+      mood: { temperature: 'cool', contrast: 'high', brightness: 'light' },
+    },
+    typography: {
+      families: [],
+      scale: [],
+      character: [],
+    },
+    shape: {
+      radius_scale: [{ token: 'radius-md', value: '12px', confidence: 'high', provenance: ['computed:borderRadius'] }],
+      corner_style: 'rounded',
+    },
+    depth: {
+      shadow_scale: [{ token: 'shadow-md', value: '0px 8px 24px rgba(0,0,0,0.12)', confidence: 'medium', provenance: ['computed:boxShadow'] }],
+      elevation_style: 'subtle',
+    },
+    spacing: {
+      base_unit: '8px',
+      component_spacing: ['8px', '16px', '24px'],
+      section_spacing: ['80px'],
+      confidence: 'medium',
+    },
+    layout: {
+      content_width: '1200px',
+      density: 'balanced',
+      grid_feel: 'structured product-marketing grid',
+    },
+    components: {
+      button: { count: 1, dominant_fill: '#2665fd', dominant_text: '#ffffff', dominant_radius: '12px', dominant_shadow: null, notes: [] },
+      card: { count: 1, dominant_fill: '#ffffff', dominant_text: '#111111', dominant_radius: '16px', dominant_shadow: null, notes: [] },
+      input: { count: 0, dominant_fill: null, dominant_text: null, dominant_radius: null, dominant_shadow: null, notes: [] },
+      navigation: { count: 0, dominant_fill: null, dominant_text: null, dominant_radius: null, dominant_shadow: null, notes: [] },
+      badge: { count: 0, dominant_fill: null, dominant_text: null, dominant_radius: null, dominant_shadow: null, notes: [] },
+    },
+    motion: {
+      tone: 'Keep motion quick and restrained.',
+      duration_tokens: [{ token: 'duration-fast', value: '160ms', confidence: 'medium', provenance: ['css-var:duration-fast'] }],
+      easing_tokens: [{ token: 'ease-standard', value: 'cubic-bezier(0.2, 0.8, 0.2, 1)', confidence: 'medium', provenance: ['css-var:ease-standard'] }],
+    },
+    personality: {
+      adjectives: ['confident', 'calm', 'systematic'],
+      tone: 'confident, calm, systematic',
+      warmth: 'cool',
+      precision: 'polished',
+      positioning: 'product-led',
+      rationale: [],
+    },
+    ambiguities: [],
+  };
+
   it('produces empty token groups for an empty identity', () => {
     const result = compileDTCG(makeIdentity(), 'Acme');
     expect(result.$name).toBe('Acme Design Tokens');
@@ -117,5 +184,21 @@ describe('compileDTCG', () => {
     expect(token).toHaveProperty('$type');
     expect(token).toHaveProperty('$description');
     expect(token).toHaveProperty('$extensions');
+  });
+
+  it('includes synthesis-driven radius, shadow, layout, and motion groups when provided', () => {
+    const result = compileDTCG(makeIdentity(), 'Acme', synthesis);
+    const brand = result.brand as Record<string, Record<string, unknown>>;
+
+    expect(brand.radius).toBeDefined();
+    expect(brand.shadow).toBeDefined();
+    expect(brand.layout).toBeDefined();
+    expect(brand.motion).toBeDefined();
+
+    const radius = brand.radius['radius-md'] as Record<string, unknown>;
+    expect(radius.$value).toBe('12px');
+
+    const contentWidth = (brand.layout as Record<string, Record<string, unknown>>).contentWidth;
+    expect(contentWidth.$value).toBe('1200px');
   });
 });

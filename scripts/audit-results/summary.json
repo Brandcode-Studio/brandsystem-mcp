@@ -1,14 +1,14 @@
 {
   "version": "0.3.12",
-  "date": "2026-04-10T04:55:00.315Z",
+  "date": "2026-04-10T06:44:05.784Z",
   "brands_tested": 10,
   "totals": {
-    "colors": 87,
+    "colors": 103,
     "fonts": 57,
     "logos": 10
   },
-  "avg_quality": "7.2",
-  "avg_duration_ms": 830,
+  "avg_quality": "7.6",
+  "avg_duration_ms": 1205,
   "logo_detection_rate": 100,
   "issues": [
     {
@@ -17,7 +17,7 @@
     },
     {
       "brand": "Basecamp",
-      "issue": "Zero colors extracted"
+      "issue": "12/16 colors have unknown role (>50%)"
     },
     {
       "brand": "Superhuman",
@@ -30,7 +30,7 @@
       "url": "https://linear.app",
       "category": "SaaS",
       "css_pattern": "Tailwind/CSS-in-JS",
-      "duration_ms": 997,
+      "duration_ms": 1025,
       "error": null,
       "extraction_quality": {
         "score": "MEDIUM",
@@ -131,7 +131,7 @@
       "url": "https://stripe.com",
       "category": "Fintech",
       "css_pattern": "Custom CSS",
-      "duration_ms": 809,
+      "duration_ms": 737,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -263,7 +263,7 @@
       "url": "https://notion.so",
       "category": "Productivity",
       "css_pattern": "CSS modules",
-      "duration_ms": 1715,
+      "duration_ms": 1702,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -429,7 +429,7 @@
       "url": "https://vercel.com",
       "category": "Developer tools",
       "css_pattern": "Tailwind/CSS vars",
-      "duration_ms": 728,
+      "duration_ms": 629,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -585,7 +585,7 @@
       "url": "https://figma.com",
       "category": "Design",
       "css_pattern": "Custom/complex",
-      "duration_ms": 661,
+      "duration_ms": 617,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -692,26 +692,126 @@
       "url": "https://basecamp.com",
       "category": "Project mgmt",
       "css_pattern": "Traditional CSS",
-      "duration_ms": 495,
+      "duration_ms": 5005,
       "error": null,
       "extraction_quality": {
-        "score": "LOW",
-        "points": 2,
+        "score": "MEDIUM",
+        "points": 6,
         "reasons": [
           "Logo found but not as inline SVG",
-          "Fewer than 2 colors extracted",
-          "4 fonts extracted"
+          "16 colors (CSS + visual)",
+          "4 fonts (CSS + visual)",
+          "Primary color identified via visual context",
+          "Surface + text roles from computed styles",
+          "Visual fallback added 16 colors, 1 fonts"
         ],
-        "recommendation": "Limited extraction. Try a different page URL, connect to Figma, or add your brand assets manually."
+        "recommendation": "Visual extraction improved results. Some gaps remain."
       },
       "extraction_summary": {
-        "colors": 0,
+        "colors": 16,
         "typography": 4,
         "logos": 1,
-        "tokens": 1,
+        "tokens": 5,
         "stylesheets_parsed": 6
       },
-      "colors": [],
+      "colors": [
+        {
+          "name": "Surface",
+          "hex": "#ffffff",
+          "role": "surface",
+          "confidence": "high"
+        },
+        {
+          "name": "Text",
+          "hex": "#0b1215",
+          "role": "text",
+          "confidence": "high"
+        },
+        {
+          "name": "Primary",
+          "hex": "#0b1215",
+          "role": "primary",
+          "confidence": "medium"
+        },
+        {
+          "name": "Accent",
+          "hex": "#fde047",
+          "role": "accent",
+          "confidence": "medium"
+        },
+        {
+          "name": "Amber",
+          "hex": "#ffd60a",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Indigo",
+          "hex": "#7054c3",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Orange",
+          "hex": "#f87917",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Indigo",
+          "hex": "#5522fa",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Coral",
+          "hex": "#cc3d33",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Coral",
+          "hex": "#eb0101",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Light Gray",
+          "hex": "#e7e8e9",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Dark Green",
+          "hex": "#007500",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Coral",
+          "hex": "#ff0101",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Green",
+          "hex": "#0b8a0f",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Blue",
+          "hex": "#2563eb",
+          "role": "unknown",
+          "confidence": "low"
+        },
+        {
+          "name": "Violet",
+          "hex": "#9932cc",
+          "role": "unknown",
+          "confidence": "low"
+        }
+      ],
       "fonts": [
         {
           "family": "Graphik",
@@ -732,8 +832,8 @@
       ],
       "logo_found": true,
       "clarifications": {
-        "total": 4,
-        "high_priority": 1
+        "total": 16,
+        "high_priority": 0
       },
       "files_written": [
         "assets",
@@ -747,7 +847,7 @@
         "assets/logo",
         "assets/logo/logo-apple-touch-icon.png"
       ],
-      "token_count": 1,
+      "token_count": 5,
       "runtime_sessions": 1,
       "has_runtime": true,
       "has_policy": true
@@ -757,7 +857,7 @@
       "url": "https://arc.net",
       "category": "Browser",
       "css_pattern": "Modern CSS",
-      "duration_ms": 380,
+      "duration_ms": 379,
       "error": null,
       "extraction_quality": {
         "score": "MEDIUM",
@@ -864,7 +964,7 @@
       "url": "https://superhuman.com",
       "category": "Email",
       "css_pattern": "Custom",
-      "duration_ms": 681,
+      "duration_ms": 646,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",
@@ -1012,7 +1112,7 @@
       "url": "https://cal.com",
       "category": "Scheduling",
       "css_pattern": "Tailwind",
-      "duration_ms": 1145,
+      "duration_ms": 722,
       "error": null,
       "extraction_quality": {
         "score": "MEDIUM",
@@ -1144,7 +1244,7 @@
       "url": "https://loom.com",
       "category": "Video",
       "css_pattern": "Mixed",
-      "duration_ms": 686,
+      "duration_ms": 590,
       "error": null,
       "extraction_quality": {
         "score": "HIGH",

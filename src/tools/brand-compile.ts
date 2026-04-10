@@ -6,6 +6,7 @@ import { needsClarification } from "../lib/confidence.js";
 import { generateVIM, generateSystemIntegration } from "../lib/vim-generator.js";
 import { compileRuntime } from "../lib/runtime-compiler.js";
 import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
+import { generateAndPersistDesignArtifacts } from "../lib/design-synthesis.js";
 import { ERROR_CODES, type ClarificationItem } from "../types/index.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 
@@ -26,7 +27,9 @@ async function handler(server: McpServer) {
   const config = await brandDir.readConfig();
   const identity = await brandDir.readCoreIdentity();
 
-  const tokens = compileDTCG(identity, config.client_name);
+  const designArtifacts = await generateAndPersistDesignArtifacts(brandDir, { overwrite: true });
+
+  const tokens = compileDTCG(identity, config.client_name, designArtifacts.synthesis);
   await brandDir.writeTokens(tokens);
 
   const clarifications: ClarificationItem[] = [];
@@ -103,7 +106,7 @@ async function handler(server: McpServer) {
   const colorTokenCount = Object.keys((brandTokens.color as Record<string, unknown>) || {}).length;
   const typoTokenCount = Object.keys((brandTokens.typography as Record<string, unknown>) || {}).length;
 
-  const filesWritten: string[] = ["tokens.json", "needs-clarification.yaml"];
+  const filesWritten: string[] = ["tokens.json", "needs-clarification.yaml", ...designArtifacts.files_written];
   const nextSteps: string[] = [];
 
   if (clarifications.length > 0) {
@@ -112,6 +115,7 @@ async function handler(server: McpServer) {
     nextSteps.push("No clarification items — system is clean");
     nextSteps.push("Run brand_report to generate the portable brand identity report");
   }
+  nextSteps.push("DESIGN.md and design-synthesis.json are refreshed — use them as the agent-facing design brief and structured synthesis layer");
 
   // --- Read optional session data ---
   const hasVisual = await brandDir.hasVisualIdentity();
@@ -211,6 +215,8 @@ async function handler(server: McpServer) {
         items: clarifications.map((c) => `[${c.priority}] ${c.question}`),
       },
       runtime_compiled: true,
+      design_synthesis_generated: true,
+      design_synthesis_source: designArtifacts.source_used,
       ...(hasVisual && { vim_generated: true }),
       ...(conversationGuide && { conversation_guide: conversationGuide }),
     },
@@ -220,7 +226,7 @@ async function handler(server: McpServer) {
 export function register(server: McpServer) {
   server.tool(
     "brand_compile",
-    "Generate DTCG design tokens, brand runtime, and interaction policy from extracted brand data. Transforms core-identity.yaml into tokens.json, brand-runtime.json (single-document brand contract for AI agents), and interaction-policy.json (enforceable rules). When Session 2+ data exists, also generates visual-identity-manifest.md and system-integration.md. Use after brand_extract_web or brand_extract_figma. Returns token counts, clarification items, and file list.",
+    "Generate DTCG design tokens, design-synthesis.json, DESIGN.md, brand runtime, and interaction policy from extracted brand data. Transforms core-identity.yaml into tokens.json, brand-runtime.json (single-document brand contract for AI agents), and interaction-policy.json (enforceable rules). When Session 2+ data exists, also generates visual-identity-manifest.md and system-integration.md. Use after brand_extract_web, brand_extract_site, brand_extract_visual, or brand_extract_figma. Returns token counts, clarification items, and file list.",
     async () => handler(server)
   );
 }

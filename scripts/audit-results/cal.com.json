@@ -3,7 +3,7 @@
   "url": "https://cal.com",
   "category": "Scheduling",
   "css_pattern": "Tailwind",
-  "duration_ms": 1145,
+  "duration_ms": 722,
   "error": null,
   "extraction_quality": {
     "score": "MEDIUM",

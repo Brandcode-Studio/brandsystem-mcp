@@ -3,26 +3,126 @@
   "url": "https://basecamp.com",
   "category": "Project mgmt",
   "css_pattern": "Traditional CSS",
-  "duration_ms": 495,
+  "duration_ms": 5005,
   "error": null,
   "extraction_quality": {
-    "score": "LOW",
-    "points": 2,
+    "score": "MEDIUM",
+    "points": 6,
     "reasons": [
       "Logo found but not as inline SVG",
-      "Fewer than 2 colors extracted",
-      "4 fonts extracted"
+      "16 colors (CSS + visual)",
+      "4 fonts (CSS + visual)",
+      "Primary color identified via visual context",
+      "Surface + text roles from computed styles",
+      "Visual fallback added 16 colors, 1 fonts"
     ],
-    "recommendation": "Limited extraction. Try a different page URL, connect to Figma, or add your brand assets manually."
+    "recommendation": "Visual extraction improved results. Some gaps remain."
   },
   "extraction_summary": {
-    "colors": 0,
+    "colors": 16,
     "typography": 4,
     "logos": 1,
-    "tokens": 1,
+    "tokens": 5,
     "stylesheets_parsed": 6
   },
-  "colors": [],
+  "colors": [
+    {
+      "name": "Surface",
+      "hex": "#ffffff",
+      "role": "surface",
+      "confidence": "high"
+    },
+    {
+      "name": "Text",
+      "hex": "#0b1215",
+      "role": "text",
+      "confidence": "high"
+    },
+    {
+      "name": "Primary",
+      "hex": "#0b1215",
+      "role": "primary",
+      "confidence": "medium"
+    },
+    {
+      "name": "Accent",
+      "hex": "#fde047",
+      "role": "accent",
+      "confidence": "medium"
+    },
+    {
+      "name": "Amber",
+      "hex": "#ffd60a",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Indigo",
+      "hex": "#7054c3",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Orange",
+      "hex": "#f87917",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Indigo",
+      "hex": "#5522fa",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Coral",
+      "hex": "#cc3d33",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Coral",
+      "hex": "#eb0101",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Light Gray",
+      "hex": "#e7e8e9",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Dark Green",
+      "hex": "#007500",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Coral",
+      "hex": "#ff0101",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Green",
+      "hex": "#0b8a0f",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Blue",
+      "hex": "#2563eb",
+      "role": "unknown",
+      "confidence": "low"
+    },
+    {
+      "name": "Violet",
+      "hex": "#9932cc",
+      "role": "unknown",
+      "confidence": "low"
+    }
+  ],
   "fonts": [
     {
       "family": "Graphik",
@@ -43,8 +143,8 @@
   ],
   "logo_found": true,
   "clarifications": {
-    "total": 4,
-    "high_priority": 1
+    "total": 16,
+    "high_priority": 0
   },
   "files_written": [
     "assets",
@@ -58,7 +158,7 @@
     "assets/logo",
     "assets/logo/logo-apple-touch-icon.png"
   ],
-  "token_count": 1,
+  "token_count": 5,
   "runtime_sessions": 1,
   "has_runtime": true,
   "has_policy": true

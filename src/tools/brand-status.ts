@@ -17,9 +17,9 @@ async function handler() {
         error: ERROR_CODES.NOT_FOUND,
         getting_started: {
           what_is_brandsystem: "brandsystem extracts and manages brand identity (logo, colors, fonts, voice, visual rules) so AI tools produce on-brand output. It creates a .brand/ directory with structured YAML, DTCG tokens, and a portable HTML report.",
-          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, compiles DTCG tokens + brand runtime + interaction policy, and generates a portable brand report — all in one call. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
+          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, escalates to deeper visual/site extraction for JS-rendered or weak-signal sites when Chrome is available, compiles DTCG tokens + brand runtime + interaction policy, generates design-synthesis.json + DESIGN.md, and generates a portable brand report — all in one call. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
           session_overview: {
-            "Session 1 — Core Identity": "brand_start → brand_extract_web → brand_compile → brand_report. Extracts colors, fonts, logo. Produces tokens.json, brand-runtime.json, interaction-policy.json, and brand-report.html.",
+            "Session 1 — Core Identity": "brand_start → brand_extract_web or brand_extract_visual or brand_extract_site → brand_generate_designmd → brand_compile → brand_report. Extracts colors, fonts, logo from static CSS, a rendered page, or a deeper multi-page rendered crawl. Produces tokens.json, brand-runtime.json, interaction-policy.json, design-synthesis.json, DESIGN.md, brand-report.html, and optional extraction-evidence.json.",
             "Session 2 — Visual Identity": "brand_deepen_identity (interview). Captures composition rules, patterns, illustration style, anti-patterns. Produces visual-identity-manifest.md.",
             "Session 3 — Messaging": "brand_extract_messaging → brand_compile_messaging (interview). Defines perspective, voice codex, brand story. Produces messaging.yaml and brand-story.md.",
             "Session 4 — Content Strategy": "brand_build_personas → brand_build_journey → brand_build_themes → brand_build_matrix. Creates audience personas, journey stages, editorial themes, and a messaging matrix.",
@@ -28,6 +28,9 @@ async function handler() {
             "brand_start — Entry point. Creates brand system from a website URL",
             "brand_status — Shows current progress (you are here)",
             "brand_extract_web — Extract colors, fonts, logo from any website",
+            "brand_extract_visual — Screenshot the rendered page and extract computed colors/fonts for JS-heavy sites",
+            "brand_extract_site — Discover representative pages, sample multiple viewports/components, and persist extraction-evidence.json",
+            "brand_generate_designmd — Generate design-synthesis.json and DESIGN.md from extracted evidence or current brand state",
             "brand_extract_figma — Extract from Figma files (higher accuracy)",
             "brand_compile — Generate DTCG tokens and VIM from extracted data",
             "brand_report — Generate portable HTML brand report",
@@ -107,6 +110,9 @@ async function handler() {
   // Check Session 2 + 3 state
   const hasVisual = await brandDir.hasVisualIdentity();
   const hasMessaging = await brandDir.hasMessaging();
+  const hasExtractionEvidence = await brandDir.hasExtractionEvidence();
+  const hasDesignSynthesis = await brandDir.hasDesignSynthesis();
+  const hasDesignMarkdown = await brandDir.hasDesignMarkdown();
 
   const s1Done = identity.colors.length > 0 && identity.typography.length > 0;
   const s1Status = s1Done ? "✓ Complete" : identity.colors.length > 0 || identity.typography.length > 0 ? "◐ In progress" : "○ Not started";
@@ -178,6 +184,9 @@ async function handler() {
   } catch {
     lines.push(`interaction-policy.json:  ○ Not compiled — run brand_compile`);
   }
+  lines.push(`extraction-evidence.json: ${hasExtractionEvidence ? "✓ Saved" : "○ Not saved"}`);
+  lines.push(`design-synthesis.json:    ${hasDesignSynthesis ? "✓ Saved" : "○ Not generated"}`);
+  lines.push(`DESIGN.md:                ${hasDesignMarkdown ? "✓ Generated" : "○ Not generated"}`);
 
   // Check Brandcode Studio connection
   const connectorConfig = await readConnectorConfig(process.cwd());
@@ -194,10 +203,14 @@ async function handler() {
   const nextSteps: string[] = [];
   if (!s1Done) {
     if (config.website_url) {
-      nextSteps.push(`Run brand_extract_web with url "${config.website_url}"`);
+      nextSteps.push(`Run brand_extract_web with url "${config.website_url}", brand_extract_visual for a one-page rendered fallback, or brand_extract_site for a deeper multi-page pass`);
     } else {
-      nextSteps.push("Run brand_extract_web with your website URL");
+      nextSteps.push("Run brand_extract_web with your website URL, brand_extract_visual for a one-page rendered fallback, or brand_extract_site for a deeper multi-page pass");
     }
+  } else if (!hasExtractionEvidence && config.website_url) {
+    nextSteps.push(`Run brand_extract_site with url "${config.website_url}" to capture deeper multi-page evidence and save extraction-evidence.json`);
+  } else if (!hasDesignSynthesis || !hasDesignMarkdown) {
+    nextSteps.push("Run brand_generate_designmd to regenerate design-synthesis.json and DESIGN.md from the latest brand data");
   } else if (!hasVisual) {
     nextSteps.push("Run brand_deepen_identity to start Session 2 — adds anti-pattern rules, composition guidelines, and visual identity to the runtime");
   } else if (!hasMessaging) {

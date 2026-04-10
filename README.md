@@ -37,7 +37,7 @@ Tell your AI tool:
 
 > Run brand_start with client_name="Acme Corp", website_url="https://acme.com", and mode="auto"
 
-That single command extracts colors, fonts, and logo from the website, compiles DTCG tokens, and generates a portable HTML brand report -- all in under 60 seconds.
+That single command extracts colors, fonts, and logo from the website, escalates to rendered or deeper multi-page extraction when the cheap pass is weak, compiles DTCG tokens, generates `design-synthesis.json` + `DESIGN.md`, and generates a portable HTML brand report -- all in under 60 seconds.
 
 ### 3. Use it
 
@@ -49,7 +49,7 @@ The AI now has your full brand context -- colors, typography, logo, anti-pattern
 
 ## What It Does
 
-**Session 1: Core Identity** -- Extract colors, fonts, and logo from a website or Figma file. Compile into DTCG tokens. Generate a portable HTML report.
+**Session 1: Core Identity** -- Extract colors, fonts, and logo from a website or Figma file. Compile into DTCG tokens, a structured design synthesis layer, a portable `DESIGN.md`, and an HTML report.
 
 **Session 2: Visual Identity** -- Define composition rules, pattern language, illustration style, and anti-patterns through a guided interview. Anti-patterns become enforceable compliance rules.
 
@@ -73,7 +73,7 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 
 | Tool | What it does |
 |------|-------------|
-| `brand_start` | **Begin here.** Creates a brand system from a website URL in under 60 seconds. Use `mode='auto'` for one-call setup. |
+| `brand_start` | **Begin here.** Creates a brand system from a website URL in under 60 seconds. Use `mode='auto'` for one-call setup with rendered and deep-site fallback on weak JS-rendered sites. |
 | `brand_status` | Check progress, get next steps, or see a getting-started guide if no brand exists yet. |
 
 ### Session 1: Core Identity
@@ -81,6 +81,9 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 | Tool | What it does |
 |------|-------------|
 | `brand_extract_web` | Extract logo (SVG/PNG), colors, and fonts from any website URL. |
+| `brand_extract_visual` | Screenshot the rendered page in headless Chrome and extract computed colors, fonts, and visual context from JS-heavy sites. |
+| `brand_extract_site` | Discover representative pages, render them across desktop and mobile, capture screenshots, sample multiple components, and persist `extraction-evidence.json`. |
+| `brand_generate_designmd` | Generate `design-synthesis.json` and `DESIGN.md` from extracted evidence or the current brand state. |
 | `brand_extract_figma` | Extract from Figma design files (higher accuracy). Two-phase: plan then ingest. |
 | `brand_set_logo` | Add/replace logo via SVG markup, URL, or data URI. |
 | `brand_compile` | Generate DTCG design tokens, brand runtime contract, and interaction policy from extracted data. |
@@ -143,7 +146,7 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 Tools auto-chain -- each tool's response tells the LLM what to run next:
 
 ```
-Session 1: brand_start → brand_extract_web → brand_compile → brand_clarify → brand_report
+Session 1: brand_start → brand_extract_web or brand_extract_visual or brand_extract_site → brand_generate_designmd → brand_compile → brand_clarify → brand_report
 Session 2: brand_deepen_identity (interview x 6) → brand_compile (generates VIM)
 Session 3: brand_extract_messaging → brand_compile_messaging (interview x 3) → brand_write
 Session 4: brand_build_personas → brand_build_journey → brand_build_themes → brand_build_matrix
@@ -173,6 +176,9 @@ After running the full pipeline, your `.brand/` directory looks like this:
 .brand/
   brand.config.yaml              # Client name, industry, source URLs, session state
   core-identity.yaml             # Colors, typography, logos with confidence scores
+  extraction-evidence.json       # Multi-page rendered evidence bundle (optional)
+  design-synthesis.json          # Structured design synthesis (radius, shadow, layout, personality)
+  DESIGN.md                      # Portable agent-facing design brief
   tokens.json                    # DTCG design tokens (compiled output)
   brand-runtime.json             # Compiled runtime contract (single-doc brand context)
   interaction-policy.json        # Enforceable rules (anti-patterns, voice, claims)
@@ -198,7 +204,10 @@ After running the full pipeline, your `.brand/` directory looks like this:
 |------|--------|---------|
 | `brand.config.yaml` | YAML | Project metadata: client name, industry, website URL, Figma file key, session number, schema version |
 | `core-identity.yaml` | YAML | All extracted brand data: colors (with roles and confidence), typography (with families and weights), logo specs (with inline SVG and data URIs), spacing |
-| `tokens.json` | JSON | [DTCG](https://tr.designtokens.org/format/) design tokens. Only includes values with medium+ confidence. Each token carries `$extensions` with source and confidence metadata |
+| `extraction-evidence.json` | JSON | Multi-page rendered evidence captured from representative pages and viewports. Contains screenshots, computed elements, and CSS custom properties used to ground synthesis |
+| `design-synthesis.json` | JSON | Structured design interpretation of the brand. Includes radius, shadow, spacing, layout, component, motion, and personality signals derived from evidence and current identity |
+| `DESIGN.md` | Markdown | Portable agent-facing design brief synthesized from the evidence bundle and current brand state |
+| `tokens.json` | JSON | [DTCG](https://tr.designtokens.org/format/) design tokens. Includes colors and typography plus synthesis-driven radius, shadow, layout, spacing, and motion groups when available |
 | `brand-runtime.json` | JSON | Single-document brand contract for AI agents. Merges all 4 session YAMLs into flat, fast-access format. Only medium+ confidence values. Compiled by `brand_compile`, read by `brand_runtime` |
 | `interaction-policy.json` | JSON | Enforceable rules engine. Visual anti-patterns, voice constraints (never-say, AI-ism patterns), and content claims policies. Used by preflight and scoring tools |
 | `needs-clarification.yaml` | YAML | Prioritized list of items the system could not resolve confidently: missing primary color, low-confidence values, unassigned roles |
@@ -293,9 +302,14 @@ If you are using the hosted-brand flow instead of local extraction, `brand_brand
 
 This usually means the website loads CSS dynamically via JavaScript. `brand_extract_web` only parses static CSS from `<style>` blocks and linked stylesheets. Solutions:
 
+- **Run `brand_extract_visual`** to analyze a single rendered page with headless Chrome and computed styles
+- **Run `brand_extract_site`** to sample representative pages across desktop and mobile and save `extraction-evidence.json`
+- **Run `brand_generate_designmd`** after extraction or manual edits to regenerate `design-synthesis.json` and `DESIGN.md`
 - **Try a different page** that uses more inline/linked CSS (e.g., the homepage, a blog post)
 - **Use Figma extraction** (`brand_extract_figma`) for higher accuracy
 - **Set values manually** using `brand_clarify` after extraction
+
+`brand_start` in `mode='auto'` already tries this visual fallback when extraction quality is low and Chrome/Chromium is available, then generates `design-synthesis.json` and `DESIGN.md` from the best available evidence.
 
 ### Figma extraction fails
 
@@ -377,6 +391,31 @@ A Figma-sourced primary color will replace a web-extracted one. A manually confi
 6. Finds logo candidates from `<img>`, `<svg>`, and `<link rel="icon">` elements
 7. Downloads and embeds logos as inline SVG or base64 data URIs
 
+### Visual Extraction
+
+`brand_extract_visual` launches headless Chrome against the target URL and:
+
+1. Captures a 2x DPR screenshot of the rendered page
+2. Extracts computed styles from semantic elements such as body, header, hero, links, cards, and buttons
+3. Reads CSS custom properties from `:root`
+4. Infers likely color roles from visual context (for example, button background → primary)
+5. Returns the screenshot as an MCP image block so the calling agent can do qualitative visual analysis
+
+This is the fallback path for JS-rendered apps and page builders where static CSS parsing misses key brand signals.
+
+### Deep Site Extraction
+
+`brand_extract_site` extends the rendered-path beyond the homepage:
+
+1. Discovers representative pages on the same domain
+2. Captures desktop and mobile screenshots for each selected page
+3. Samples multiple instances of buttons, cards, links, inputs, sections, and other components
+4. Persists the results to `.brand/extraction-evidence.json`
+5. Feeds that evidence into `brand_generate_designmd` / `brand_compile` to produce `.brand/design-synthesis.json` and `.brand/DESIGN.md`
+5. Merges additional colors and fonts back into `core-identity.yaml` when `merge=true`
+
+Use this when the homepage is not enough to understand the brand system, or when you want richer evidence before token compilation.
+
 ### Figma Extraction
 
 `brand_extract_figma` works in two steps to bridge between the Figma MCP and brandsystem:
@@ -439,7 +478,7 @@ Each stage builds on the previous. Stop anywhere — you get value immediately.
 
 | Stage | What You Get | How |
 |-------|-------------|-----|
-| **1. Free scan** | Brand tokens + HTML report with platform setup guides | `brand_extract_web` → `brand_compile` → `brand_report` |
+| **1. Free scan** | Brand tokens + DESIGN.md + HTML report with platform setup guides | `brand_start` (auto) or `brand_extract_web` / `brand_extract_visual` / `brand_extract_site` → `brand_generate_designmd` → `brand_compile` → `brand_report` |
 | **2. MCP depth** | Figma extraction, clarification, full audit | Session 1 with `brand_extract_figma` + `brand_clarify` |
 | **3. Visual identity** | Composition rules, patterns, anti-patterns, VIM | Session 2: `brand_deepen_identity` → `brand_compile` |
 | **4. Core messaging** | Voice profile, perspective, brand story | Session 3: `brand_extract_messaging` → `brand_compile_messaging` |

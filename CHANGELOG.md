@@ -1,9 +1,18 @@
 # Changelog
 
-## 0.3.18 (2026-04-10)
+## 0.4.0 (2026-04-10)
+
+### Added
+- **Multimodal visual extraction (I8).** Added `brand_extract_visual` for rendered-page extraction via headless Chrome. The tool captures a 2x DPR screenshot, extracts computed styles from semantic elements plus `:root` CSS custom properties, infers likely color roles from visual context, and returns the screenshot as an MCP image block for agent-side vision analysis.
+- **Deep site extraction (Phase 1).** Added `brand_extract_site` for representative multi-page extraction. The tool discovers high-signal pages on the same domain, captures desktop and mobile screenshots, samples multiple components per page, persists `.brand/extraction-evidence.json`, and merges additional colors/fonts into `core-identity.yaml`.
+- **Design synthesis + DESIGN.md (Phase 2/3).** Added `brand_generate_designmd` plus the shared synthesis pipeline that writes `.brand/design-synthesis.json` and `.brand/DESIGN.md`. The synthesis layer turns extracted evidence into radius, shadow, spacing, layout, motion, component, and personality signals for both humans and agents.
 
 ### Improved
 - **Extraction quality scoring recalibrated (I7).** Replaced the simple point accumulation with weighted scoring: colors 35%, fonts 20%, logo 20%, role assignment 15%, primary identification 10%. Zero colors now gets a specific "JavaScript-applied styles" remediation message. Role assignment rate factors into the score (brands with many unknown-role colors get penalized). MEDIUM score now includes specific gap identification with remediation steps.
+- **`brand_start` auto-mode visual fallback.** When static CSS extraction scores LOW or finds fewer than two colors, `brand_start` now attempts visual extraction, merges the computed colors/fonts into `core-identity.yaml`, rescales quality, and includes the screenshot in the MCP response for visual validation.
+- **`brand_start` deep fallback.** When the cheap CSS pass is weak and Chrome is available, `brand_start` now tries the multi-page site extractor before dropping back to the single-page visual fallback. This saves `extraction-evidence.json` and uses richer multi-page evidence when possible.
+- **Richer compiled token output.** `brand_compile` and `brand_start(auto)` now compile synthesis-driven radius, shadow, layout, spacing, and motion groups into `tokens.json` when those signals are present.
+- **Canonical compile parity.** `brand_compile` and `brand_start(auto)` now both generate `design-synthesis.json` and `DESIGN.md`, keeping the default URL onboarding flow aligned with the manual compile flow.
 
 ## 0.3.17 (2026-04-10)
 

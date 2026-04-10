@@ -57,9 +57,9 @@ function expectValidMetadata(json: Record<string, unknown>): void {
 // ---------------------------------------------------------------------------
 
 describe("tool registration", () => {
-  it("registers all 31 tools", async () => {
+  it("registers all 34 tools", async () => {
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(31);
+    expect(tools.length).toBe(34);
   });
 
   it("every tool has a non-empty description", async () => {
@@ -204,6 +204,36 @@ describe("tools that require .brand/ dir", () => {
     expectValidMetadata(json);
   });
 
+  it("brand_extract_visual returns gracefully without .brand/", async () => {
+    const result = await client.callTool({
+      name: "brand_extract_visual",
+      arguments: { url: "https://example.com", merge: false },
+    });
+    const content = result.content as McpContent;
+    expect(content).toBeDefined();
+    expect(content.length).toBeGreaterThanOrEqual(1);
+    // Either returns image + text (if Chrome found) or just text (unavailable/error)
+    const textItem = content.find((c) => c.type === "text");
+    expect(textItem).toBeDefined();
+  }, 45_000);
+
+  it("brand_extract_site returns gracefully without .brand/ when merge is false", async () => {
+    const result = await client.callTool({
+      name: "brand_extract_site",
+      arguments: { url: "https://example.com", merge: false, page_limit: 2 },
+    });
+    const content = result.content as McpContent;
+    expect(content).toBeDefined();
+    expect(content.length).toBeGreaterThanOrEqual(1);
+    const textItem = content.find((c) => c.type === "text");
+    expect(textItem).toBeDefined();
+  }, 60_000);
+
+  it("brand_generate_designmd handles missing .brand/", async () => {
+    const json = await callAndParse("brand_generate_designmd", {});
+    expectValidMetadata(json);
+  });
+
   it("brand_deepen_identity handles missing .brand/", async () => {
     const json = await callAndParse("brand_deepen_identity", {
       mode: "interview",
@@ -314,7 +344,9 @@ describe("tools that fetch URLs (network-dependent)", () => {
     expect(content).toBeDefined();
     expect(content.length).toBeGreaterThanOrEqual(1);
     // Parse response — it should be valid JSON regardless of network outcome
-    const json = JSON.parse(content[0].text);
+    const textItem = content.find((item) => item.type === "text");
+    expect(textItem).toBeDefined();
+    const json = JSON.parse(textItem!.text);
     expect(json._metadata).toBeDefined();
   }, 30_000);
 

@@ -11,10 +11,13 @@ import { mergeColor, mergeTypography, needsClarification } from "../lib/confiden
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
+import { extractSite, extractVisual, inferRolesFromVisual, isVisualExtractionAvailable } from "../lib/visual-extractor.js";
 import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { compileRuntime } from "../lib/runtime-compiler.js";
 import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
 import { generateReportHTML, generateBrandInstructions } from "../lib/report-html.js";
+import { persistSiteExtraction } from "../lib/site-evidence.js";
+import { generateAndPersistDesignArtifacts } from "../lib/design-synthesis.js";
 import { ERROR_CODES, type ColorEntry, type TypographyEntry, type LogoSpec, type CoreIdentity, type ClarificationItem } from "../types/index.js";
 
 const paramsShape = {
@@ -479,18 +482,148 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
     qualityRecommendation = "Limited extraction. Try a different page URL, connect to Figma, or add your brand assets manually.";
   }
 
-  const extractionQuality = {
+  let extractionQuality = {
     score: qualityScore,
     points: qualityPoints,
     reasons: qualityReasons,
     recommendation: qualityRecommendation,
   };
 
+  // --- Step 1b: Visual fallback when CSS parsing yields poor results ---
+  let visualScreenshot: Buffer | null = null;
+  let visualUsed = false;
+  let siteExtractionUsed = false;
+  let siteExtractionSummary: { pages: number; colors_added: number; fonts_added: number; screenshots_saved: number } | null = null;
+
+  if ((qualityScore === "LOW" || colors.length < 2) && isVisualExtractionAvailable()) {
+    const siteResult = await extractSite(url, {
+      pageLimit: 4,
+      viewports: ["desktop", "mobile"],
+    });
+    if (siteResult.success) {
+      const persisted = await persistSiteExtraction(brandDir, siteResult, { merge: true });
+      siteExtractionUsed = true;
+      visualUsed = true;
+      siteExtractionSummary = {
+        pages: siteResult.selectedPages.length,
+        colors_added: persisted.colors_added,
+        fonts_added: persisted.fonts_added,
+        screenshots_saved: persisted.screenshots_saved,
+      };
+      visualScreenshot = siteResult.selectedPages[0]?.viewports.find((viewport) => viewport.viewport === "desktop")?.screenshot ?? null;
+
+      const mergedIdentity = await brandDir.readCoreIdentity();
+      colors = [...mergedIdentity.colors];
+      typography = [...mergedIdentity.typography];
+
+      // Rescore quality with site evidence included
+      qualityPoints = 0;
+      qualityReasons.length = 0;
+
+      const hasInlineSvgLogo2 = logos.some((l) => l.variants.some((v) => v.inline_svg));
+      if (hasInlineSvgLogo2) { qualityPoints += 3; qualityReasons.push("Logo found with inline SVG"); }
+      else if (logoFound) { qualityReasons.push("Logo found but not as inline SVG"); }
+
+      if (colors.length >= 4) { qualityPoints += 2; qualityReasons.push(`${colors.length} colors (CSS + site extraction)`); }
+      else if (colors.length >= 2) { qualityPoints += 1; qualityReasons.push(`${colors.length} colors (CSS + site extraction)`); }
+
+      if (typography.length >= 3) { qualityPoints += 2; qualityReasons.push(`${typography.length} fonts (CSS + site extraction)`); }
+      else if (typography.length >= 1) { qualityPoints += 1; qualityReasons.push(`${typography.length} font(s) (CSS + site extraction)`); }
+
+      if (colors.some((c) => c.role === "primary")) { qualityPoints += 1; qualityReasons.push("Primary color identified via multi-page visual context"); }
+      if (colors.some((c) => c.role === "surface") && colors.some((c) => c.role === "text")) {
+        qualityPoints += 1; qualityReasons.push("Surface + text roles from computed styles");
+      }
+
+      qualityReasons.push(`Deep site extraction sampled ${siteResult.selectedPages.length} pages and added ${persisted.colors_added} colors, ${persisted.fonts_added} fonts`);
+
+      if (qualityPoints >= 8) { qualityScore = "HIGH"; qualityRecommendation = "Strong extraction (CSS + site evidence). Ready to confirm and compile."; }
+      else if (qualityPoints >= 5) { qualityScore = "MEDIUM"; qualityRecommendation = "Deep site extraction improved results. Some gaps remain."; }
+      else { qualityScore = "LOW"; qualityRecommendation = "Even with deep site extraction, results are limited. Try Figma or manual entry."; }
+
+      extractionQuality = { score: qualityScore, points: qualityPoints, reasons: qualityReasons, recommendation: qualityRecommendation };
+    } else {
+      const visualResult = await extractVisual(url);
+      if (visualResult.success) {
+        visualUsed = true;
+        visualScreenshot = visualResult.screenshot;
+
+        // Infer roles from visual context (button → primary, body → surface, etc.)
+        const roleCandidates = inferRolesFromVisual(visualResult.computedElements, visualResult.cssCustomProperties);
+
+        // Merge visual colors into the identity
+        let visualColorsAdded = 0;
+        for (const vc of roleCandidates) {
+          const entry: ColorEntry = {
+            name: generateColorName(vc.hex, vc.role),
+            value: vc.hex,
+            role: vc.role as ColorEntry["role"],
+            source: "web",
+            confidence: vc.confidence,
+            css_property: `computed:${vc.source_context}`,
+          };
+          const before = colors.length;
+          colors = mergeColor(colors, entry);
+          if (colors.length > before) visualColorsAdded++;
+        }
+
+        // Merge visual fonts
+        for (const font of visualResult.uniqueFonts) {
+          const entry: TypographyEntry = {
+            name: font,
+            family: font,
+            source: "web",
+            confidence: "medium",
+          };
+          typography = mergeTypography(typography, entry);
+        }
+
+        // Rewrite identity with merged data
+        const mergedIdentity: CoreIdentity = {
+          schema_version: identity.schema_version,
+          colors,
+          typography,
+          logo: logos,
+          spacing: identity.spacing,
+        };
+        await brandDir.writeCoreIdentity(mergedIdentity);
+
+        // Rescore quality with visual data included
+        qualityPoints = 0;
+        qualityReasons.length = 0;
+
+        const hasInlineSvgLogo2 = logos.some((l) => l.variants.some((v) => v.inline_svg));
+        if (hasInlineSvgLogo2) { qualityPoints += 3; qualityReasons.push("Logo found with inline SVG"); }
+        else if (logoFound) { qualityReasons.push("Logo found but not as inline SVG"); }
+
+        if (colors.length >= 4) { qualityPoints += 2; qualityReasons.push(`${colors.length} colors (CSS + visual)`); }
+        else if (colors.length >= 2) { qualityPoints += 1; qualityReasons.push(`${colors.length} colors (CSS + visual)`); }
+
+        if (typography.length >= 3) { qualityPoints += 2; qualityReasons.push(`${typography.length} fonts (CSS + visual)`); }
+        else if (typography.length >= 1) { qualityPoints += 1; qualityReasons.push(`${typography.length} font(s) (CSS + visual)`); }
+
+        if (colors.some((c) => c.role === "primary")) { qualityPoints += 1; qualityReasons.push("Primary color identified via visual context"); }
+        if (colors.some((c) => c.role === "surface") && colors.some((c) => c.role === "text")) {
+          qualityPoints += 1; qualityReasons.push("Surface + text roles from computed styles");
+        }
+
+        qualityReasons.push(`Visual fallback added ${visualColorsAdded} colors, ${visualResult.uniqueFonts.length} fonts`);
+
+        if (qualityPoints >= 8) { qualityScore = "HIGH"; qualityRecommendation = "Strong extraction (CSS + visual). Ready to confirm and compile."; }
+        else if (qualityPoints >= 5) { qualityScore = "MEDIUM"; qualityRecommendation = "Visual extraction improved results. Some gaps remain."; }
+        else { qualityScore = "LOW"; qualityRecommendation = "Even with visual extraction, results are limited. Try Figma or manual entry."; }
+
+        extractionQuality = { score: qualityScore, points: qualityPoints, reasons: qualityReasons, recommendation: qualityRecommendation };
+      }
+    }
+  }
+
   // --- Step 2: Compile (same logic as brand_compile) ---
   const config = await brandDir.readConfig();
   const freshIdentity = await brandDir.readCoreIdentity();
+  const designArtifacts = await generateAndPersistDesignArtifacts(brandDir, { overwrite: true });
 
-  const tokens = compileDTCG(freshIdentity, config.client_name);
+  const tokens = compileDTCG(freshIdentity, config.client_name, designArtifacts.synthesis);
   await brandDir.writeTokens(tokens);
 
   const clarifications: ClarificationItem[] = [];
@@ -603,25 +736,35 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   const filesWritten = [
     "brand.config.yaml",
     "core-identity.yaml",
+    ...designArtifacts.files_written,
     "tokens.json",
     "brand-runtime.json",
     "interaction-policy.json",
     "needs-clarification.yaml",
     "brand-report.html",
+    ...(siteExtractionUsed ? ["extraction-evidence.json"] : []),
   ];
 
   const hasPrimary = freshIdentity.colors.some((c) => c.role === "primary");
 
-  return buildResponse({
-    what_happened: `Auto mode: created .brand/ for "${input.client_name}", extracted from ${url}, compiled tokens + runtime + policy, and generated report`,
+  const textResponse = buildResponse({
+    what_happened: `Auto mode: created .brand/ for "${input.client_name}", extracted from ${url}${siteExtractionUsed ? " (CSS + deep site extraction)" : visualUsed ? " (CSS + visual)" : ""}, compiled tokens + runtime + policy, generated design synthesis, and generated report`,
     next_steps: [
       "Show the user their brand summary and confirm key decisions before proceeding",
+      "Mention that DESIGN.md and design-synthesis.json were generated as portable brand system artifacts",
+      ...(visualUsed ? ["A screenshot of the website is included — use it to validate the extracted colors and assess brand personality"] : []),
     ],
     data: {
       mode: "auto",
       client_name: input.client_name,
       brand_dir: ".brand/",
       files_written: filesWritten,
+      ...(siteExtractionUsed ? { evidence_file: ".brand/extraction-evidence.json" } : {}),
+      design_synthesis_file: ".brand/design-synthesis.json",
+      design_markdown_file: ".brand/DESIGN.md",
+      design_synthesis_source: designArtifacts.source_used,
+      visual_extraction_used: visualUsed,
+      site_extraction_used: siteExtractionUsed,
       extraction_quality: extractionQuality,
       extraction_summary: {
         colors: colors.length,
@@ -629,6 +772,10 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
         logos: logos.length,
         tokens: tokenCount,
         stylesheets_parsed: stylesheetUrls.slice(0, 5).length + 1,
+        ...(siteExtractionSummary ? {
+          site_pages_sampled: siteExtractionSummary.pages,
+          site_screenshots_saved: siteExtractionSummary.screenshots_saved,
+        } : {}),
       },
       all_colors: colors.map((c) => ({
         name: c.name,
@@ -661,10 +808,25 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
       report_file: ".brand/brand-report.html",
       report_size: `${Math.round(reportHtml.length / 1024)}KB`,
       brand_instructions: brandInstructions,
+      ...(visualUsed ? {
+        visual_analysis_prompt: [
+          `A screenshot of the website is attached${siteExtractionUsed ? " from the deeper multi-page extraction pass" : ""}. Use it to:`,
+          "1. Validate the extracted primary color — does it match the dominant CTA/brand color you see?",
+          "2. Assess the brand personality — professional/playful, premium/accessible, minimal/rich?",
+          "3. Note any colors visible in the screenshot that the extraction may have missed",
+          "4. Describe the typography character — geometric, humanist, serif? Weight usage?",
+          "5. Note the spatial feel — dense/spacious, sharp/rounded corners?",
+        ].join("\n"),
+      } : {}),
       conversation_guide: {
         instruction: [
           "The entire Session 1 pipeline ran automatically. Present the results:",
           `1. Show extraction quality (${qualityScore}) and mention: ${qualityRecommendation}`,
+          ...(siteExtractionUsed
+            ? ["   NOTE: Deep site extraction was used because the cheap CSS pass was weak. The screenshot is attached, and extraction-evidence.json was saved with multi-page evidence."]
+            : visualUsed
+              ? ["   NOTE: Visual extraction was used as a fallback because CSS parsing yielded limited results. The screenshot is attached — describe what you see in the brand."]
+              : []),
           `2. ${logoFound ? "Show the logo if possible — ask 'Is this your logo?'" : "No logo was found. Suggest: Figma extraction, direct logo URL via brand_set_logo, or manual upload."}`,
           `3. Show ALL ${colors.length} extracted colors (hex + name + role). Ask three things:`,
           `   a) 'Which is your PRIMARY brand color?' (highlight candidates: ${chromaticCandidates.join(", ") || "none"})`,
@@ -672,14 +834,32 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
           `   c) 'What roles should the remaining colors play? (secondary, accent, etc.)'`,
           `4. List the fonts (${typography.map((t) => t.family).join(", ") || "none found"}) — ask 'Are these correct?'`,
           "5. After confirmation: 'Your brand runtime is compiled. Any agent you give brand-runtime.json to will produce on-brand content with the right colors, fonts, and logo.'",
-          "6. Explain what Session 2 adds (don't just say 'go deeper'): 'Session 2 captures your visual rules — composition guidelines, anti-patterns, illustration direction. It makes the runtime dramatically more useful because agents won't just use the right colors, they'll use them the right way. Your sub-agents could reject off-brand image prompts automatically.'",
-          "7. Ask: 'Want to add visual rules now, or is the core identity enough for what you need?'",
-          "8. If they want team sharing: 'Run brand_brandcode_connect to save this on Brandcode Studio and sync across your team.'",
+          "6. Mention: 'I also generated .brand/DESIGN.md and .brand/design-synthesis.json. DESIGN.md is the portable design brief for agents; design-synthesis.json is the structured layer behind the richer tokens.'",
+          "7. Explain what Session 2 adds (don't just say 'go deeper'): 'Session 2 captures your visual rules — composition guidelines, anti-patterns, illustration direction. It makes the runtime dramatically more useful because agents won't just use the right colors, they'll use them the right way. Your sub-agents could reject off-brand image prompts automatically.'",
+          "8. Ask: 'Want to add visual rules now, or is the core identity enough for what you need?'",
+          "9. If they want team sharing: 'Run brand_brandcode_connect to save this on Brandcode Studio and sync across your team.'",
           ...(qualityScore === "LOW" ? ["If extraction quality is LOW, suggest: Figma extraction, different URL, or manual input via brand_set_logo."] : []),
         ].join("\n"),
       },
     },
   });
+
+  // If visual extraction produced a screenshot, return it as a multi-content MCP response
+  if (visualScreenshot) {
+    const textContent = textResponse.content[0];
+    return {
+      content: [
+        {
+          type: "image",
+          data: visualScreenshot.toString("base64"),
+          mimeType: "image/png",
+        } as unknown as { type: "text"; text: string },
+        textContent,
+      ],
+    };
+  }
+
+  return textResponse;
 }
 
 async function handler(input: Params) {
@@ -769,7 +949,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_start",
-    "Create a brand system from any website URL — extract brand colors, fonts, and logo in under 60 seconds. Use when the user says 'create a brand system', 'extract brand from website', 'set up brand guidelines', 'get design tokens', or 'brand identity'. Set mode='auto' with a website_url to run the full pipeline (extract, compile DTCG tokens + brand runtime + interaction policy, generate HTML report) in one call. If .brand/ already exists, returns current status with next steps. Returns colors with roles, typography, logo (SVG/PNG), and confidence scores. After creation, suggest Brandcode Studio connector for team sync.",
+    "Create a brand system from any website URL — extract brand colors, fonts, and logo in under 60 seconds. Use when the user says 'create a brand system', 'extract brand from website', 'set up brand guidelines', 'get design tokens', or 'brand identity'. Set mode='auto' with a website_url to run the full pipeline (extract, compile DTCG tokens + design-synthesis.json + DESIGN.md + brand runtime + interaction policy, generate HTML report) in one call. If .brand/ already exists, returns current status with next steps. Returns colors with roles, typography, logo (SVG/PNG), and confidence scores. After creation, suggest Brandcode Studio connector for team sync.",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

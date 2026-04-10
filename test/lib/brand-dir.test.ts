@@ -155,4 +155,36 @@ describe('BrandDir', () => {
     await bd.writeRuntime({ version: '1.0.0' });
     expect(await bd.hasRuntime()).toBe(true);
   });
+
+  it('hasTokens() returns false before writing, true after', async () => {
+    await bd.scaffold();
+    expect(await bd.hasTokens()).toBe(false);
+    await bd.writeTokens({ $name: 'Test', brand: {} });
+    expect(await bd.hasTokens()).toBe(true);
+  });
+
+  it('readDesignSynthesis() returns data written by writeDesignSynthesis()', async () => {
+    await bd.scaffold();
+    const synthesis = {
+      schema_version: '0.4.0',
+      generated_at: '2026-04-10T00:00:00.000Z',
+      source: 'current-brand',
+      brand: { client_name: 'Test', website_url: null },
+    };
+    await bd.writeDesignSynthesis(synthesis);
+    const result = await bd.readDesignSynthesis();
+    expect(result).toEqual(synthesis);
+  });
+
+  it('hasDesignSynthesis() and hasDesignMarkdown() reflect persisted design artifacts', async () => {
+    await bd.scaffold();
+    expect(await bd.hasDesignSynthesis()).toBe(false);
+    expect(await bd.hasDesignMarkdown()).toBe(false);
+
+    await bd.writeDesignSynthesis({ schema_version: '0.4.0' });
+    await bd.writeMarkdown('DESIGN.md', '# DESIGN.md');
+
+    expect(await bd.hasDesignSynthesis()).toBe(true);
+    expect(await bd.hasDesignMarkdown()).toBe(true);
+  });
 });
