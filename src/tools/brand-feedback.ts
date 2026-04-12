@@ -188,8 +188,57 @@ async function readBrandContext(): Promise<{
   }
 }
 
+const FEEDBACK_ENDPOINT = "https://brandcode.studio/api/feedback";
+
+/**
+ * Drain unsent local feedback to the remote endpoint.
+ * Called on every brand_feedback invocation to ship any backlog.
+ * Fire-and-forget: never blocks the current submission.
+ */
+async function drainLocalFeedback(): Promise<number> {
+  let sent = 0;
+  try {
+    const files = await readdir(FEEDBACK_DIR);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const raw = await readFile(join(FEEDBACK_DIR, file), "utf-8");
+        const item = JSON.parse(raw);
+        // Skip already-sent items
+        if (item._remote_sent) continue;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const resp = await fetch(FEEDBACK_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: raw,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (resp.ok) {
+          // Mark as sent so we don't re-send
+          item._remote_sent = true;
+          item._remote_sent_at = new Date().toISOString();
+          await writeFile(join(FEEDBACK_DIR, file), JSON.stringify(item, null, 2), "utf-8");
+          sent++;
+        }
+      } catch {
+        // Individual file failed — continue with others
+      }
+    }
+  } catch {
+    // Can't read dir — no-op
+  }
+  return sent;
+}
+
 async function sendHandler(input: SendParams) {
   await ensureFeedbackDir();
+
+  // Drain any unsent local feedback in the background
+  const drainPromise = drainLocalFeedback().catch(() => 0);
 
   const rateLimitMsg = await checkFeedbackRateLimit();
   if (rateLimitMsg) {
@@ -265,26 +314,56 @@ async function sendHandler(input: SendParams) {
     "utf-8"
   );
 
+  // Send feedback to Brandcode Studio (fire-and-forget, never blocks)
+  // This is how agents close the feedback loop — local write is the fallback,
+  // remote send is how the team sees what's happening in the field.
+  let remoteSent = false;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(FEEDBACK_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(feedback),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    remoteSent = resp.ok;
+    if (remoteSent) {
+      // Mark local file as sent
+      feedback._remote_sent = true;
+      feedback._remote_sent_at = new Date().toISOString();
+      await writeFile(join(FEEDBACK_DIR, filename), JSON.stringify(feedback, null, 2), "utf-8");
+    }
+  } catch {
+    // Remote send failed — local file is the fallback. Never block on this.
+  }
+
+  // Wait for drain to complete (non-blocking, already started)
+  const drainedCount = await drainPromise;
+
   const whatHappened = isAgentSignal
-    ? `Agent signal recorded: ${input.signal || "unknown"} for ${cleanToolUsed || "unknown tool"}`
-    : `Feedback received and saved as ${filename}`;
+    ? `Agent signal recorded: ${input.signal || "unknown"} for ${cleanToolUsed || "unknown tool"}${remoteSent ? " (sent to Brandcode team)" : " (saved locally)"}`
+    : `Feedback received${remoteSent ? " and sent to Brandcode team" : " (saved locally — remote send failed, team will see it when you connect to Studio)"}`;
 
   return buildResponse({
     what_happened: whatHappened,
     next_steps: [
       "The brandsystem team reviews agent feedback to prioritize improvements.",
-      "Use brand_feedback_review to see all feedback and triage items.",
+      ...(remoteSent ? [] : ["Feedback was saved locally. It will be sent when brandcode.studio is reachable."]),
     ],
     data: {
       feedbackId: id,
       category: input.category,
       severity,
+      remote_sent: remoteSent,
       ...(isAgentSignal && {
         signal: input.signal,
         tool_used: cleanToolUsed,
         ...(brandContext && { brand_context: brandContext }),
       }),
       stored_at: join(FEEDBACK_DIR, filename),
+      ...(drainedCount > 0 && { backlog_sent: drainedCount }),
     },
   });
 }

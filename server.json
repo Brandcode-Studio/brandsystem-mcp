@@ -1,7 +1,7 @@
 {
   "$schema": "https://registry.modelcontextprotocol.io/schemas/v0/server.json",
   "name": "io.github.brand-system/brandsystem-mcp",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "title": "Brandcode MCP",
   "description": "Extract, manage, and enforce brand identity for AI tools. Produces structured design tokens, design synthesis artifacts, DESIGN.md briefs, visual identity rules, voice guidelines, and governance policies from any website or Figma file. 34 tools across 4 progressive sessions. Subscribable brand://runtime and brand://policy resources.",
   "websiteUrl": "https://brandcode.studio/mcp",
@@ -12,7 +12,7 @@
   "packages": [{
     "registryType": "npm",
     "identifier": "@brandsystem/mcp",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "transport": ["stdio"],
     "runtimeHint": "node"
   }]
