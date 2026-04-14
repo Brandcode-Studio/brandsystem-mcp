@@ -4,13 +4,15 @@
 
 # @brandsystem/mcp
 
-Extract and manage brand identity for AI tools -- logo, colors, typography, voice, and visual rules.
+**Make your brand machine-readable.** Extract identity from any website, structure it as tokens and policies, and make it available to every AI tool you use.
 
 ## What It Solves
 
-AI tools produce generic output because they have no brand context. Brand guidelines live in PDFs, Figma files, and people's heads -- none of which are readily surfaced at the moment of creation in other tools.
+AI tools produce generic output because they have no brand context. Brand guidelines live in PDFs, Figma files, and people's heads, none of which AI tools can read at the moment of creation.
 
-This MCP server extracts brand identity from live sources (websites, Figma files), compiles it into structured design tokens, and makes it available to any AI tool through the [Model Context Protocol](https://modelcontextprotocol.io). The result is a `.brand/` directory with your colors, fonts, logos, voice rules, and DTCG tokens -- portable, version-controlled, and ready for any AI tool to consume.
+This MCP server extracts brand identity from live sources (websites, rendered pages, Figma files), compiles it into structured design tokens, runtime contracts, and interaction policies, and makes it available to any AI tool through the [Model Context Protocol](https://modelcontextprotocol.io). The result is a `.brand/` directory with your colors, fonts, logos, voice rules, visual anti-patterns, and DTCG tokens. Portable, version-controlled, and ready for any AI tool to consume.
+
+With `brand-runtime.json` loaded, agent prompts collapse from 200-400 tokens of inline brand context to just the delta. First output is on-brand. No review bottleneck.
 
 ---
 
