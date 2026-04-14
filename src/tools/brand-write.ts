@@ -579,6 +579,7 @@ async function handler(input: WriteParams) {
       client_name: config.client_name,
       brand_layers_available: layersAvailable,
       creation_brief: brief,
+      agent_tip: "Run brand_preflight on your output afterward to verify brand compliance. Run brand_audit_content for a 0-100 score. If handing off to a sub-agent, pass .brand/brand-runtime.json as context instead of re-running brand_write.",
       conversation_guide: {
         instruction: instructions.join(" "),
       },

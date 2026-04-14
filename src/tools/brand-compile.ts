@@ -217,6 +217,7 @@ async function handler(server: McpServer) {
       runtime_compiled: true,
       design_synthesis_generated: true,
       design_synthesis_source: designArtifacts.source_used,
+      agent_tip: "Load .brand/brand-runtime.json into any sub-agent's context. It replaces 200-400 tokens of per-prompt brand boilerplate with a single file. First output will be on-brand.",
       ...(hasVisual && { vim_generated: true }),
       ...(conversationGuide && { conversation_guide: conversationGuide }),
     },

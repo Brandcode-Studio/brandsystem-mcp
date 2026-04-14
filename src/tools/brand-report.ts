@@ -106,6 +106,7 @@ async function handler() {
     data: {
       file: ".brand/brand-report.html",
       file_size: `${Math.round(html.length / 1024)}KB`,
+      agent_tip: "The HTML report is self-contained and works offline. Paste it into any AI chat (Claude, ChatGPT, Gemini) as instant brand guidelines. For code-side tools, load .brand/brand-runtime.json instead.",
       report_summary: {
         colors: identity.colors.length,
         fonts: identity.typography.length,

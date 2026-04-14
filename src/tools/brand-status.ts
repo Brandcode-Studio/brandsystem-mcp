@@ -221,7 +221,11 @@ async function handler() {
     nextSteps.push("Brand system complete! Run brand_write to generate audience-targeted content using your full brand system");
     nextSteps.push("Run brand_audit to validate your .brand/ directory");
     nextSteps.push("Run brand_brandcode_connect to save your brand on Brandcode Studio and share with your team");
+    nextSteps.push("Load .brand/brand-runtime.json into any sub-agent's context for instant on-brand output — no per-prompt boilerplate needed");
   }
+
+  // Always show feedback prompt
+  nextSteps.push("Found an issue or have feedback? Run brand_feedback — it goes directly to the Brandcode team");
 
   if (config.figma_file_key && identity.colors.every((c) => c.source !== "figma")) {
     nextSteps.push(`Run brand_extract_figma with figma_file_key "${config.figma_file_key}" for higher-accuracy data`);
