@@ -104,6 +104,18 @@ async function handler(input: Params) {
         screenshot_count: extraction.selectedPages.reduce((sum, page) => sum + page.viewports.length, 0),
         aggregated_colors: [...new Set(extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.uniqueColors)))].length,
         aggregated_fonts: [...new Set(extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.uniqueFonts)))],
+        spacing: {
+          baseUnit: extraction.selectedPages.flatMap((page) => page.viewports.map((viewport) => viewport.visualTokens.spacing.baseUnit)).find((value): value is string => Boolean(value)) ?? null,
+          scale: [...new Set(extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.visualTokens.spacing.scale)))].sort((a, b) => a - b),
+          commonValues: extraction.selectedPages[0]?.viewports[0]?.visualTokens.spacing.commonValues ?? [],
+        },
+        border_radius: extraction.selectedPages[0]?.viewports[0]?.visualTokens.borderRadius ?? { values: [], dominantStyle: "sharp" },
+        shadows: extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.visualTokens.shadows)).slice(0, 6),
+        components: {
+          buttons: extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.visualTokens.components.buttons)).slice(0, 4),
+          inputs: extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.visualTokens.components.inputs)).slice(0, 4),
+          badges: extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.visualTokens.components.badges)).slice(0, 4),
+        },
       },
       merged,
       evidence_file: evidenceFile,

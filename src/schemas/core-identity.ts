@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const ConfidenceEnum = z.enum(["confirmed", "high", "medium", "low"]);
-const SourceEnum = z.enum(["web", "figma", "manual"]);
+const SourceEnum = z.enum(["web", "visual", "figma", "guidelines", "manual"]);
 
 export const ColorEntrySchema = z.object({
   name: z.string(),

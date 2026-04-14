@@ -33,6 +33,8 @@ import { register as registerCheckCompliance } from "./tools/brand-check-complia
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 import { register as registerRuntime } from "./tools/brand-runtime.js";
 import { register as registerExtractVisual } from "./tools/brand-extract-visual.js";
+import { register as registerExtractPdf } from "./tools/brand-extract-pdf.js";
+import { register as registerResolveConflicts } from "./tools/brand-resolve-conflicts.js";
 import { register as registerBrandcodeConnect } from "./tools/brand-brandcode-connect.js";
 import { register as registerBrandcodeSync } from "./tools/brand-brandcode-sync.js";
 import { register as registerBrandcodeStatus } from "./tools/brand-brandcode-status.js";
@@ -51,6 +53,8 @@ export function createServer(): McpServer {
   registerExtractWeb(server);  // Extract from website (CSS parsing)
   registerExtractVisual(server); // Extract from website (headless Chrome + vision)
   registerExtractSite(server); // Extract from website (multi-page rendered crawl)
+  registerExtractPdf(server); // Extract from PDF guidelines
+  registerResolveConflicts(server); // Compare and resolve source conflicts
   registerGenerateDesignMd(server); // Generate design-synthesis.json + DESIGN.md
   registerExtractFigma(server);// Extract from Figma
   registerSetLogo(server);     // Add/replace logo manually

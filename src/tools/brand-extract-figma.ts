@@ -6,6 +6,7 @@ import { mergeColor, mergeTypography } from "../lib/confidence.js";
 import { resolveSvg } from "../lib/svg-resolver.js";
 import { ERROR_CODES } from "../types/index.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
+import { buildSourceCatalogRecords, upsertSourceCatalog } from "../lib/source-catalog.js";
 
 const paramsShape = {
   mode: z.enum(["plan", "ingest"]).describe('"plan" to get instructions, "ingest" to process Figma data'),
@@ -126,6 +127,37 @@ async function handleIngest(input: Params) {
   }
 
   await brandDir.writeCoreIdentity({ ...identity, colors, typography, logo: logos });
+  await upsertSourceCatalog(
+    brandDir,
+    buildSourceCatalogRecords({
+      colors: (input.variables ?? []).reduce<ColorEntry[]>((acc, v) => {
+        if (v.resolvedType !== "COLOR" || typeof v.value !== "string") return acc;
+        const hex = normalizeColor(v.value);
+        if (!hex) return acc;
+        acc.push({
+          name: v.name.replace(/\//g, " ").trim(),
+          value: hex,
+          role: inferRoleFromFigmaName(v.name),
+          source: "figma",
+          confidence: "high",
+          figma_variable_id: v.name,
+        });
+        return acc;
+      }, []),
+      typography: (input.styles ?? [])
+        .filter((s): s is NonNullable<Params["styles"]>[number] => s.type === "TEXT" && Boolean(s.fontFamily))
+        .map((s) => ({
+          name: s.name.replace(/\//g, " ").trim(),
+          family: s.fontFamily!,
+          size: s.fontSize ? `${s.fontSize}px` : undefined,
+          weight: s.fontWeight,
+          line_height: s.lineHeight ? String(s.lineHeight) : undefined,
+          source: "figma" as const,
+          confidence: "high" as const,
+          figma_style_id: s.name,
+        })),
+    }),
+  );
 
   // Build the brandcode_figma_import_v1 artifact for Brand Loader interop
   const config = await brandDir.readConfig();

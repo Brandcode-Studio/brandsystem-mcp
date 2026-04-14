@@ -11,6 +11,7 @@ import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
 import { ERROR_CODES, type ColorEntry, type TypographyEntry, type LogoSpec, type CoreIdentity } from "../types/index.js";
+import { buildSourceCatalogRecords, upsertSourceCatalog } from "../lib/source-catalog.js";
 
 const paramsShape = {
   url: z.string().url().describe("Website URL to scan (e.g. 'https://acme.com'). The homepage usually has the best logo and color data."),
@@ -383,6 +384,34 @@ async function handler(input: Params) {
     spacing: identity.spacing,
   };
   await brandDir.writeCoreIdentity(updated);
+  await upsertSourceCatalog(
+    brandDir,
+    buildSourceCatalogRecords({
+      colors: promotedColors.slice(0, 20).map((ec) => {
+        const role = inferColorRole(ec as Parameters<typeof inferColorRole>[0]);
+        const rawName = ec.property.startsWith("--")
+          ? ec.property.replace(/^--/, "").replace(/[-_]/g, " ")
+          : `${ec.property} ${ec.value}`;
+        const name = isCssArtifactName(rawName, ec.value)
+          ? generateColorName(ec.value, role)
+          : rawName;
+        return {
+          name,
+          value: ec.value,
+          role,
+          source: "web" as const,
+          confidence: inferColorConfidence(ec),
+          css_property: ec.property,
+        };
+      }),
+      typography: cleanedFonts.slice(0, 8).map((ef) => ({
+        name: ef.family,
+        family: ef.family,
+        source: "web" as const,
+        confidence: ef.frequency >= 5 ? "high" as const : ef.frequency >= 2 ? "medium" as const : "low" as const,
+      })),
+    }),
+  );
 
   const newColors = colors.length - identity.colors.length;
   const newFonts = typography.length - identity.typography.length;

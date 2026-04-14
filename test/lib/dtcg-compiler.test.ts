@@ -42,13 +42,18 @@ describe('compileDTCG', () => {
     shape: {
       radius_scale: [{ token: 'radius-md', value: '12px', confidence: 'high', provenance: ['computed:borderRadius'] }],
       corner_style: 'rounded',
+      values: [{ value: '12px', count: 4 }],
+      dominant_style: 'rounded',
     },
     depth: {
       shadow_scale: [{ token: 'shadow-md', value: '0px 8px 24px rgba(0,0,0,0.12)', confidence: 'medium', provenance: ['computed:boxShadow'] }],
       elevation_style: 'subtle',
+      shadows: [{ value: '0px 8px 24px rgba(0,0,0,0.12)', count: 2, context: 'cards' }],
     },
     spacing: {
       base_unit: '8px',
+      scale: [4, 8, 16, 24, 32, 80],
+      common_values: [{ px: 8, count: 12 }, { px: 16, count: 8 }],
       component_spacing: ['8px', '16px', '24px'],
       section_spacing: ['80px'],
       confidence: 'medium',
@@ -64,6 +69,11 @@ describe('compileDTCG', () => {
       input: { count: 0, dominant_fill: null, dominant_text: null, dominant_radius: null, dominant_shadow: null, notes: [] },
       navigation: { count: 0, dominant_fill: null, dominant_text: null, dominant_radius: null, dominant_shadow: null, notes: [] },
       badge: { count: 0, dominant_fill: null, dominant_text: null, dominant_radius: null, dominant_shadow: null, notes: [] },
+      variants: {
+        buttons: [{ backgroundColor: '#2665fd', color: '#ffffff', borderRadius: '12px', padding: '8px 16px', border: null, shadow: null, variant: 'primary', count: 1 }],
+        inputs: [],
+        badges: [],
+      },
     },
     motion: {
       tone: 'Keep motion quick and restrained.',

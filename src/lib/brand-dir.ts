@@ -324,6 +324,25 @@ export class BrandDir {
     }
   }
 
+  // --- Source catalog ---
+
+  async readSourceCatalog<T = unknown>(): Promise<T> {
+    return this.readJson("source-catalog.json") as Promise<T>;
+  }
+
+  async writeSourceCatalog(data: unknown): Promise<void> {
+    await this.writeJson("source-catalog.json", data);
+  }
+
+  async hasSourceCatalog(): Promise<boolean> {
+    try {
+      await access(this.path("source-catalog.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // --- Asset scanning ---
 
   async listAssets(subdir: string): Promise<string[]> {

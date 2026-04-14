@@ -4,6 +4,7 @@ import type { BrandConfigData, CoreIdentityData, TokensFileData } from "../schem
 import type { Confidence } from "../types/index.js";
 import type { ExtractionEvidenceFile } from "./site-evidence.js";
 import type { ComputedElement } from "./visual-extractor.js";
+import { summarizeVisualTokens, type VisualComponentVariant } from "./visual-tokens.js";
 
 export type DesignSignalConfidence = "high" | "medium" | "low";
 export type DesignSynthesisSource = "evidence" | "current-brand";
@@ -94,13 +95,18 @@ export interface DesignSynthesisFile {
   shape: {
     radius_scale: DesignSignal[];
     corner_style: "sharp" | "balanced" | "rounded";
+    values: Array<{ value: string; count: number }>;
+    dominant_style: "sharp" | "rounded" | "pill";
   };
   depth: {
     shadow_scale: DesignSignal[];
     elevation_style: "flat" | "subtle" | "layered";
+    shadows: Array<{ value: string; count: number; context: string }>;
   };
   spacing: {
     base_unit: string | null;
+    scale: number[];
+    common_values: Array<{ px: number; count: number }>;
     component_spacing: string[];
     section_spacing: string[];
     confidence: DesignSignalConfidence;
@@ -116,6 +122,11 @@ export interface DesignSynthesisFile {
     input: ComponentSynthesis;
     navigation: ComponentSynthesis;
     badge: ComponentSynthesis;
+    variants: {
+      buttons: VisualComponentVariant[];
+      inputs: VisualComponentVariant[];
+      badges: VisualComponentVariant[];
+    };
   };
   motion: {
     tone: string;
@@ -439,6 +450,7 @@ function tokenizeScale(prefix: string, values: number[], provenance: string[]): 
 }
 
 function extractRadiusScale(elements: ComputedElement[], cssVars: Record<string, string>) {
+  const visualTokens = summarizeVisualTokens(elements);
   const radiusValues = new Set<number>();
 
   for (const element of elements) {
@@ -459,10 +471,13 @@ function extractRadiusScale(elements: ComputedElement[], cssVars: Record<string,
   return {
     radius_scale: tokenizeScale("radius", sorted, ["computed:borderRadius", "css-vars:radius"]),
     corner_style: cornerStyle as DesignSynthesisFile["shape"]["corner_style"],
+    values: visualTokens.borderRadius.values,
+    dominant_style: visualTokens.borderRadius.dominantStyle,
   };
 }
 
 function extractShadowScale(elements: ComputedElement[], cssVars: Record<string, string>) {
+  const visualTokens = summarizeVisualTokens(elements);
   const shadowValues = new Set<string>();
 
   for (const element of elements) {
@@ -487,6 +502,7 @@ function extractShadowScale(elements: ComputedElement[], cssVars: Record<string,
   return {
     shadow_scale: shadowScale,
     elevation_style: elevationStyle as DesignSynthesisFile["depth"]["elevation_style"],
+    shadows: visualTokens.shadows,
   };
 }
 
@@ -502,6 +518,7 @@ function inferBaseUnit(values: number[]): number | null {
 }
 
 function extractSpacing(identity: CoreIdentityData, elements: ComputedElement[], cssVars: Record<string, string>) {
+  const visualTokens = summarizeVisualTokens(elements);
   const spacingValues: number[] = [];
 
   if (identity.spacing?.scale) {
@@ -537,6 +554,8 @@ function extractSpacing(identity: CoreIdentityData, elements: ComputedElement[],
 
   return {
     base_unit: baseUnit,
+    scale: deduped,
+    common_values: visualTokens.spacing.commonValues,
     component_spacing: componentSpacing,
     section_spacing: sectionSpacing,
     confidence,
@@ -759,6 +778,7 @@ export function buildDesignSynthesis(
   const typographyFamilies = inferTypographyFamilies(identity, evidenceSnapshot.elements);
   const typographyScale = buildTypographyScale(identity, evidenceSnapshot.elements);
   const typographyCharacter = dedupeStrings(typographyFamilies.map((entry) => entry.character));
+  const visualTokens = summarizeVisualTokens(evidenceSnapshot.elements);
   const shape = extractRadiusScale(evidenceSnapshot.elements, evidenceSnapshot.cssVars);
   const depth = extractShadowScale(evidenceSnapshot.elements, evidenceSnapshot.cssVars);
   const spacing = extractSpacing(identity, evidenceSnapshot.elements, evidenceSnapshot.cssVars);
@@ -807,6 +827,7 @@ export function buildDesignSynthesis(
       input: summarizeComponent(evidenceSnapshot.elements, ["input"]),
       navigation: summarizeComponent(evidenceSnapshot.elements, ["header"]),
       badge: summarizeComponent(evidenceSnapshot.elements, ["badge"]),
+      variants: visualTokens.components,
     },
     motion,
     personality: provisionalPersonality,
@@ -901,18 +922,22 @@ export function renderDesignMarkdown(synthesis: DesignSynthesisFile): string {
     `Buttons: ${synthesis.components.button.count > 0 ? `dominant fill ${synthesis.components.button.dominant_fill ?? "none"}, text ${synthesis.components.button.dominant_text ?? "inherit"}, radius ${synthesis.components.button.dominant_radius ?? "none"}, shadow ${synthesis.components.button.dominant_shadow ?? "none"}.` : "No button instances were observed."}`,
     `Cards: ${synthesis.components.card.count > 0 ? `dominant fill ${synthesis.components.card.dominant_fill ?? "none"}, radius ${synthesis.components.card.dominant_radius ?? "none"}, shadow ${synthesis.components.card.dominant_shadow ?? "none"}.` : "No card pattern was observed."}`,
     `Inputs and nav: inputs use ${synthesis.components.input.dominant_radius ?? "unspecified"} radius; navigation fill resolves to ${synthesis.components.navigation.dominant_fill ?? "unspecified"}.`,
+    `Button variants: ${synthesis.components.variants.buttons.length > 0 ? synthesis.components.variants.buttons.map((variant) => `${variant.variant} (${variant.backgroundColor ?? "transparent"}, radius ${variant.borderRadius ?? "0px"}, padding ${variant.padding ?? "auto"})`).join(", ") : "none detected"}.`,
+    `Input variants: ${synthesis.components.variants.inputs.length > 0 ? synthesis.components.variants.inputs.map((variant) => variant.variant).join(", ") : "none detected"}. Badge variants: ${synthesis.components.variants.badges.length > 0 ? synthesis.components.variants.badges.map((variant) => variant.variant).join(", ") : "none detected"}.`,
     "",
     "## 5. Layout Principles",
     "",
     `Grid feel: ${synthesis.layout.grid_feel}.`,
     `Content width: ${synthesis.layout.content_width ?? "not confidently detected"}.`,
-    `Spacing model: base unit ${synthesis.spacing.base_unit ?? "not confidently detected"} with component spacing ${synthesis.spacing.component_spacing.join(", ") || "unknown"} and larger section spacing ${synthesis.spacing.section_spacing.join(", ") || "unknown"}.`,
+    `Spacing model: base unit ${synthesis.spacing.base_unit ?? "not confidently detected"} with detected scale ${synthesis.spacing.scale.length > 0 ? synthesis.spacing.scale.map((value) => `${value}px`).join(", ") : "unknown"}, common values ${synthesis.spacing.common_values.length > 0 ? synthesis.spacing.common_values.map((item) => `${item.px}px x${item.count}`).join(", ") : "unknown"}, component spacing ${synthesis.spacing.component_spacing.join(", ") || "unknown"}, and larger section spacing ${synthesis.spacing.section_spacing.join(", ") || "unknown"}.`,
     "",
     "## 6. Depth and Elevation",
     "",
     `Elevation style: ${synthesis.depth.elevation_style}.`,
     `Shadow scale: ${formatSignalList(synthesis.depth.shadow_scale)}.`,
+    `Observed shadows: ${synthesis.depth.shadows.length > 0 ? synthesis.depth.shadows.map((shadow) => `${shadow.value} (${shadow.context}, x${shadow.count})`).join(", ") : "none detected"}.`,
     `Radius scale: ${formatSignalList(synthesis.shape.radius_scale)}.`,
+    `Observed radii: ${synthesis.shape.values.length > 0 ? synthesis.shape.values.map((radius) => `${radius.value} x${radius.count}`).join(", ") : "none detected"}; dominant shape language is ${synthesis.shape.dominant_style}.`,
     "",
     "## 7. Motion and Interaction Tone",
     "",

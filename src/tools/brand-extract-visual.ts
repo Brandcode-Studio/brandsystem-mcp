@@ -20,11 +20,11 @@ import {
   inferRolesFromVisual,
   isVisualExtractionAvailable,
   type VisualColorCandidate,
-  type ComputedElement,
 } from "../lib/visual-extractor.js";
-import { mergeColor, mergeTypography } from "../lib/confidence.js";
+import { mergeColorWithPriority, mergeTypographyWithPriority } from "../lib/confidence.js";
 import { generateColorName } from "../lib/color-namer.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
+import { buildSourceCatalogRecords, getConfiguredSourcePriority, upsertSourceCatalog } from "../lib/source-catalog.js";
 
 const paramsShape = {
   url: z.string().url().describe("Website URL to visually extract brand identity from (e.g. 'https://basecamp.com')"),
@@ -82,9 +82,14 @@ async function handler(input: Params) {
   if (input.merge) {
     const brandDir = new BrandDir(process.cwd());
     if (await brandDir.exists()) {
+      const config = await brandDir.readConfig();
+      const sourcePriority = getConfiguredSourcePriority(config);
       const identity = await brandDir.readCoreIdentity();
       let colors = [...identity.colors];
       let typography = [...identity.typography];
+      let spacing = identity.spacing;
+      const visualColors: ColorEntry[] = [];
+      const visualTypography: TypographyEntry[] = [];
 
       // Merge visual colors
       for (const vc of roleCandidates) {
@@ -92,12 +97,13 @@ async function handler(input: Params) {
           name: generateColorName(vc.hex, vc.role),
           value: vc.hex,
           role: vc.role as ColorEntry["role"],
-          source: "web",
+          source: "visual",
           confidence: vc.confidence,
           css_property: `computed:${vc.source_context}`,
         };
+        visualColors.push(entry);
         const before = colors.length;
-        colors = mergeColor(colors, entry);
+        colors = mergeColorWithPriority(colors, entry, sourcePriority);
         if (colors.length > before) mergedCount++;
       }
 
@@ -106,17 +112,37 @@ async function handler(input: Params) {
         const entry: TypographyEntry = {
           name: font,
           family: font,
-          source: "web",
+          source: "visual",
           confidence: "medium",
         };
-        typography = mergeTypography(typography, entry);
+        visualTypography.push(entry);
+        typography = mergeTypographyWithPriority(typography, entry, sourcePriority);
+      }
+
+      if (result.visualTokens.spacing.scale.length > 0 || result.visualTokens.spacing.baseUnit) {
+        spacing = {
+          base_unit: result.visualTokens.spacing.baseUnit ?? spacing?.base_unit,
+          scale: result.visualTokens.spacing.scale.length > 0 ? result.visualTokens.spacing.scale : spacing?.scale,
+          source: "visual",
+          confidence: result.visualTokens.spacing.scale.length >= 5 ? "high" : "medium",
+        };
       }
 
       await brandDir.writeCoreIdentity({
         ...identity,
         colors,
         typography,
+        spacing,
       });
+
+      await upsertSourceCatalog(
+        brandDir,
+        buildSourceCatalogRecords({
+          colors: visualColors,
+          typography: visualTypography,
+          spacing: spacing?.source === "visual" ? spacing : null,
+        }),
+      );
     }
   }
 
@@ -142,6 +168,14 @@ async function handler(input: Params) {
       },
 
       computed_fonts: result.uniqueFonts,
+
+      spacing: result.visualTokens.spacing,
+
+      border_radius: result.visualTokens.borderRadius,
+
+      shadows: result.visualTokens.shadows,
+
+      components: result.visualTokens.components,
 
       computed_elements: result.computedElements,
 

@@ -1,5 +1,5 @@
 export type Confidence = "confirmed" | "high" | "medium" | "low";
-export type Source = "web" | "figma" | "manual";
+export type Source = "web" | "visual" | "figma" | "guidelines" | "manual";
 
 export interface ColorEntry {
   name: string;
@@ -59,6 +59,7 @@ export interface BrandConfig {
   website_url?: string;
   figma_file_key?: string;
   created_at: string;
+  source_priority?: Source[];
 }
 
 export interface ClarificationItem {

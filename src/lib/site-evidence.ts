@@ -1,8 +1,11 @@
 import { BrandDir } from "./brand-dir.js";
-import { mergeColor, mergeTypography } from "./confidence.js";
+import { mergeColorWithPriority, mergeTypographyWithPriority } from "./confidence.js";
 import { generateColorName } from "./color-namer.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
 import type { ComputedElement, SiteExtractionResultSuccess, VisualColorCandidate } from "./visual-extractor.js";
+import type { VisualTokenSummary } from "./visual-tokens.js";
+import { summarizeVisualTokens } from "./visual-tokens.js";
+import { buildSourceCatalogRecords, getConfiguredSourcePriority, upsertSourceCatalog } from "./source-catalog.js";
 
 export interface PersistedSiteViewportEvidence {
   viewport: "desktop" | "mobile";
@@ -12,6 +15,7 @@ export interface PersistedSiteViewportEvidence {
   unique_colors: string[];
   unique_fonts: string[];
   role_candidates: VisualColorCandidate[];
+  visual_tokens: VisualTokenSummary;
 }
 
 export interface PersistedSitePageEvidence {
@@ -33,6 +37,7 @@ export interface ExtractionEvidenceFile {
     viewports: Array<"desktop" | "mobile">;
     aggregated_colors: string[];
     aggregated_fonts: string[];
+    visual_tokens: VisualTokenSummary | null;
   };
 }
 
@@ -66,11 +71,15 @@ export async function persistSiteExtraction(
   let screenshotsSaved = 0;
 
   if (merge) {
+    const config = await brandDir.readConfig();
+    const sourcePriority = getConfiguredSourcePriority(config);
     const identity = await brandDir.readCoreIdentity();
     let colors = [...identity.colors];
     let typography = [...identity.typography];
+    let spacing = identity.spacing;
 
     const fontCounts = new Map<string, number>();
+    const spacingCandidates = new Map<number, number>();
 
     for (const page of extraction.selectedPages) {
       for (const viewport of page.viewports) {
@@ -79,12 +88,12 @@ export async function persistSiteExtraction(
             name: generateColorName(candidate.hex, candidate.role),
             value: candidate.hex,
             role: candidate.role as ColorEntry["role"],
-            source: "web",
+            source: "visual",
             confidence: candidate.confidence,
             css_property: `computed:${candidate.source_context} @ ${page.pageType}/${viewport.viewport}`,
           };
           const before = colors.length;
-          colors = mergeColor(colors, entry);
+          colors = mergeColorWithPriority(colors, entry, sourcePriority);
           if (colors.length > before) colorsAdded++;
         }
 
@@ -93,6 +102,10 @@ export async function persistSiteExtraction(
           const current = fontCounts.get(element.fontFamily) ?? 0;
           fontCounts.set(element.fontFamily, current + 1);
         }
+
+        for (const value of viewport.visualTokens.spacing.scale) {
+          spacingCandidates.set(value, (spacingCandidates.get(value) ?? 0) + 1);
+        }
       }
     }
 
@@ -100,19 +113,42 @@ export async function persistSiteExtraction(
       const entry: TypographyEntry = {
         name: family,
         family,
-        source: "web",
+        source: "visual",
         confidence: count >= 6 ? "high" : count >= 2 ? "medium" : "low",
       };
       const before = typography.length;
-      typography = mergeTypography(typography, entry);
+      typography = mergeTypographyWithPriority(typography, entry, sourcePriority);
       if (typography.length > before) fontsAdded++;
+    }
+
+    const spacingScale = [...spacingCandidates.keys()].sort((a, b) => a - b);
+    const baseUnit = extraction.selectedPages
+      .flatMap((page) => page.viewports.map((viewport) => viewport.visualTokens.spacing.baseUnit))
+      .find((value): value is string => Boolean(value));
+    if (spacingScale.length > 0 || baseUnit) {
+      spacing = {
+        base_unit: baseUnit ?? spacing?.base_unit,
+        scale: spacingScale.length > 0 ? spacingScale : spacing?.scale,
+        source: "visual",
+        confidence: spacingScale.length >= 5 ? "high" : "medium",
+      };
     }
 
     await brandDir.writeCoreIdentity({
       ...identity,
       colors,
       typography,
+      spacing,
     });
+
+    await upsertSourceCatalog(
+      brandDir,
+      buildSourceCatalogRecords({
+        colors: colors.filter((entry) => entry.source === "visual"),
+        typography: typography.filter((entry) => entry.source === "visual"),
+        spacing: spacing?.source === "visual" ? spacing : null,
+      }),
+    );
   }
 
   const selectedPages: PersistedSitePageEvidence[] = [];
@@ -140,6 +176,7 @@ export async function persistSiteExtraction(
         unique_colors: viewport.uniqueColors,
         unique_fonts: viewport.uniqueFonts,
         role_candidates: viewport.roleCandidates,
+        visual_tokens: viewport.visualTokens,
       });
     }
 
@@ -163,6 +200,7 @@ export async function persistSiteExtraction(
       viewports: [...viewportsUsed],
       aggregated_colors: [...aggregatedColors],
       aggregated_fonts: [...aggregatedFonts],
+      visual_tokens: summarizeVisualTokens(extraction.selectedPages.flatMap((page) => page.viewports.flatMap((viewport) => viewport.computedElements))),
     },
   };
 

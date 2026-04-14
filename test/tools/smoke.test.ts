@@ -57,9 +57,9 @@ function expectValidMetadata(json: Record<string, unknown>): void {
 // ---------------------------------------------------------------------------
 
 describe("tool registration", () => {
-  it("registers all 34 tools", async () => {
+  it("registers all 36 tools", async () => {
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(34);
+    expect(tools.length).toBe(36);
   });
 
   it("every tool has a non-empty description", async () => {
@@ -228,6 +228,20 @@ describe("tools that require .brand/ dir", () => {
     const textItem = content.find((c) => c.type === "text");
     expect(textItem).toBeDefined();
   }, 60_000);
+
+  it("brand_extract_pdf handles missing .brand/", async () => {
+    const json = await callAndParse("brand_extract_pdf", {
+      file_path: "/tmp/brand-guidelines.pdf",
+    });
+    expectValidMetadata(json);
+  });
+
+  it("brand_resolve_conflicts handles missing .brand/", async () => {
+    const json = await callAndParse("brand_resolve_conflicts", {
+      mode: "show",
+    });
+    expectValidMetadata(json);
+  });
 
   it("brand_generate_designmd handles missing .brand/", async () => {
     const json = await callAndParse("brand_generate_designmd", {});

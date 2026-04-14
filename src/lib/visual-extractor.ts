@@ -15,6 +15,7 @@ import { existsSync } from "node:fs";
 import { platform } from "node:os";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES } from "./url-validator.js";
 import { getVersion } from "./version.js";
+import { summarizeVisualTokens, type VisualTokenSummary } from "./visual-tokens.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,11 +30,14 @@ export interface ComputedElement {
   letterSpacing?: string;
   fontFeatureSettings?: string;
   borderColor: string;
+  border?: string;
   borderRadius: string;
   boxShadow?: string;
   maxWidth?: string;
   paddingInline?: string;
   paddingBlock?: string;
+  marginInline?: string;
+  marginBlock?: string;
   textTransform?: string;
   textSample?: string;
   domPath?: string;
@@ -51,6 +55,7 @@ export interface VisualExtraction {
   uniqueColors: string[];
   /** Unique font families found across computed elements */
   uniqueFonts: string[];
+  visualTokens: VisualTokenSummary;
   /** Whether Chrome was found and extraction succeeded */
   success: true;
 }
@@ -77,6 +82,7 @@ export interface SiteViewportExtraction {
   uniqueColors: string[];
   uniqueFonts: string[];
   roleCandidates: VisualColorCandidate[];
+  visualTokens: VisualTokenSummary;
 }
 
 export interface SitePageExtraction {
@@ -152,7 +158,7 @@ const ELEMENT_SELECTOR_DEFS = [
   { name: "card", sel: "[class*=card], article", max: 10 },
   { name: "input", sel: "input, textarea, select", max: 5 },
   { name: "section_alt", sel: "main > section:nth-child(2), main > div:nth-child(2)", max: 2 },
-  { name: "badge", sel: "[class*=badge], [class*=chip], [class*=tag]", max: 6 },
+  { name: "badge", sel: "[class*=badge], [class*=chip], [class*=tag], [class*=pill]", max: 6 },
   { name: "code", sel: "pre, code", max: 4 },
   { name: "table", sel: "table", max: 2 },
 ] as const;
@@ -340,11 +346,14 @@ function extractionScript(
     letterSpacing: string;
     fontFeatureSettings: string;
     borderColor: string;
+    border: string;
     borderRadius: string;
     boxShadow: string;
     maxWidth: string;
     paddingInline: string;
     paddingBlock: string;
+    marginInline: string;
+    marginBlock: string;
     textTransform: string;
     textSample?: string;
     domPath?: string;
@@ -378,11 +387,14 @@ function extractionScript(
     letterSpacing: string;
     fontFeatureSettings: string;
     borderColor: string;
+    border: string;
     borderRadius: string;
     boxShadow: string;
     maxWidth: string;
     paddingInline: string;
     paddingBlock: string;
+    marginInline: string;
+    marginBlock: string;
     textTransform: string;
     textSample?: string;
     domPath?: string;
@@ -404,11 +416,14 @@ function extractionScript(
         letterSpacing: cs.letterSpacing,
         fontFeatureSettings: cs.fontFeatureSettings,
         borderColor: cs.borderColor,
+        border: cs.border,
         borderRadius: cs.borderRadius,
         boxShadow: cs.boxShadow,
         maxWidth: cs.maxWidth,
         paddingInline: cs.paddingInline,
         paddingBlock: cs.paddingBlock,
+        marginInline: cs.marginInline,
+        marginBlock: cs.marginBlock,
         textTransform: cs.textTransform,
         textSample: textSample || undefined,
         domPath: buildDomPath(el),
@@ -458,6 +473,100 @@ function isNeutral(hex: string): boolean {
   const b = parseInt(hex.slice(5, 7), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.93 || luminance < 0.07;
+}
+
+function normalizeComputedElements(
+  elements: Array<{
+    selector: string;
+    color: string;
+    backgroundColor: string;
+    fontFamily: string;
+    fontSize: string;
+    fontWeight: string;
+    lineHeight: string;
+    letterSpacing: string;
+    fontFeatureSettings: string;
+    borderColor: string;
+    border: string;
+    borderRadius: string;
+    boxShadow: string;
+    maxWidth: string;
+    paddingInline: string;
+    paddingBlock: string;
+    marginInline: string;
+    marginBlock: string;
+    textTransform: string;
+    textSample?: string;
+    domPath?: string;
+  }>,
+  meta?: { viewport?: "desktop" | "mobile"; pageUrl?: string; pageType?: string },
+): {
+  computedElements: ComputedElement[];
+  uniqueColors: string[];
+  uniqueFonts: string[];
+  visualTokens: VisualTokenSummary;
+} {
+  const colorSet = new Set<string>();
+  const fontSet = new Set<string>();
+
+  const computedElements: ComputedElement[] = elements.map((el) => {
+    if (!isTransparent(el.color)) {
+      const hex = rgbToHex(el.color);
+      if (hex) colorSet.add(hex);
+    }
+    if (!isTransparent(el.backgroundColor)) {
+      const hex = rgbToHex(el.backgroundColor);
+      if (hex) colorSet.add(hex);
+    }
+
+    const primaryFont = el.fontFamily
+      .split(",")[0]
+      .trim()
+      .replace(/^["']|["']$/g, "");
+
+    if (
+      primaryFont &&
+      primaryFont !== "serif" &&
+      primaryFont !== "sans-serif" &&
+      primaryFont !== "monospace"
+    ) {
+      fontSet.add(primaryFont);
+    }
+
+    return {
+      selector: el.selector,
+      color: rgbToHex(el.color) ?? el.color,
+      backgroundColor: isTransparent(el.backgroundColor) ? "transparent" : (rgbToHex(el.backgroundColor) ?? el.backgroundColor),
+      fontFamily: primaryFont,
+      fontSize: el.fontSize,
+      fontWeight: el.fontWeight,
+      lineHeight: el.lineHeight,
+      letterSpacing: el.letterSpacing,
+      fontFeatureSettings: el.fontFeatureSettings,
+      borderColor: isTransparent(el.borderColor) ? "transparent" : (rgbToHex(el.borderColor) ?? el.borderColor),
+      border: el.border,
+      borderRadius: el.borderRadius,
+      boxShadow: el.boxShadow,
+      maxWidth: el.maxWidth,
+      paddingInline: el.paddingInline,
+      paddingBlock: el.paddingBlock,
+      marginInline: el.marginInline,
+      marginBlock: el.marginBlock,
+      textTransform: el.textTransform,
+      textSample: el.textSample,
+      domPath: el.domPath,
+      viewport: meta?.viewport,
+      pageUrl: meta?.pageUrl,
+      pageType: meta?.pageType,
+    };
+  });
+
+  return {
+    computedElements,
+    uniqueColors: [...colorSet],
+    uniqueFonts: [...fontSet],
+    visualTokens: summarizeVisualTokens(computedElements),
+  };
 }
 
 // ── Main extraction function ───────────────────────────────────────────────
@@ -521,57 +630,13 @@ export async function extractVisual(url: string): Promise<VisualExtractionResult
     // Extract computed styles via in-page JS
     const extracted = await page.evaluate(
       extractionScript,
-      ELEMENT_SELECTOR_DEFS.map((def) => ({ ...def, max: 1 })),
+      [...ELEMENT_SELECTOR_DEFS],
     );
 
     await browser.close();
     browser = null;
 
-    // Process results
-    const colorSet = new Set<string>();
-    const fontSet = new Set<string>();
-
-    const computedElements: ComputedElement[] = extracted.elements.map((el) => {
-      // Collect unique colors
-      if (!isTransparent(el.color)) {
-        const hex = rgbToHex(el.color);
-        if (hex) colorSet.add(hex);
-      }
-      if (!isTransparent(el.backgroundColor)) {
-        const hex = rgbToHex(el.backgroundColor);
-        if (hex) colorSet.add(hex);
-      }
-
-      // Collect unique fonts (clean up computed font-family strings)
-      const primaryFont = el.fontFamily
-        .split(",")[0]
-        .trim()
-        .replace(/^["']|["']$/g, "");
-      if (primaryFont && primaryFont !== "serif" && primaryFont !== "sans-serif" && primaryFont !== "monospace") {
-        fontSet.add(primaryFont);
-      }
-
-      return {
-        selector: el.selector,
-        color: rgbToHex(el.color) ?? el.color,
-        backgroundColor: isTransparent(el.backgroundColor) ? "transparent" : (rgbToHex(el.backgroundColor) ?? el.backgroundColor),
-        fontFamily: primaryFont,
-        fontSize: el.fontSize,
-        fontWeight: el.fontWeight,
-        lineHeight: el.lineHeight,
-        letterSpacing: el.letterSpacing,
-        fontFeatureSettings: el.fontFeatureSettings,
-        borderColor: isTransparent(el.borderColor) ? "transparent" : (rgbToHex(el.borderColor) ?? el.borderColor),
-        borderRadius: el.borderRadius,
-        boxShadow: el.boxShadow,
-        maxWidth: el.maxWidth,
-        paddingInline: el.paddingInline,
-        paddingBlock: el.paddingBlock,
-        textTransform: el.textTransform,
-        textSample: el.textSample,
-        domPath: el.domPath,
-      };
-    });
+    const normalized = normalizeComputedElements(extracted.elements);
 
     // Keep all CSS custom properties for later synthesis, but only add
     // color-like values into the unique color set.
@@ -579,20 +644,21 @@ export async function extractVisual(url: string): Promise<VisualExtractionResult
     for (const [prop, val] of Object.entries(extracted.cssVars)) {
       const hex = rgbToHex(val);
       if (hex) {
-        colorSet.add(hex);
+        normalized.uniqueColors.push(hex);
       } else if (/^#[0-9a-f]{3,8}$/i.test(val)) {
-        colorSet.add(val.toLowerCase());
+        normalized.uniqueColors.push(val.toLowerCase());
       }
     }
 
     return {
       success: true,
       screenshot,
-      computedElements,
+      computedElements: normalized.computedElements,
       cssCustomProperties,
       pageTitle: extracted.title,
-      uniqueColors: [...colorSet],
-      uniqueFonts: [...fontSet],
+      uniqueColors: [...new Set(normalized.uniqueColors)],
+      uniqueFonts: normalized.uniqueFonts,
+      visualTokens: normalized.visualTokens,
     };
   } catch (err) {
     if (browser) {
@@ -681,76 +747,31 @@ export async function extractSite(
           const extracted = await page.evaluate(extractionScript, [...ELEMENT_SELECTOR_DEFS]);
           pageTitle = pageTitle || extracted.title;
 
-          const colorSet = new Set<string>();
-          const fontSet = new Set<string>();
-
-          const computedElements: ComputedElement[] = extracted.elements.map((el) => {
-            if (!isTransparent(el.color)) {
-              const hex = rgbToHex(el.color);
-              if (hex) colorSet.add(hex);
-            }
-            if (!isTransparent(el.backgroundColor)) {
-              const hex = rgbToHex(el.backgroundColor);
-              if (hex) colorSet.add(hex);
-            }
-
-            const primaryFont = el.fontFamily
-              .split(",")[0]
-              .trim()
-              .replace(/^["']|["']$/g, "");
-
-            if (
-              primaryFont &&
-              primaryFont !== "serif" &&
-              primaryFont !== "sans-serif" &&
-              primaryFont !== "monospace"
-            ) {
-              fontSet.add(primaryFont);
-            }
-
-            return {
-              selector: el.selector,
-              color: rgbToHex(el.color) ?? el.color,
-              backgroundColor: isTransparent(el.backgroundColor) ? "transparent" : (rgbToHex(el.backgroundColor) ?? el.backgroundColor),
-              fontFamily: primaryFont,
-              fontSize: el.fontSize,
-              fontWeight: el.fontWeight,
-              lineHeight: el.lineHeight,
-              letterSpacing: el.letterSpacing,
-              fontFeatureSettings: el.fontFeatureSettings,
-              borderColor: isTransparent(el.borderColor) ? "transparent" : (rgbToHex(el.borderColor) ?? el.borderColor),
-              borderRadius: el.borderRadius,
-              boxShadow: el.boxShadow,
-              maxWidth: el.maxWidth,
-              paddingInline: el.paddingInline,
-              paddingBlock: el.paddingBlock,
-              textTransform: el.textTransform,
-              textSample: el.textSample,
-              domPath: el.domPath,
-              viewport: viewportName,
-              pageUrl: selectedPage.url,
-              pageType: selectedPage.pageType,
-            };
+          const normalized = normalizeComputedElements(extracted.elements, {
+            viewport: viewportName,
+            pageUrl: selectedPage.url,
+            pageType: selectedPage.pageType,
           });
 
           const cssCustomProperties: Record<string, string> = { ...extracted.cssVars };
           for (const [prop, val] of Object.entries(extracted.cssVars)) {
             const hex = rgbToHex(val);
             if (hex) {
-              colorSet.add(hex);
+              normalized.uniqueColors.push(hex);
             } else if (/^#[0-9a-f]{3,8}$/i.test(val)) {
-              colorSet.add(val.toLowerCase());
+              normalized.uniqueColors.push(val.toLowerCase());
             }
           }
 
           extractedViewports.push({
             viewport: viewportName,
             screenshot,
-            computedElements,
+            computedElements: normalized.computedElements,
             cssCustomProperties,
-            uniqueColors: [...colorSet],
-            uniqueFonts: [...fontSet],
-            roleCandidates: inferRolesFromVisual(computedElements, cssCustomProperties),
+            uniqueColors: [...new Set(normalized.uniqueColors)],
+            uniqueFonts: normalized.uniqueFonts,
+            roleCandidates: inferRolesFromVisual(normalized.computedElements, cssCustomProperties),
+            visualTokens: normalized.visualTokens,
           });
         }
 

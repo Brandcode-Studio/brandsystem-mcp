@@ -133,6 +133,10 @@ function compileSynthesisSpacing(
     group.base = { $value: synthesis.spacing.base_unit, $type: "dimension" };
   }
 
+  synthesis.spacing.scale.forEach((value, index) => {
+    group[`scale-${index + 1}`] = { $value: `${value}px`, $type: "dimension" };
+  });
+
   synthesis.spacing.component_spacing.forEach((value, index) => {
     group[`component-${index + 1}`] = { $value: value, $type: "dimension" };
   });
