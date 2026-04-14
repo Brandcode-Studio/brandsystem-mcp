@@ -3,6 +3,7 @@ import { getVersion } from "./lib/version.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
+import { trackToolCall } from "./lib/telemetry.js";
 import { register as registerInit } from "./tools/brand-init.js";
 import { register as registerStatus } from "./tools/brand-status.js";
 import { register as registerExtractWeb } from "./tools/brand-extract-web.js";

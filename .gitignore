@@ -8,3 +8,4 @@ dist/
 scripts/audit-results/
 REGISTRIES.md
 specs/brand-extraction-*.md
+.mcpregistry_*

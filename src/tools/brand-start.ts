@@ -2,7 +2,7 @@ import { z } from "zod";
 import * as cheerio from "cheerio";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
-import { buildResponse, safeParseParams } from "../lib/response.js";
+import { buildResponse, safeParseParams, startToolTimer } from "../lib/response.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryColor, getTopChromaticCandidates } from "../lib/css-parser.js";
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";

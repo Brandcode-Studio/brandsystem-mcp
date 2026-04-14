@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { McpResponseData } from "../types/index.js";
 import { ERROR_CODES } from "../types/index.js";
 import { buildOnrampGuidance, type OnrampGuidance } from "./onramp.js";
+import { trackToolCall as _trackToolCall } from "./telemetry.js";
+export { trackToolCall, startToolTimer } from "./telemetry.js";
 
 const MAX_RESPONSE_CHARS = 50000;
 
@@ -114,6 +116,14 @@ export function buildResponse(input: McpResponseData): {
       text = text.substring(0, MAX_RESPONSE_CHARS) + "\n...[TRUNCATED]";
     }
   }
+
+  // Auto-telemetry: track every tool response (opt-in via BRANDSYSTEM_TELEMETRY)
+  const isError = !!(input.data && typeof input.data === "object" && "error" in input.data);
+  _trackToolCall({
+    tool: input.what_happened.split(":")[0].split("—")[0].trim().toLowerCase().replace(/\s+/g, "_").slice(0, 50),
+    success: !isError,
+    error_code: isError ? String((input.data as Record<string, unknown>).error) : undefined,
+  });
 
   return {
     content: [{ type: "text", text }],
