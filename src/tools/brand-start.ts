@@ -156,7 +156,13 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
 
   const url = websiteUrl;
 
-  // --- Step 1: Web extraction (same logic as brand_extract_web) ---
+  // --- Step 0: Check if visual extraction (Playwright) is available ---
+  // When Chrome/Playwright is available, use it as the PRIMARY extraction path.
+  // This produces dramatically better results than static CSS parsing because it
+  // reads computed styles from the rendered page. Static CSS is the fallback.
+  const hasVisualExtraction = isVisualExtractionAvailable();
+
+  // --- Step 1: Web extraction (static CSS + inline styles) ---
   let html: string;
   try {
     const response = await safeFetch(url, {
@@ -495,7 +501,9 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   let siteExtractionUsed = false;
   let siteExtractionSummary: { pages: number; colors_added: number; fonts_added: number; screenshots_saved: number } | null = null;
 
-  if ((qualityScore === "LOW" || colors.length < 2) && isVisualExtractionAvailable()) {
+  // Visual extraction: run when Chrome is available (not just as LOW-quality fallback)
+  // This is the primary extraction path for computed styles, multi-page crawl, and screenshots
+  if (hasVisualExtraction) {
     const siteResult = await extractSite(url, {
       pageLimit: 4,
       viewports: ["desktop", "mobile"],
@@ -607,15 +615,21 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
           qualityPoints += 1; qualityReasons.push("Surface + text roles from computed styles");
         }
 
-        qualityReasons.push(`Visual fallback added ${visualColorsAdded} colors, ${visualResult.uniqueFonts.length} fonts`);
+        qualityReasons.push(`Visual extraction added ${visualColorsAdded} colors, ${visualResult.uniqueFonts.length} fonts from rendered page`);
 
-        if (qualityPoints >= 8) { qualityScore = "HIGH"; qualityRecommendation = "Strong extraction (CSS + visual). Ready to confirm and compile."; }
-        else if (qualityPoints >= 5) { qualityScore = "MEDIUM"; qualityRecommendation = "Visual extraction improved results. Some gaps remain."; }
-        else { qualityScore = "LOW"; qualityRecommendation = "Even with visual extraction, results are limited. Try Figma or manual entry."; }
+        if (qualityPoints >= 8) { qualityScore = "HIGH"; qualityRecommendation = "Strong extraction (CSS + rendered page). Ready to confirm and compile."; }
+        else if (qualityPoints >= 5) { qualityScore = "MEDIUM"; qualityRecommendation = "Good extraction from rendered page. Some gaps may need manual confirmation."; }
+        else { qualityScore = "LOW"; qualityRecommendation = "Even with rendered-page extraction, results are limited. Try Figma or provide brand assets manually."; }
 
         extractionQuality = { score: qualityScore, points: qualityPoints, reasons: qualityReasons, recommendation: qualityRecommendation };
       }
     }
+  }
+
+  // If Chrome was not available, add a note about what was missed
+  if (!hasVisualExtraction && qualityScore !== "HIGH") {
+    qualityReasons.push("Chrome/Playwright not available — extraction used static CSS only. For better results (computed styles, JS-rendered content, multi-page crawl), install Chrome or run in an environment with browser support.");
+    extractionQuality = { ...extractionQuality, reasons: qualityReasons };
   }
 
   // --- Step 2: Compile (same logic as brand_compile) ---
