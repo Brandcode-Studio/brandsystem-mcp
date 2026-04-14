@@ -270,7 +270,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_ingest_assets",
-    "Scan and catalog brand assets (illustrations, stickers, patterns, icons) in .brand/assets/. Mode 'scan' (default) inventories all asset directories and identifies files missing from MANIFEST.yaml. Mode 'tag' adds metadata to a specific file: description, usage context, and theme compatibility. Use after adding asset files to .brand/assets/ subdirectories. Returns directory summaries and untagged file lists.",
+    "Scan and catalog brand assets (illustrations, stickers, patterns, icons) in .brand/assets/. Mode 'scan' (default) inventories all asset subdirectories and identifies files not yet in MANIFEST.yaml. Mode 'tag' adds metadata to a specific file (description, usage context, theme compatibility) and writes to MANIFEST.yaml. Read-only in scan mode; writes MANIFEST.yaml in tag mode. Use after adding asset files to .brand/assets/ subdirectories. Use when the user says 'catalog assets', 'what assets do I have', or 'tag this illustration'. Returns directory summaries with file counts, untagged file lists, and tagged file details. NOT for logo management — use brand_set_logo. NOT for brand extraction — use brand_extract_web.",
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

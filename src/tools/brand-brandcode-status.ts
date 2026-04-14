@@ -121,7 +121,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_status",
-    'Inspect the Brandcode Studio connection for the current project. Shows connected brand, sync token, last sync time, sync history, and local package summary. Use when the user says "brandcode status", "check connection", or "am I synced?". Returns structured connection data.',
+    'Inspect the Brandcode Studio connection for the current project. Read-only — reads .brand/brandcode-connector.json and .brand/brandcode-sync-history.json without making network requests. Shows connected brand slug, remote URL, sync token, last sync time, sync history, and local package contents. Use when the user says "brandcode status", "check connection", "am I synced?", or "show brand connection". Returns structured connection data or a clear "not connected" message with instructions to run brand_brandcode_connect. NOT for syncing — use brand_brandcode_sync to pull updates.',
     async () => handler(),
   );
 }

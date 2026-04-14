@@ -558,7 +558,7 @@ export function register(server: McpServer) {
 
   server.tool(
     "brand_feedback_review",
-    "Review all agent feedback filed via brand_feedback. Shows summary stats (by category, severity, status) and individual items. Use this to triage feedback, spot patterns, and prioritize fixes. Filter by category or status.",
+    "Review all agent feedback stored in ~/.brandsystem/feedback/. Read-only — reads local JSON files without network access. Shows summary stats (by category, severity, status) and individual items with timestamps. Filter by category (bug, friction, feature_request, agent_signal) or status (new, quarantined, acknowledged, fixed). Quarantined items were flagged for potential prompt injection. Use to triage feedback, spot recurring issues, and prioritize fixes. NOT for submitting feedback — use brand_feedback. NOT for changing item status — use brand_feedback_triage.",
     reviewParamsShape,
     async (args) => {
       const parsed = safeParseParams(ReviewParamsSchema, args);

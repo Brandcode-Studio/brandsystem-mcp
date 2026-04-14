@@ -106,7 +106,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_pdf",
-    "Extract brand colors, typography, spacing, and guideline rules from a PDF brand guidelines document. Merges extracted values into core-identity.yaml as source='guidelines', which can outrank web extraction based on brand.config.yaml source_priority.",
+    "Extract brand colors, typography, spacing, and guideline rules from a PDF brand guidelines document. Accepts a local file path to a PDF. Uses text extraction and pattern matching to identify hex color values, font names, size specifications, and spacing rules. Writes extracted values to core-identity.yaml with source='guidelines' and updates source-catalog.json. Guidelines source outranks web extraction by default based on brand.config.yaml source_priority. Use when the user has brand guidelines as a PDF file — this is the most accurate extraction source. Use after brand_extract_web to merge authoritative guideline values with web-extracted data. Run brand_resolve_conflicts afterward to review any disagreements between sources. NOT for website extraction — use brand_extract_web. NOT for Figma — use brand_extract_figma.",
     paramsShape,
     async (args) => {
       const result = safeParseParams(ParamsSchema, args);

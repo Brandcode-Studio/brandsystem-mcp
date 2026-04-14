@@ -146,7 +146,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_sync",
-    'Sync a previously connected Brandcode Studio brand. Pulls only if the hosted brand has changed (delta-aware via syncToken). Use when the user says "sync brand", "update from Studio", or "check for brand updates". Returns sync mode (updated/no_change) and changed areas.',
+    'Sync local .brand/ with a previously connected Brandcode Studio brand. Pull-only: fetches the latest package from Studio and updates local files. Delta-aware via syncToken — no-ops when the brand has not changed. Writes to .brand/brandcode-package.json and .brand/brandcode-sync-history.json. Requires a prior brand_brandcode_connect. Use when the user says "sync brand", "update from Studio", "pull latest brand", or "check for brand updates". Returns sync mode (updated/no_change/error), changed areas, and advice. NOT for initial connection — use brand_brandcode_connect first. NOT for checking status without syncing — use brand_brandcode_status.',
     paramsShape,
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);

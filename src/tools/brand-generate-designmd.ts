@@ -59,7 +59,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_generate_designmd",
-    "Generate a grounded DESIGN.md and structured design-synthesis.json from the current brand system. Prefers rendered extraction evidence when available, but can fall back to the current core brand state after manual edits or compile steps.",
+    "Generate DESIGN.md (portable agent-facing design brief) and design-synthesis.json (structured radius, shadow, spacing, layout, motion, component, and personality signals) from the current brand system. Reads extraction-evidence.json when available for grounded visual signals; falls back to core-identity.yaml and tokens.json after manual edits. Use after brand_extract_site or brand_extract_visual to synthesize multi-page evidence into a single design brief. Use after brand_compile if evidence is unavailable. Returns file paths and synthesis source used. Read-only except for writing the two output files. NOT for extracting brand identity — use brand_extract_web or brand_extract_visual first.",
     paramsShape,
     async (args) => {
       const parsed = ParamsSchema.safeParse(args);
