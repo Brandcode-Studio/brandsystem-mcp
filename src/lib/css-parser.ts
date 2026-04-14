@@ -123,6 +123,15 @@ const PLATFORM_DEFAULT_PATTERNS = [
   /^--mantine-/,                    // Mantine
   /^--tw-/,                         // Tailwind internal
   /^--fa-/,                         // Font Awesome
+  /^--toastify-/,                   // React Toastify
+  /^--diff-/,                       // Diff viewer libraries
+  /^--rc-/,                         // Ant Design / rc-components
+  /^--prism-/,                      // PrismJS syntax highlighting
+  /^--hljs-/,                       // Highlight.js
+  /^--cm-/,                         // CodeMirror
+  /^--monaco-/,                     // Monaco editor
+  /^--radix-/,                      // Radix UI primitives
+  /^--shiki-/,                      // Shiki syntax highlighting
 ];
 
 // Page builder brand variable patterns (higher priority than platform defaults)
@@ -349,14 +358,22 @@ const SYSTEM_FONTS = new Set([
   // Apple system fonts
   "-apple-system", "blinkmacsystemfont",
   "sf pro", "sf pro display", "sf pro text", "sf pro rounded",
+  // Apple emoji fonts (must never be "brand" fonts)
+  "apple color emoji", "noto color emoji", "twemoji mozilla",
   // Apple monospace fallbacks
   "sfmono-regular", "sf mono", "menlo", "monaco",
   // Windows system fonts
   "segoe ui", "segoe ui emoji", "segoe ui symbol",
   // Cross-platform monospace fallbacks
   "consolas", "liberation mono", "courier new", "courier",
+  // IDE / editor fonts (appear when extracting from dev tool sites)
+  "cursor", "jetbrains mono", "fira code", "source code pro",
+  "cascadia code", "cascadia mono", "hack", "iosevka",
   // Android
   "roboto mono", "droid sans mono",
+  // Icon fonts (not typography)
+  "material icons", "material symbols", "fontawesome",
+  "font awesome", "icomoon", "eicons",
 ]);
 
 function isSystemFont(name: string): boolean {
