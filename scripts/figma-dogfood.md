@@ -5,9 +5,9 @@
 - A real Figma file with variables and text styles
 - .brand/ directory initialized
 
-## Test Files (suggested)
+## Test Files
 
-1. **Column Five brand file** — full token set, known colors/fonts for validation
+1. **Column Five brand file** — `https://www.figma.com/file/tThS6mp66Wx2ILvw4zTzpg?node-id=4244-10&m=draw&type=design` — full token set, known colors/fonts for validation
 2. **ATTA brand file** — extracted VIC exists for comparison
 3. **Any client Figma file** with defined variables and text styles
 
