@@ -1,0 +1,27 @@
+name: Extraction Benchmark
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install chromium
+      - name: Run extraction benchmark
+        run: node scripts/extraction-audit.mjs
+        timeout-minutes: 10
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: scripts/audit-results/
+          retention-days: 30

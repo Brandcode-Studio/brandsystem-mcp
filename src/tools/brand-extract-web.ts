@@ -12,6 +12,7 @@ import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
 import { ERROR_CODES, type ColorEntry, type TypographyEntry, type LogoSpec, type CoreIdentity } from "../types/index.js";
 import { buildSourceCatalogRecords, upsertSourceCatalog } from "../lib/source-catalog.js";
+import { isFirecrawlAvailable, scrapeWithFirecrawl } from "../lib/firecrawl.js";
 
 const paramsShape = {
   url: z.string().url().describe("Website URL to scan (e.g. 'https://acme.com'). The homepage usually has the best logo and color data."),
@@ -40,36 +41,49 @@ async function handler(input: Params) {
     });
   }
 
-  let html: string;
-  try {
-    const response = await safeFetch(input.url, {
-      signal: AbortSignal.timeout(15000),
-      headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
-    });
-    if (!response.ok) {
+  // Fetch HTML: Firecrawl (if API key set) → static fetch
+  let html: string = "";
+  let fetchSource: "firecrawl" | "static" = "static";
+
+  if (isFirecrawlAvailable()) {
+    const fcResult = await scrapeWithFirecrawl(input.url);
+    if (fcResult.success) {
+      html = fcResult.html;
+      fetchSource = "firecrawl";
+    }
+  }
+
+  if (!html) {
+    try {
+      const response = await safeFetch(input.url, {
+        signal: AbortSignal.timeout(15000),
+        headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
+      });
+      if (!response.ok) {
+        return buildResponse({
+          what_happened: `Failed to fetch ${input.url} (HTTP ${response.status})`,
+          next_steps: [
+            "Check the URL is correct and publicly accessible (not behind a login)",
+            "Try a different page URL on the same domain",
+            "Try brand_extract_figma instead if you have a Figma file",
+            "If this keeps happening, run brand_feedback to report the issue.",
+          ],
+          data: { error: ERROR_CODES.FETCH_FAILED, status: response.status, statusText: response.statusText },
+        });
+      }
+      html = await readResponseWithLimit(response, MAX_HTML_BYTES);
+    } catch (err) {
       return buildResponse({
-        what_happened: `Failed to fetch ${input.url} (HTTP ${response.status})`,
+        what_happened: `Failed to fetch ${input.url}`,
         next_steps: [
           "Check the URL is correct and publicly accessible (not behind a login)",
           "Try a different page URL on the same domain",
           "Try brand_extract_figma instead if you have a Figma file",
           "If this keeps happening, run brand_feedback to report the issue.",
         ],
-        data: { error: ERROR_CODES.FETCH_FAILED, status: response.status, statusText: response.statusText },
+        data: { error: ERROR_CODES.FETCH_FAILED, details: String(err) },
       });
     }
-    html = await readResponseWithLimit(response, MAX_HTML_BYTES);
-  } catch (err) {
-    return buildResponse({
-      what_happened: `Failed to fetch ${input.url}`,
-      next_steps: [
-        "Check the URL is correct and publicly accessible (not behind a login)",
-        "Try a different page URL on the same domain",
-        "Try brand_extract_figma instead if you have a Figma file",
-        "If this keeps happening, run brand_feedback to report the issue.",
-      ],
-      data: { error: ERROR_CODES.FETCH_FAILED, details: String(err) },
-    });
   }
 
   const $ = cheerio.load(html);

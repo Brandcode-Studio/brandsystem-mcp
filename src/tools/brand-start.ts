@@ -12,6 +12,7 @@ import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
 import { extractSite, extractVisual, inferRolesFromVisual, isVisualExtractionAvailable } from "../lib/visual-extractor.js";
+import { isFirecrawlAvailable, scrapeWithFirecrawl } from "../lib/firecrawl.js";
 import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { compileRuntime } from "../lib/runtime-compiler.js";
 import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
@@ -162,33 +163,48 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   // reads computed styles from the rendered page. Static CSS is the fallback.
   const hasVisualExtraction = isVisualExtractionAvailable();
 
-  // --- Step 1: Web extraction (static CSS + inline styles) ---
-  let html: string;
-  try {
-    const response = await safeFetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
-    });
-    if (!response.ok) {
+  // --- Step 1: Fetch HTML ---
+  // Priority: Firecrawl (if API key set) → static fetch (always available)
+  // Firecrawl handles JS rendering, anti-bot, and proxy management.
+  let html: string = "";
+  let fetchSource: "firecrawl" | "static" = "static";
+
+  if (isFirecrawlAvailable()) {
+    const fcResult = await scrapeWithFirecrawl(url);
+    if (fcResult.success) {
+      html = fcResult.html;
+      fetchSource = "firecrawl";
+    }
+  }
+
+  if (!html) {
+    try {
+      const response = await safeFetch(url, {
+        signal: AbortSignal.timeout(15000),
+        headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
+      });
+      if (!response.ok) {
+        return buildResponse({
+          what_happened: `Auto mode: failed to fetch ${url} (HTTP ${response.status}). Falling back to interactive mode.`,
+          next_steps: [
+            "Check the URL is correct and publicly accessible",
+            "Try brand_extract_web manually with a different URL, or use brand_extract_figma",
+          ],
+          data: { error: ERROR_CODES.AUTO_FETCH_FAILED, status: response.status, fallback: "interactive" },
+        });
+      }
+      html = await readResponseWithLimit(response, MAX_HTML_BYTES);
+      fetchSource = "static";
+    } catch (err) {
       return buildResponse({
-        what_happened: `Auto mode: failed to fetch ${url} (HTTP ${response.status}). Falling back to interactive mode.`,
+        what_happened: `Auto mode: failed to fetch ${url}. Falling back to interactive mode.`,
         next_steps: [
           "Check the URL is correct and publicly accessible",
           "Try brand_extract_web manually with a different URL, or use brand_extract_figma",
         ],
-        data: { error: ERROR_CODES.AUTO_FETCH_FAILED, status: response.status, fallback: "interactive" },
+        data: { error: ERROR_CODES.AUTO_FETCH_FAILED, details: String(err), fallback: "interactive" },
       });
     }
-    html = await readResponseWithLimit(response, MAX_HTML_BYTES);
-  } catch (err) {
-    return buildResponse({
-      what_happened: `Auto mode: failed to fetch ${url}. Falling back to interactive mode.`,
-      next_steps: [
-        "Check the URL is correct and publicly accessible",
-        "Try brand_extract_web manually with a different URL, or use brand_extract_figma",
-      ],
-      data: { error: ERROR_CODES.AUTO_FETCH_FAILED, details: String(err), fallback: "interactive" },
-    });
   }
 
   const $ = cheerio.load(html);
@@ -501,14 +517,23 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   let siteExtractionUsed = false;
   let siteExtractionSummary: { pages: number; colors_added: number; fonts_added: number; screenshots_saved: number } | null = null;
 
-  // Visual extraction: run when Chrome is available (not just as LOW-quality fallback)
-  // This is the primary extraction path for computed styles, multi-page crawl, and screenshots
+  // Visual extraction: run in parallel with static CSS when Chrome is available.
+  // Static CSS results are already computed above (fast, 1-2s).
+  // Visual extraction runs concurrently (slower, 15-45s) and merges richer data.
+  // If visual extraction times out or fails, the static CSS results stand alone.
   if (hasVisualExtraction) {
-    const siteResult = await extractSite(url, {
-      pageLimit: 4,
-      viewports: ["desktop", "mobile"],
-    });
-    if (siteResult.success) {
+    // Race visual extraction against a 30-second timeout
+    // (don't let slow Playwright block the whole pipeline)
+    const siteResultPromise = Promise.race([
+      extractSite(url, {
+        pageLimit: 4,
+        viewports: ["desktop", "mobile"],
+      }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000)),
+    ]);
+
+    const siteResult = await siteResultPromise;
+    if (siteResult && siteResult.success) {
       const persisted = await persistSiteExtraction(brandDir, siteResult, { merge: true });
       siteExtractionUsed = true;
       visualUsed = true;
@@ -550,7 +575,12 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
       else { qualityScore = "LOW"; qualityRecommendation = "Even with deep site extraction, results are limited. Try Figma or manual entry."; }
 
       extractionQuality = { score: qualityScore, points: qualityPoints, reasons: qualityReasons, recommendation: qualityRecommendation };
+    } else if (siteResult === null) {
+      // Site extraction timed out (30s cap). Static CSS results stand.
+      qualityReasons.push("Visual extraction timed out (30s). Results are from static CSS only. For richer extraction, try brand_extract_site or brand_extract_visual separately.");
+      extractionQuality = { ...extractionQuality, reasons: qualityReasons };
     } else {
+      // Site extraction returned but wasn't successful. Try single-page visual fallback.
       const visualResult = await extractVisual(url);
       if (visualResult.success) {
         visualUsed = true;
