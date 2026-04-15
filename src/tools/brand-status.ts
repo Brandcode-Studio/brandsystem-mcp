@@ -209,28 +209,27 @@ async function handler() {
     lines.push(recovery.formatted);
   }
 
+  // Build next_steps: use recovery guidance (ranked by impact) when available,
+  // fall back to linear session progression when recovery can't assess state
   const nextSteps: string[] = [];
-  if (!s1Done) {
+
+  if (recovery && recovery.actions.length > 0) {
+    // Recovery guidance takes precedence — top 3 actions as next_steps
+    const topActions = recovery.actions.filter((a) => a.tier === "highest");
+    for (const action of topActions) {
+      const args = action.toolArgs ? ` ${action.toolArgs}` : "";
+      nextSteps.push(`${action.description} (${action.tool}${args}) — unlocks ${action.unlocks[0]}, +${action.readinessPoints}pp readiness`);
+    }
+  } else if (!s1Done) {
     if (config.website_url) {
       nextSteps.push(`Run brand_extract_web with url "${config.website_url}", brand_extract_visual for a one-page rendered fallback, or brand_extract_site for a deeper multi-page pass`);
     } else {
       nextSteps.push("Run brand_extract_web with your website URL, brand_extract_visual for a one-page rendered fallback, or brand_extract_site for a deeper multi-page pass");
     }
-  } else if (!hasExtractionEvidence && config.website_url) {
-    nextSteps.push(`Run brand_extract_site with url "${config.website_url}" to capture deeper multi-page evidence and save extraction-evidence.json`);
-  } else if (!hasDesignSynthesis || !hasDesignMarkdown) {
-    nextSteps.push("Run brand_generate_designmd to regenerate design-synthesis.json and DESIGN.md from the latest brand data");
-  } else if (!hasVisual) {
-    nextSteps.push("Run brand_deepen_identity to start Session 2 — adds anti-pattern rules, composition guidelines, and visual identity to the runtime");
-  } else if (!hasMessaging) {
-    nextSteps.push("Run brand_extract_messaging to audit your current website voice (optional but recommended), then brand_compile_messaging to define perspective, voice codex, and brand story (Session 3)");
-  } else if (!hasStrategy) {
-    nextSteps.push("Run brand_build_personas to start Session 4 — define target audiences, then brand_build_journey, brand_build_themes, brand_build_matrix");
-  } else {
+  } else if (!hasVisual && !hasMessaging && !hasStrategy) {
     nextSteps.push("Brand system complete! Run brand_write to generate audience-targeted content using your full brand system");
     nextSteps.push("Run brand_audit to validate your .brand/ directory");
     nextSteps.push("Run brand_brandcode_connect to save your brand on Brandcode Studio and share with your team");
-    nextSteps.push("Load .brand/brand-runtime.json into any sub-agent's context for instant on-brand output — no per-prompt boilerplate needed");
   }
 
   // Always show feedback prompt

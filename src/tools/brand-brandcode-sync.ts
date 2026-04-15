@@ -129,9 +129,20 @@ async function handlePull(input: Params) {
   };
   await writeConnectorConfig(cwd, updatedConfig);
 
-  // Compute brand diff (old runtime vs new runtime from package)
-  const oldRuntime = (oldPackage as Record<string, unknown> | null)?.runtime as Record<string, unknown> | null ?? null;
-  const newRuntime = (pullResult.package as Record<string, unknown>).runtime as Record<string, unknown> | null ?? null;
+  // Compute brand diff — normalize package structure to find runtime
+  const extractRuntime = (pkg: Record<string, unknown> | null): Record<string, unknown> | null => {
+    if (!pkg) return null;
+    // Direct runtime key
+    if (pkg.runtime && typeof pkg.runtime === "object") return pkg.runtime as Record<string, unknown>;
+    // Nested under brandInstance
+    const instance = pkg.brandInstance as Record<string, unknown> | undefined;
+    if (instance?.runtime && typeof instance.runtime === "object") return instance.runtime as Record<string, unknown>;
+    // Package itself looks like a runtime (has identity + voice/visual keys)
+    if (pkg.identity && typeof pkg.identity === "object") return pkg;
+    return null;
+  };
+  const oldRuntime = extractRuntime(oldPackage as Record<string, unknown> | null);
+  const newRuntime = extractRuntime(pullResult.package as Record<string, unknown>);
   const diff = computeBrandDiff(oldRuntime, newRuntime);
 
   // Record sync history

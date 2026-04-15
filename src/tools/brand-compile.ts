@@ -8,6 +8,7 @@ import { compileRuntime } from "../lib/runtime-compiler.js";
 import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
 import { generateAndPersistDesignArtifacts } from "../lib/design-synthesis.js";
 import { ERROR_CODES, type ClarificationItem } from "../types/index.js";
+import { invalidateCheckCache } from "../lib/brand-check-engine.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 
 async function handler(server: McpServer) {
@@ -158,6 +159,9 @@ async function handler(server: McpServer) {
   const policy = compileInteractionPolicy(config.schema_version, visual, messaging, strategy);
   await brandDir.writePolicy(policy);
   filesWritten.push("interaction-policy.json");
+
+  // Invalidate brand_check cache so subsequent checks use fresh data
+  invalidateCheckCache();
 
   // Notify subscribed resource clients that runtime + policy have changed
   server.sendResourceListChanged();
