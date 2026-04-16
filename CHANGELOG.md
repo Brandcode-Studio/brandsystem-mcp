@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2 (2026-04-16)
+
+### Fixed
+- **Studio URL redirect.** Default Studio URL changed from `www.brandcode.studio` to `brandcode.studio`. The `www` subdomain issued a 301 redirect that stripped POST bodies, breaking magic link auth and brand save endpoints.
+
 ## 0.7.1 (2026-04-16)
 
 ### Added
