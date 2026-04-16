@@ -5,33 +5,33 @@ describe("resolveBrandcodeHostedUrl", () => {
   it("resolves a bare slug", () => {
     const r = resolveBrandcodeHostedUrl("pendium");
     expect(r.slug).toBe("pendium");
-    expect(r.baseUrl).toBe("https://www.brandcode.studio");
+    expect(r.baseUrl).toBe("https://brandcode.studio");
     expect(r.detailUrl).toBe(
-      "https://www.brandcode.studio/api/brand/hosted/pendium",
+      "https://brandcode.studio/api/brand/hosted/pendium",
     );
     expect(r.connectUrl).toBe(
-      "https://www.brandcode.studio/api/brand/hosted/pendium/connect",
+      "https://brandcode.studio/api/brand/hosted/pendium/connect",
     );
     expect(r.pullUrl).toBe(
-      "https://www.brandcode.studio/api/brand/hosted/pendium/pull",
+      "https://brandcode.studio/api/brand/hosted/pendium/pull",
     );
   });
 
   it("resolves a /start/brands/ URL", () => {
     const r = resolveBrandcodeHostedUrl(
-      "https://www.brandcode.studio/start/brands/pendium",
+      "https://brandcode.studio/start/brands/pendium",
     );
     expect(r.slug).toBe("pendium");
-    expect(r.baseUrl).toBe("https://www.brandcode.studio");
+    expect(r.baseUrl).toBe("https://brandcode.studio");
   });
 
   it("resolves an /api/brand/hosted/ URL", () => {
     const r = resolveBrandcodeHostedUrl(
-      "https://www.brandcode.studio/api/brand/hosted/my-brand",
+      "https://brandcode.studio/api/brand/hosted/my-brand",
     );
     expect(r.slug).toBe("my-brand");
     expect(r.pullUrl).toBe(
-      "https://www.brandcode.studio/api/brand/hosted/my-brand/pull",
+      "https://brandcode.studio/api/brand/hosted/my-brand/pull",
     );
   });
 
@@ -74,7 +74,7 @@ describe("resolveBrandcodeHostedUrl", () => {
 
   it("resolves URL with trailing path after slug", () => {
     const r = resolveBrandcodeHostedUrl(
-      "https://www.brandcode.studio/api/brand/hosted/pendium/connect",
+      "https://brandcode.studio/api/brand/hosted/pendium/connect",
     );
     expect(r.slug).toBe("pendium");
   });

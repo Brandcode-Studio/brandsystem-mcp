@@ -10,7 +10,7 @@
 
 import type { ResolvedHostedBrand } from "./types.js";
 
-const DEFAULT_HOST = "https://www.brandcode.studio";
+const DEFAULT_HOST = "https://brandcode.studio";
 
 /**
  * Extract slug and base URL from any recognized Brandcode input.

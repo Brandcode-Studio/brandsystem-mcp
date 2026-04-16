@@ -104,7 +104,7 @@ function buildMessage(completeness: BrandCompleteness | null, connector: string,
 export async function buildOnrampGuidance(options?: {
   studioBaseUrl?: string;
 }): Promise<OnrampGuidance> {
-  const studioBase = options?.studioBaseUrl ?? "https://www.brandcode.studio";
+  const studioBase = options?.studioBaseUrl ?? "https://brandcode.studio";
   const brandDir = new BrandDir(process.cwd());
   const completeness = await assessCompleteness(brandDir);
 

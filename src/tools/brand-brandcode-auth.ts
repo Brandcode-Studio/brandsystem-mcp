@@ -13,7 +13,7 @@ import {
   BrandcodeClientError,
 } from "../connectors/brandcode/client.js";
 
-const DEFAULT_STUDIO_URL = "https://www.brandcode.studio";
+const DEFAULT_STUDIO_URL = "https://brandcode.studio";
 
 const paramsShape = {
   mode: z
@@ -36,7 +36,7 @@ const paramsShape = {
     .string()
     .optional()
     .describe(
-      'Brandcode Studio base URL. Defaults to "https://www.brandcode.studio". Override for self-hosted instances.',
+      'Brandcode Studio base URL. Defaults to "https://brandcode.studio". Override for self-hosted instances.',
     ),
 };
 

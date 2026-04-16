@@ -19,7 +19,7 @@
 
 import { getVersion } from "./version.js";
 
-const TELEMETRY_ENDPOINT = "https://www.brandcode.studio/api/telemetry";
+const TELEMETRY_ENDPOINT = "https://brandcode.studio/api/telemetry";
 
 let _enabled: boolean | null = null;
 let _sessionId: string | null = null;
