@@ -15,7 +15,7 @@ import {
   BrandcodeClientError,
 } from "../connectors/brandcode/client.js";
 
-const DEFAULT_STUDIO_URL = "https://brandcode.studio";
+const DEFAULT_STUDIO_URL = "https://www.brandcode.studio";
 
 const paramsShape = {
   mode: z

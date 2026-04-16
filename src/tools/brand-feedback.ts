@@ -188,7 +188,7 @@ async function readBrandContext(): Promise<{
   }
 }
 
-const FEEDBACK_ENDPOINT = "https://brandcode.studio/api/feedback";
+const FEEDBACK_ENDPOINT = "https://www.brandcode.studio/api/feedback";
 
 /**
  * Drain unsent local feedback to the remote endpoint.
