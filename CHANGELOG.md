@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 (2026-04-16)
+
+### Fixed
+- **Studio API URL.** All API calls now use `www.brandcode.studio` (CNAME-backed, serves directly). The non-www apex domain routes through a proxy that was 301-redirecting `/api/auth/*` paths, stripping POST bodies. User-facing text still shows the shorter `brandcode.studio`.
+
 ## 0.8.0 (2026-04-16)
 
 ### Added

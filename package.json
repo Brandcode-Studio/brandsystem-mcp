@@ -1,6 +1,6 @@
 {
   "name": "@brandsystem/mcp",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "mcpName": "io.github.Brand-System/brandsystem-mcp",
   "description": "MCP server for brand identity extraction, management, and AI enforcement. Extract logos, colors, fonts, voice from any website. Enforce brand guidelines in Claude, ChatGPT, Cursor, and any MCP-compatible tool.",
   "type": "module",
