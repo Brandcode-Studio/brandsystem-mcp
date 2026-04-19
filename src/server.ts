@@ -42,6 +42,8 @@ import { register as registerBrandcodeAuth } from "./tools/brand-brandcode-auth.
 import { register as registerBrandcodeConnect } from "./tools/brand-brandcode-connect.js";
 import { register as registerBrandcodeSync } from "./tools/brand-brandcode-sync.js";
 import { register as registerBrandcodeStatus } from "./tools/brand-brandcode-status.js";
+import { register as registerRepoConnect } from "./tools/brand-repo-connect.js";
+import { register as registerRepoStatus } from "./tools/brand-repo-status.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -98,6 +100,10 @@ export function createServer(): McpServer {
   registerBrandcodeConnect(server);  // Connect to hosted brand (pull or save)
   registerBrandcodeSync(server);     // Sync with hosted brand (pull or push)
   registerBrandcodeStatus(server);   // Inspect connection status
+
+  // ── Git-connected source ──
+  registerRepoConnect(server);       // Connect a GitHub repo for auto-sync
+  registerRepoStatus(server);        // Check repo connection health
 
   // ── Cross-session utilities ──
   registerWrite(server);       // Load brand context for content gen
