@@ -41,7 +41,7 @@ export async function fetchHostedBrandPackage(
       headers: {
         accept: "application/json",
         "user-agent": USER_AGENT,
-        "x-brandcode-mcp-service-token": opts.ucsServiceToken,
+        authorization: `Bearer ${opts.ucsServiceToken}`,
       },
       signal: opts.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     });

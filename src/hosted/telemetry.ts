@@ -46,7 +46,7 @@ export async function emitAgentRunRecord(
       headers: {
         "content-type": "application/json",
         "user-agent": USER_AGENT,
-        "x-brandcode-mcp-service-token": input.ucsServiceToken,
+        authorization: `Bearer ${input.ucsServiceToken}`,
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(TIMEOUT_MS),
