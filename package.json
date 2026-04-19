@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prelint": "npm run verify:release-metadata",
-    "lint": "tsc --noEmit"
+    "lint": "tsc -p tsconfig.check.json"
   },
   "engines": {
     "node": ">=20.18.1"

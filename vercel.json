@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/:slug([a-z0-9][a-z0-9-]*)",
+      "destination": "/api/:slug"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "cache-control", "value": "no-store" }
+      ]
+    }
+  ]
+}
