@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Brandcode MCP Phase 0 lock.** Added `specs/brandcode-mcp-phase-0-lock.md` to lock the S009 G-5b decisions: 8-tool hosted surface, `@brandcode/mcp` naming, `mcp.brandcode.studio/{slug}` URL structure, free-v1 pricing posture, and the Phase 1 staging-prototype handoff.
+- **Hosted MCP status surfacing.** `brand_brandcode_status` now returns `brandcode_mcp_available`, `brandcode_mcp_phase`, `brandcode_mcp_url`, and the locked 8-tool surface so agents can distinguish the Phase 0 lock from the Phase 1 hosted launch.
+
+### Changed
+- README and `llms.txt` now clarify the "Two MCPs, one brand" story: `@brandsystem/mcp` is the local Build MCP; Brandcode MCP is the upcoming hosted Use MCP.
+
 ## 0.9.0 (2026-04-18)
 
 ### Added

@@ -85,6 +85,21 @@ describe("brand_brandcode_status tool", () => {
     expect(connector.syncToken).toBe("pendium:3:2026-04-05T22:00:00.000Z");
     expect(result.sync_count).toBe(1);
     expect(result.has_package).toBe(false);
+    expect(result.brandcode_mcp_available).toBe(false);
+    expect(result.brandcode_mcp_phase).toBe("phase_0_locked");
+    expect(result.brandcode_mcp_url).toBe(
+      "https://mcp.brandcode.studio/pendium",
+    );
+    expect(result.brandcode_mcp_tools).toEqual([
+      "brand_runtime",
+      "brand_search",
+      "brand_check",
+      "brand_status",
+      "list_brand_assets",
+      "get_brand_asset",
+      "brand_feedback",
+      "brand_history",
+    ]);
     await cleanup();
   });
 
@@ -116,6 +131,8 @@ describe("brand_brandcode_status tool", () => {
     const status = result.status as string;
     expect(status).toContain("pendium");
     expect(status).toContain(".brand/brandcode-package.json");
+    expect(status).toContain("Brandcode MCP");
+    expect(status).toContain("https://mcp.brandcode.studio/pendium");
     await cleanup();
   });
 

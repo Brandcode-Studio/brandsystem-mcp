@@ -32,8 +32,9 @@ Tested in production: visual consistency is near-instant from the runtime. Voice
 - Structure: DTCG design tokens, design-synthesis.json, DESIGN.md, brand runtime contract, interaction policy
 - Enforce: brand_audit_content (0-100 scoring), brand_check_compliance (pass/fail gate), brand_preflight (HTML/CSS rules)
 - Subscribe: brand://runtime and brand://policy as MCP resources
-- Connect: sync with hosted brands on Brandcode Studio (brand_brandcode_connect, brand_brandcode_sync)
+- Connect: sync with hosted brands on Brandcode Studio and optionally refresh reads through Live Mode (brand_brandcode_connect, brand_brandcode_sync, brand_brandcode_live)
 - Portable: .brand/ directory works standalone or synced to a team via Brandcode Studio
+- Companion: Brandcode MCP is the locked hosted "Use" MCP at https://mcp.brandcode.studio/{slug}; @brandsystem/mcp remains the local "Build" MCP
 
 ## For agent-to-agent handoff
 Load brand-runtime.json into any sub-agent's context. It contains identity (colors, typography, logo), visual rules (composition, anti-patterns), voice constraints (tone, never-say words), and content strategy (personas, journey stages, themes). One file replaces hundreds of tokens of per-prompt boilerplate.

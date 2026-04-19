@@ -7,6 +7,21 @@ import {
   readPackagePayload,
 } from "../connectors/brandcode/persistence.js";
 
+const BRANDCODE_MCP_TOOL_SURFACE = [
+  "brand_runtime",
+  "brand_search",
+  "brand_check",
+  "brand_status",
+  "list_brand_assets",
+  "get_brand_asset",
+  "brand_feedback",
+  "brand_history",
+] as const;
+
+function getBrandcodeMcpUrl(slug: string): string {
+  return `https://mcp.brandcode.studio/${slug}`;
+}
+
 async function handler() {
   const cwd = process.cwd();
 
@@ -25,6 +40,7 @@ async function handler() {
   const history = await readSyncHistory(cwd);
   const pkg = await readPackagePayload(cwd);
   const lastEvent = history.events[history.events.length - 1] ?? null;
+  const brandcodeMcpUrl = getBrandcodeMcpUrl(config.slug);
 
   const lines: string[] = [
     "── Brandcode Connection ──────────────",
@@ -38,6 +54,11 @@ async function handler() {
     "── Pull endpoint ─────────────────────",
     `Pull URL:    ${config.pullUrl}`,
     `Connect URL: ${config.connectUrl}`,
+    "",
+    "── Brandcode MCP ─────────────────────",
+    "Status:      Phase 0 locked; staging prototype next",
+    `URL:         ${brandcodeMcpUrl}`,
+    `Tools:       ${BRANDCODE_MCP_TOOL_SURFACE.length} read/append-only tools`,
   ];
 
   if (lastEvent) {
@@ -114,6 +135,10 @@ async function handler() {
       last_sync: lastEvent,
       sync_count: history.events.length,
       has_package: pkg !== null,
+      brandcode_mcp_available: false,
+      brandcode_mcp_phase: "phase_0_locked",
+      brandcode_mcp_url: brandcodeMcpUrl,
+      brandcode_mcp_tools: [...BRANDCODE_MCP_TOOL_SURFACE],
     },
   });
 }
@@ -121,7 +146,7 @@ async function handler() {
 export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_status",
-    'Inspect the Brandcode Studio connection for the current project. Read-only — reads .brand/brandcode-connector.json and .brand/brandcode-sync-history.json without making network requests. Shows connected brand slug, remote URL, sync token, last sync time, sync history, and local package contents. Use when the user says "brandcode status", "check connection", "am I synced?", or "show brand connection". Returns structured connection data or a clear "not connected" message with instructions to run brand_brandcode_connect. NOT for syncing — use brand_brandcode_sync to pull updates.',
+    'Inspect the Brandcode Studio connection for the current project. Read-only — reads .brand/brandcode-connector.json and .brand/brandcode-sync-history.json without making network requests. Shows connected brand slug, remote URL, sync token, last sync time, sync history, local package contents, and Phase 0 Brandcode MCP URL/status. Use when the user says "brandcode status", "check connection", "am I synced?", or "show brand connection". Returns structured connection data or a clear "not connected" message with instructions to run brand_brandcode_connect. NOT for syncing — use brand_brandcode_sync to pull updates.',
     async () => handler(),
   );
 }

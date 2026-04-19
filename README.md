@@ -104,6 +104,14 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 
 **Brandcode Studio-connected flow** -- Connect an existing hosted brand from Brandcode Studio, pull the packaged brand into `.brand/`, and keep it synced over time.
 
+### Two MCPs, One Brand
+
+`@brandsystem/mcp` is the **Build** MCP: extract from websites, Figma, and PDFs; compile tokens, runtime, and policy; keep a local `.brand/` directory portable and versionable.
+
+Brandcode MCP is the hosted **Use** MCP: connect an MCP client to a live Brandcode Studio brand at `https://mcp.brandcode.studio/{slug}` so agents can fetch current runtime, search approved knowledge, check drafts, retrieve assets, and leave feedback without copying guidelines between tools.
+
+Phase 0 for Brandcode MCP is locked in [specs/brandcode-mcp-phase-0-lock.md](specs/brandcode-mcp-phase-0-lock.md). Phase 1 is the staging prototype. Until that prototype ships, keep using `@brandsystem/mcp` for local build/sync and Live Mode for connected reads.
+
 ---
 
 ## Tools Reference
@@ -179,6 +187,7 @@ Each session builds on the previous. Stop anywhere -- you get value immediately.
 | `brand_brandcode_connect` | Connect a local `.brand/` directory to a hosted Brandcode Studio brand and pull the current package. |
 | `brand_brandcode_sync` | Pull updates from a previously connected hosted brand using sync-token-aware delta behavior. |
 | `brand_brandcode_status` | Inspect the current Brandcode Studio connection, sync history, and local package summary. |
+| `brand_brandcode_live` | Toggle connected read tools to refresh from the hosted runtime within a short cache TTL. |
 
 ### Tool Flow
 
