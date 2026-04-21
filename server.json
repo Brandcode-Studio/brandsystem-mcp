@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.Brandcode-Studio/brandsystem-mcp",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "title": "@brandsystem/mcp · Build",
   "description": "Author a portable .brand runtime. Extract identity from websites, Figma, and PDFs; compile governance, tokens, and voice rules into a single .brand/ directory; deploy to Claude Design, Claude Code, Cursor, and every MCP client. One artifact, every surface on brand.",
   "websiteUrl": "https://brandcode.studio/mcp",
@@ -12,7 +12,7 @@
   "packages": [{
     "registryType": "npm",
     "identifier": "@brandsystem/mcp",
-    "version": "0.9.1",
+    "version": "0.9.2",
     "transport": { "type": "stdio" },
     "runtimeHint": "node"
   }]

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2 (2026-04-21)
+
+### Added
+- **`brand_enrich_skill` tool (S010 N-2 PR3).** Takes a Claude Design-style auto-generated `SKILL.md`, diffs it against `.brand/governance/` YAML (narrative-library, valid-proof-points, anti-patterns, application-rules, taste-codes), and returns an enriched `SKILL.md` with missing governance content injected, cited by ID, and grouped into canonical sections. Additive only — never rewrites existing content; appends to existing guardrail-like sections ("Hard rules", "Guardrails") instead of duplicating. Response shape includes `diff_summary` with per-category add counts plus warnings.
+
+### Changed
+- **GitHub org rename.** Repo moved from `github.com/Brand-System/brandsystem-mcp` to `github.com/Brandcode-Studio/brandsystem-mcp`. Updated `repository.url`, `bugs`, `mcpName` (`io.github.Brandcode-Studio/brandsystem-mcp`), `server.json.name`, and all README/llms.txt badge + link references. MCP registry consumers with the old identifier cached will re-discover on next refresh.
+
 ## 0.9.1 (2026-04-19)
 
 ### Added
