@@ -45,6 +45,7 @@ import { register as registerBrandcodeStatus } from "./tools/brand-brandcode-sta
 import { register as registerBrandcodeLive } from "./tools/brand-brandcode-live.js";
 import { register as registerRepoConnect } from "./tools/brand-repo-connect.js";
 import { register as registerRepoStatus } from "./tools/brand-repo-status.js";
+import { register as registerEnrichSkill } from "./tools/brand-enrich-skill.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -110,6 +111,7 @@ export function createServer(): McpServer {
   // ── Cross-session utilities ──
   registerWrite(server);       // Load brand context for content gen
   registerExport(server);      // Generate portable brand files
+  registerEnrichSkill(server); // Enrich an auto-SKILL.md against .brand/governance/
   registerFeedback(server);    // Bug reports + feature ideas
 
   // ── Resources (read-only, subscribable brand data) ──
