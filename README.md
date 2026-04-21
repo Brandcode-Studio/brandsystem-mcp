@@ -1,9 +1,9 @@
-[![CI](https://github.com/Brand-System/brandsystem-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Brand-System/brandsystem-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/Brandcode-Studio/brandsystem-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Brandcode-Studio/brandsystem-mcp/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@brandsystem/mcp)](https://www.npmjs.com/package/@brandsystem/mcp)
 [![Node](https://img.shields.io/node/v/@brandsystem/mcp)](https://www.npmjs.com/package/@brandsystem/mcp)
-[![brandsystem-mcp MCP server](https://glama.ai/mcp/servers/Brand-System/brandsystem-mcp/badges/score.svg)](https://glama.ai/mcp/servers/Brand-System/brandsystem-mcp)
+[![brandsystem-mcp MCP server](https://glama.ai/mcp/servers/Brandcode-Studio/brandsystem-mcp/badges/score.svg)](https://glama.ai/mcp/servers/Brandcode-Studio/brandsystem-mcp)
 [![npm downloads](https://img.shields.io/npm/dw/@brandsystem/mcp)](https://www.npmjs.com/package/@brandsystem/mcp)
-[![MCP Badge](https://lobehub.com/badge/mcp/brand-system-brandsystem-mcp)](https://lobehub.com/mcp/brand-system-brandsystem-mcp)
+[![MCP Badge](https://lobehub.com/badge/mcp/brandcode-studio-brandsystem-mcp)](https://lobehub.com/mcp/brandcode-studio-brandsystem-mcp)
 
 # @brandsystem/mcp — Build
 

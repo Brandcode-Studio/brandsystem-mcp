@@ -48,5 +48,5 @@ brand-runtime, brand-governance, Claude Design integration, design-tokens, voice
 
 ## Links
 - Website: https://brandcode.studio
-- GitHub: https://github.com/Brand-System/brandsystem-mcp
+- GitHub: https://github.com/Brandcode-Studio/brandsystem-mcp
 - npm: https://www.npmjs.com/package/@brandsystem/mcp

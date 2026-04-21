@@ -1,7 +1,7 @@
 {
   "name": "@brandsystem/mcp",
   "version": "0.9.1",
-  "mcpName": "io.github.Brand-System/brandsystem-mcp",
+  "mcpName": "io.github.Brandcode-Studio/brandsystem-mcp",
   "description": "Author a portable .brand runtime — the governance layer that travels with your brand. Extract identity from websites, Figma, and PDFs; compile tokens, anti-patterns, and voice rules into a single .brand/ directory; deploy to Claude Design, Claude Code, Cursor, ChatGPT, and any MCP-compatible tool. One artifact, every surface on brand.",
   "type": "module",
   "main": "dist/index.js",
@@ -63,8 +63,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Brand-System/brandsystem-mcp"
+    "url": "https://github.com/Brandcode-Studio/brandsystem-mcp"
   },
   "homepage": "https://brandcode.studio/mcp",
-  "bugs": "https://github.com/Brand-System/brandsystem-mcp/issues"
+  "bugs": "https://github.com/Brandcode-Studio/brandsystem-mcp/issues"
 }
