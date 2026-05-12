@@ -1784,3 +1784,56 @@ No next Ready lane remains because the next useful proof step is blocked on
 external production route/env provisioning. Public release also remains blocked
 on final legal/subprocessor launch language, future public package/source
 approval, directory metadata, and explicit Jason release approval.
+
+## 2026-05-12 - L31 Pushed And CI-Proven
+
+Jason asked to push M001-L31.
+
+Pushed:
+
+- `main` to `d0e06b3`.
+
+GitHub CI:
+
+- Run: `25746822612`
+- URL:
+  `https://github.com/Brandcode-Studio/brandsystem-mcp/actions/runs/25746822612`
+- Result: success.
+- Node 20, Node 22, and Node 24 jobs passed `npm ci`, `npm run build`,
+  `npm run lint`, `npm test`, and `npm audit --audit-level=high`.
+
+No release, npm publish, public MCP directory submission, public listing
+metadata change, hosted tool addition, selected-kit default behavior, custody
+relaxation, production client handoff, production key generation, production
+endpoint proof, self-serve deletion/export operation, public SLA, legal terms,
+or public release proof happened.
+
+## 2026-05-12 - Operational Roadmap Shaped
+
+Jason agreed that the next work should stay operational: make limited use real,
+then production proof real, then later reopen package/directory questions.
+
+Added:
+
+- `specs/brandcode-mcp-operational-roadmap-m001-m003.md`
+- `.claudex/packets/M001-L32-production-route-env-repair.md`
+- `.claudex/prompts/M001-L32-production-route-env-repair.md`
+
+Roadmap sequence:
+
+- M001 remainder: production route/env repair, production live-key smoke proof,
+  M001 closeout and M002 opening.
+- M002: approved-client handoff rehearsal, support-ledger dogfood, key
+  rotation/revocation/offboarding drill, non-Brandcode brand proof, and one
+  evidence-led quality repair.
+- M003A: hosted observability event matrix, hosted error/abuse evidence
+  capture, leak/abuse drill, backup ops owner/escalation, and legal/subprocessor
+  launch-language review packet.
+
+Current Ready lane:
+
+- M001-L32 - Production Route And Env Repair.
+
+The L32 lane must not generate `bck_live_` keys or run production smoke. It
+only repairs/records production route and env readiness so the following lane
+can run production proof safely.

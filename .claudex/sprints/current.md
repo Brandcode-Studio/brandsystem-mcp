@@ -12,8 +12,8 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
 ## Current Truth
 
 - `origin/main` includes M001 coordination/proof docs through pushed tip
-  `3961be4`; local `main` now includes M001-L31 lane prep, production proof
-  preflight truth, and the docs-only limited-client handoff packet.
+  `d0e06b3`; local `main` now includes the next-1.5-sprints operational
+  roadmap and M001-L32 lane prep.
 - Latest GitHub CI baseline before M001-L01 was `61218ac`, and that CI is green.
 - The seven hosted implementation commits from `9cd1c77` through `40e94a0` landed as one push batch; only the tip got CI.
 - The `40e94a0` CI failure was `npm audit`; build, lint, and tests passed at the cumulative hosted MCP state.
@@ -287,6 +287,18 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
   package/listing metadata, release/publish posture, directory submission,
   public source/license posture, production keys, production endpoint access,
   public deletion/export SLA, or self-serve deletion/export operations.
+- M001-L31 was pushed to `origin/main` at tip `d0e06b3`.
+- GitHub CI run `25746822612` passed on pushed tip `d0e06b3` across Node 20,
+  Node 22, and Node 24. All three jobs passed `npm ci`, `npm run build`,
+  `npm run lint`, `npm test`, and `npm audit --audit-level=high`.
+- The operational roadmap for the remainder of M001, M002, and the first half
+  of M003 is recorded in
+  `specs/brandcode-mcp-operational-roadmap-m001-m003.md`.
+- The roadmap sequence is production route/env repair, production smoke proof,
+  M001 closeout/open M002, limited-client pilot rehearsal, support-ledger
+  dogfood, key rotation/revocation/offboarding drill, non-Brandcode brand
+  proof, one evidence-led quality repair, then M003 production trust
+  foundations.
 
 ## Lanes
 
@@ -323,6 +335,7 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
 | M001-L29 | Done | `.claudex/packets/M001-L29-limited-client-go-no-go-checklist.md` | Consolidate limited-client evidence into a staging/production/public go/no-go checklist without making release claims. |
 | M001-L30 | Done | `.claudex/packets/M001-L30-limited-client-staging-freshness-proof.md` | Applied the go/no-go checklist to the current Column Five Brandcode staging instance and refreshed redacted hosted proof. |
 | M001-L31 | Done | `.claudex/packets/M001-L31-limited-client-handoff-packet.md` | Drafted the approved limited-client handoff packet with setup, claims, support, custody, key posture, and current production-proof blocker. |
+| M001-L32 | Ready | `.claudex/packets/M001-L32-production-route-env-repair.md` | Repair production DNS/alias/env readiness for `mcp.brandcode.studio` without generating live keys or running production smoke. |
 
 ## Blockers And Decisions
 
@@ -349,6 +362,8 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
   GitHub CI run `25705113500` passed on pushed tip `201ee36`.
 - Push/CI proof for M001-L30 is complete: GitHub CI run `25710999132`
   passed on pushed tip `3961be4`.
+- Push/CI proof for M001-L31 is complete: GitHub CI run `25746822612`
+  passed on pushed tip `d0e06b3`.
 - L13 converted directory metadata and production-key/non-Brandcode proof into product-spine deferrals until hosted terms/rate-limit posture is settled.
 - L14 converted hosted-service terms, retention/privacy, custody, abuse handling, rate-limit posture, pricing copy, and package/source posture into a blocked release gate.
 - Full-suite local test deferral is resolved by M001-L16.
@@ -389,10 +404,19 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
 - M001-L31 drafted the limited-client handoff packet that an approved staging
   client could receive, while keeping the production proof blocker and
   public-release blockers explicit.
+- The next 1.5 sprint roadmap is operationalized in
+  `specs/brandcode-mcp-operational-roadmap-m001-m003.md`. It keeps M001 and
+  M002 focused on production proof and limited-client use before any public
+  package/directory work.
+- The next Ready lane is M001-L32. It should repair route/env readiness only;
+  live-key generation and production smoke belong to the following lane once
+  `mcp.brandcode.studio` resolves and Production env baseline is complete.
 
 ## Ready Lane Rule
 
-No lane is Ready for automation right now.
+Exactly one lane is Ready for automation:
+
+- `.claudex/packets/M001-L32-production-route-env-repair.md`
 
 The deletion/export pre-release operating posture is recorded, but public
 deletion/export launch language is still blocked on final legal/subprocessor
@@ -405,5 +429,5 @@ approval, or relax private custody. Production proof/live-key testing for
 resolved first. Jason approval remains a hard blocker for any release or
 publish action.
 
-Next automation should not continue until the external production DNS/env
-blocker is resolved or Jason names a new non-production lane.
+Next automation should start with M001-L32. Do not generate `bck_live_` keys
+or run production smoke until production route/env readiness is proven.
