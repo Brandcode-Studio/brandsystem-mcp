@@ -335,7 +335,7 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
 | M001-L29 | Done | `.claudex/packets/M001-L29-limited-client-go-no-go-checklist.md` | Consolidate limited-client evidence into a staging/production/public go/no-go checklist without making release claims. |
 | M001-L30 | Done | `.claudex/packets/M001-L30-limited-client-staging-freshness-proof.md` | Applied the go/no-go checklist to the current Column Five Brandcode staging instance and refreshed redacted hosted proof. |
 | M001-L31 | Done | `.claudex/packets/M001-L31-limited-client-handoff-packet.md` | Drafted the approved limited-client handoff packet with setup, claims, support, custody, key posture, and current production-proof blocker. |
-| M001-L32 | Ready | `.claudex/packets/M001-L32-production-route-env-repair.md` | Repair production DNS/alias/env readiness for `mcp.brandcode.studio` without generating live keys or running production smoke. |
+| M001-L32 | Blocked - external DNS/secret env | `.claudex/packets/M001-L32-production-route-env-repair.md` | Added the production alias and `BRANDCODE_MCP_ENV=production`; blocked on external DNS plus Production service-token and durable rate-limit secret env before live-key proof. |
 
 ## Blockers And Decisions
 
@@ -408,15 +408,18 @@ Turn the implemented Brandcode hosted MCP surface into an A-grade pre-release ca
   `specs/brandcode-mcp-operational-roadmap-m001-m003.md`. It keeps M001 and
   M002 focused on production proof and limited-client use before any public
   package/directory work.
-- The next Ready lane is M001-L32. It should repair route/env readiness only;
-  live-key generation and production smoke belong to the following lane once
-  `mcp.brandcode.studio` resolves and Production env baseline is complete.
+- M001-L32 partially repaired production route/env readiness by adding the
+  `mcp.brandcode.studio` Vercel alias and Production
+  `BRANDCODE_MCP_ENV=production`. The next proof step is blocked until
+  external DNS sets `A mcp.brandcode.studio 76.76.21.21` or moves nameservers
+  to Vercel, and Production receives `BRANDCODE_MCP_SERVICE_TOKEN` plus
+  durable shared rate-limit env.
 
 ## Ready Lane Rule
 
-Exactly one lane is Ready for automation:
-
-- `.claudex/packets/M001-L32-production-route-env-repair.md`
+No lane is Ready for automation because the next useful lane,
+M001-L33 Production Live-Key Smoke Proof, is blocked on external DNS and
+Production secret env provisioning.
 
 The deletion/export pre-release operating posture is recorded, but public
 deletion/export launch language is still blocked on final legal/subprocessor
@@ -429,5 +432,7 @@ approval, or relax private custody. Production proof/live-key testing for
 resolved first. Jason approval remains a hard blocker for any release or
 publish action.
 
-Next automation should start with M001-L32. Do not generate `bck_live_` keys
-or run production smoke until production route/env readiness is proven.
+Do not generate `bck_live_` keys or run production smoke until
+`mcp.brandcode.studio` resolves, Production service-token env exists, durable
+shared rate-limit env exists, and a fresh Production deployment can reach the
+hosted app-level bearer gate.

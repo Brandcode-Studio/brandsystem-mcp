@@ -242,13 +242,13 @@ staging route. It is not an evergreen claim and not production approval.
 ## Current Production Blocker
 
 Jason authorized production proof/live-key testing for the `brandcode` slug on
-2026-05-12, but production proof is currently blocked:
+2026-05-12. M001-L32 added the `mcp.brandcode.studio` production alias and
+Production `BRANDCODE_MCP_ENV=production`, but production proof is currently
+blocked:
 
 - `mcp.brandcode.studio` does not resolve;
-- no production MCP alias is visible for `mcp.brandcode.studio`;
-- Vercel Production env currently lists only `MCP_LOG_LEVEL`, `NODE_ENV`, and
-  `UCS_API_BASE_URL`;
-- Production does not currently list `BRANDCODE_MCP_ENV=production`;
+- Vercel says external DNS must set `A mcp.brandcode.studio 76.76.21.21`, or
+  the domain nameservers must move to Vercel;
 - Production does not currently list `BRANDCODE_MCP_TEST_KEYS` or equivalent
   live-key seed env;
 - Production does not currently list `BRANDCODE_MCP_SERVICE_TOKEN`;

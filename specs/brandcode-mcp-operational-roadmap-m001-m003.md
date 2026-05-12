@@ -114,10 +114,13 @@ production trust foundations are done:
 
 ## Current Next Lane
 
-The next Ready lane is:
+No lane is Ready.
 
-- `M001-L32 - Production Route And Env Repair`
-
-That lane should repair route/env readiness only. It should not generate
-`bck_live_` keys or run production smoke until the route resolves and
-Production env baseline is complete.
+M001-L32 partially repaired route/env readiness by adding the
+`mcp.brandcode.studio` production alias and Production
+`BRANDCODE_MCP_ENV=production`, then stopped on named external blockers.
+M001-L33 should not become Ready until `mcp.brandcode.studio` resolves,
+Production has `BRANDCODE_MCP_SERVICE_TOKEN`, Production has durable shared
+rate-limit env, and a fresh Production deployment can reach the app-level
+bearer gate. It should not generate `bck_live_` keys or run production smoke
+before those blockers clear.

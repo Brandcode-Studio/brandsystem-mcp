@@ -1,6 +1,6 @@
 # M001-L32 - Production Route And Env Repair
 
-**Status:** Ready
+**Status:** Blocked - external DNS and Production secret env
 **Sprint:** M001 - Brandcode MCP Stabilization And Pre-Release Hardening
 **Repo:** `/Users/jasonlankow/Desktop/brandsystem-mcp`
 **Lane type:** Hosted production infrastructure repair / non-release proof prep
@@ -25,6 +25,29 @@ but M001-L31 preflight found production proof blocked:
 This lane repairs production route/env readiness so the next lane can generate
 live keys and run production smoke without creating sensitive credentials into
 a broken proof path.
+
+## Result
+
+M001-L32 partially repaired the route/env baseline:
+
+- Added `mcp.brandcode.studio` to the linked `brandsystem-mcp` Vercel project.
+- `vercel alias ls` now shows
+  `brandsystem-az14haxle-column-five.vercel.app -> mcp.brandcode.studio`.
+- Added `BRANDCODE_MCP_ENV=production` to Production env.
+- Confirmed no `bck_live_` keys were generated and production smoke was not
+  run.
+
+The lane remains blocked on external provisioning:
+
+- `mcp.brandcode.studio` still does not resolve. Vercel requires external DNS
+  to set `A mcp.brandcode.studio 76.76.21.21`, or the domain nameservers must
+  move to Vercel.
+- Production still lacks `BRANDCODE_MCP_SERVICE_TOKEN`.
+- Production still lacks durable shared rate-limit env:
+  `BRANDCODE_MCP_RATE_LIMIT_REDIS_REST_*`, `UPSTASH_REDIS_REST_*`, or
+  `KV_REST_API_*`.
+- Production `BRANDCODE_MCP_TEST_KEYS` remains intentionally unset until the
+  next live-key proof lane.
 
 ## Scope
 
@@ -72,13 +95,16 @@ Implement narrowly:
 ## Acceptance
 
 - `mcp.brandcode.studio` resolves and reaches the hosted MCP app-level bearer
-  gate for `/brandcode`, or a precise external blocker is recorded.
+  gate for `/brandcode`, or a precise external blocker is recorded. External
+  DNS blocker recorded.
 - Production env baseline is present or an exact provisioning blocker is
-  recorded.
-- No live keys are generated.
-- No production smoke is run.
-- `git diff --check` passes.
+  recorded. Production MCP mode is present; service-token and durable
+  rate-limit secret env blockers recorded.
+- No live keys are generated. Passed.
+- No production smoke is run. Passed.
+- `git diff --check` passes. Passed.
 - Run focused verification only for touched code; docs/env-only changes may
   skip lint/build/tests with a clear note.
 - Exactly one next Ready lane remains, unless a named external blocker
-  prevents continuing.
+  prevents continuing. No next Ready lane should be opened until DNS and
+  secret env blockers clear.

@@ -4,9 +4,29 @@
 
 Active sprint: M001 - Brandcode MCP stabilization and pre-release hardening.
 
-The hosted Brandcode Use MCP implementation has all 8 locked v0.1 tools wired in code. M001-L01 added a repeatable smoke harness at `npm run smoke:hosted-mcp`; M001-L02 refreshed the Use MCP roadmap so it no longer describes implemented tools as stubs. M001-L03/L04 staging route and feedback append proof now pass. M001-L06 completed the license/package/directory/security trust audit. M001-L07 expanded hosted auth/scope/security proof and documented rate-limit posture. M001-L08 proved hosted asset custody blocking and surfaced the package-safe asset fixture blocker. M001-L09 traced that blocker upstream to UCS/Brandcode Studio package data. M001-L10 repaired the UCS package delivery ref, M001-L11 proved the package-safe asset through hosted MCP smoke, M001-L12 completed multi-client proof with MCP Inspector and Claude Code, M001-L13 completed release-candidate trust review, M001-L14 completed the hosted terms/rate-limit gate, M001-L15 captured Jason's approval of the recommended hosted-service posture, M001-L16 restored full local test-suite proof, M001-L17 pushed the M001 stack with green GitHub CI, M001-L18 restored GitHub Actions Node runtime trust, M001-L19 added active hosted in-process pre-release rate limiting, M001-L20 added and proved durable shared Redis REST rate limiting on staging, M001-L21 drafted hosted data-policy truth, M001-L22 prepared the package/source posture decision brief, M001-L23 added the limited-client readiness plan, M001-L24 added the onboarding template plus a real Column Five Brandcode staging proof, M001-L25 proved the Column Five client-config dry run through Claude Code using a Jason-approved staging-only generate-and-run key flow, M001-L26 added the limited-client key operations runbook, M001-L27 added the limited-client support intake ledger, M001-L28 prepared the deletion/export launch decision brief, M001-L29 added the limited-client go/no-go checklist, M001-L30 applied that checklist to the current Column Five Brandcode staging route, and M001-L31 drafted the reusable limited-client handoff packet. M001-L31 is pushed and CI-green at `d0e06b3`. The next 1.5 sprint operational roadmap is now `specs/brandcode-mcp-operational-roadmap-m001-m003.md`. After Jason asked to generate the needed keys, M001-L30 generated fresh staging-only full/read keys, installed them as sensitive Vercel Preview env, deployed Ready Preview `dpl_4aQ9vVdsXC6SD5u7TMqXZKs4eCQC`, re-aliased staging to `https://brandsystem-pwnz9m3oy-column-five.vercel.app`, and proved hosted smoke green. Jason then authorized production proof/live-key testing for the `brandcode` slug, but production proof is blocked because `mcp.brandcode.studio` does not resolve and the Vercel Production env is missing hosted MCP mode, live-key seed, service-token, and durable rate-limit variables. Jason approved the L28 pre-release deletion/export operating posture, while final public legal/subprocessor launch language remains blocked. Jason chose Option 4 for v0.1 limited-client posture: defer public `@brandcode/mcp` package/source distribution while improving the hosted Brandcode product for approved clients. Option 3 remains the likely future public direction. Jason does not want to release yet; release remains blocked on explicit approval and final launch-language review.
+The hosted Brandcode Use MCP implementation has all 8 locked v0.1 tools wired in code. M001-L01 added a repeatable smoke harness at `npm run smoke:hosted-mcp`; M001-L02 refreshed the Use MCP roadmap so it no longer describes implemented tools as stubs. M001-L03/L04 staging route and feedback append proof now pass. M001-L06 completed the license/package/directory/security trust audit. M001-L07 expanded hosted auth/scope/security proof and documented rate-limit posture. M001-L08 proved hosted asset custody blocking and surfaced the package-safe asset fixture blocker. M001-L09 traced that blocker upstream to UCS/Brandcode Studio package data. M001-L10 repaired the UCS package delivery ref, M001-L11 proved the package-safe asset through hosted MCP smoke, M001-L12 completed multi-client proof with MCP Inspector and Claude Code, M001-L13 completed release-candidate trust review, M001-L14 completed the hosted terms/rate-limit gate, M001-L15 captured Jason's approval of the recommended hosted-service posture, M001-L16 restored full local test-suite proof, M001-L17 pushed the M001 stack with green GitHub CI, M001-L18 restored GitHub Actions Node runtime trust, M001-L19 added active hosted in-process pre-release rate limiting, M001-L20 added and proved durable shared Redis REST rate limiting on staging, M001-L21 drafted hosted data-policy truth, M001-L22 prepared the package/source posture decision brief, M001-L23 added the limited-client readiness plan, M001-L24 added the onboarding template plus a real Column Five Brandcode staging proof, M001-L25 proved the Column Five client-config dry run through Claude Code using a Jason-approved staging-only generate-and-run key flow, M001-L26 added the limited-client key operations runbook, M001-L27 added the limited-client support intake ledger, M001-L28 prepared the deletion/export launch decision brief, M001-L29 added the limited-client go/no-go checklist, M001-L30 applied that checklist to the current Column Five Brandcode staging route, M001-L31 drafted the reusable limited-client handoff packet, and M001-L32 partially repaired production route/env readiness. M001-L31 is pushed and CI-green at `d0e06b3`. The next 1.5 sprint operational roadmap is now `specs/brandcode-mcp-operational-roadmap-m001-m003.md`. After Jason asked to generate the needed keys, M001-L30 generated fresh staging-only full/read keys, installed them as sensitive Vercel Preview env, deployed Ready Preview `dpl_4aQ9vVdsXC6SD5u7TMqXZKs4eCQC`, re-aliased staging to `https://brandsystem-pwnz9m3oy-column-five.vercel.app`, and proved hosted smoke green. Jason then authorized production proof/live-key testing for the `brandcode` slug. M001-L32 added the `mcp.brandcode.studio` production alias and Production `BRANDCODE_MCP_ENV=production`, but production proof remains blocked because external DNS still does not resolve and Production secret env still lacks `BRANDCODE_MCP_SERVICE_TOKEN`, durable shared rate-limit env, and the intentionally deferred live-key store. Jason approved the L28 pre-release deletion/export operating posture, while final public legal/subprocessor launch language remains blocked. Jason chose Option 4 for v0.1 limited-client posture: defer public `@brandcode/mcp` package/source distribution while improving the hosted Brandcode product for approved clients. Option 3 remains the likely future public direction. Jason does not want to release yet; release remains blocked on explicit approval and final launch-language review.
 
 ## Latest Build Work
+
+M001-L32 production route/env repair partially completed and blocked:
+
+- Added `mcp.brandcode.studio` to the linked `brandsystem-mcp` Vercel project.
+- `vercel alias ls` now shows
+  `brandsystem-az14haxle-column-five.vercel.app -> mcp.brandcode.studio`.
+- Added Production `BRANDCODE_MCP_ENV=production`.
+- `mcp.brandcode.studio` still does not resolve. Vercel reports external DNS
+  must set `A mcp.brandcode.studio 76.76.21.21`, or the domain nameservers
+  must move to Vercel.
+- Production still lacks `BRANDCODE_MCP_SERVICE_TOKEN` and durable shared
+  rate-limit env (`BRANDCODE_MCP_RATE_LIMIT_REDIS_REST_*`,
+  `UPSTASH_REDIS_REST_*`, or `KV_REST_API_*`).
+- Production `BRANDCODE_MCP_TEST_KEYS` remains intentionally unset until L33
+  generates scoped `bck_live_` keys.
+- Direct production deployment URL reaches the hosted app but returns a
+  misconfigured service-token response, not the app-level bearer gate.
+- No `bck_live_` keys were generated. No production smoke was run.
+- No next Ready lane remains because M001-L33 is blocked on external DNS and
+  Production secret env provisioning.
 
 Operational roadmap shaped:
 
@@ -42,11 +62,12 @@ M001-L31 completed the limited-client handoff packet:
   key/scope posture, tool expectations, custody expectations, smoke/proof bar,
   support/intake, rotation/offboarding, and a redacted Column Five Brandcode
   internal staging example.
-- The packet preserves the production proof truth: Jason authorized production
-  proof/live-key testing for the `brandcode` slug, but production proof is
-  blocked on `mcp.brandcode.studio` DNS/alias and missing Production env for
-  hosted MCP mode, live-key seed, service token, and durable shared rate
-  limits.
+- The packet preserved the production proof truth at the time: Jason
+  authorized production proof/live-key testing for the `brandcode` slug, but
+  production proof was blocked on `mcp.brandcode.studio` DNS/alias and missing
+  Production env for hosted MCP mode, live-key seed, service token, and durable
+  shared rate limits. M001-L32 later added the production alias and
+  `BRANDCODE_MCP_ENV=production`; DNS and secret env remain blocked.
 - No code changed. Verification was docs-only with `git diff --check`.
 - No release, npm publish, public MCP directory submission, public listing
   metadata change, hosted tool addition, selected-kit default behavior, custody
@@ -677,16 +698,14 @@ Latest hosted proof:
 
 ## Next Ready Lane
 
-Exactly one lane is Ready:
+No lane is Ready. M001-L33 Production Live-Key Smoke Proof is blocked until
+external DNS and Production secret env provisioning are complete.
 
-- `.claudex/packets/M001-L32-production-route-env-repair.md`
-- Convenience prompt:
-  `.claudex/prompts/M001-L32-production-route-env-repair.md`
-
-M001-L32 should repair route/env readiness only. `mcp.brandcode.studio` must
-resolve, a production alias must exist, and Production env must include hosted
-MCP mode, service token, durable shared rate-limit variables, and a production
-key-store path/name before any `bck_live_` key generation or production smoke.
+M001-L32 added the production alias and Production MCP mode, but
+`mcp.brandcode.studio` must resolve, Production env must include the hosted MCP
+service token and durable shared rate-limit variables, and a fresh Production
+deployment must reach the app-level bearer gate before any `bck_live_` key
+generation or production smoke.
 
 Public deletion/export launch language remains blocked until final
 legal/subprocessor review. No public SLA, self-serve deletion/export, or

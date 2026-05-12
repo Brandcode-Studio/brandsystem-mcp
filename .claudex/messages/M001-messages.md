@@ -1837,3 +1837,48 @@ Current Ready lane:
 The L32 lane must not generate `bck_live_` keys or run production smoke. It
 only repairs/records production route and env readiness so the following lane
 can run production proof safely.
+
+## 2026-05-12 - M001-L32 Production Route Env Repair Blocked
+
+M001-L32 partially repaired the production route/env baseline, then stopped
+before live-key proof.
+
+Repaired:
+
+- Added `mcp.brandcode.studio` to the linked `brandsystem-mcp` Vercel project.
+- `vercel alias ls` now shows
+  `brandsystem-az14haxle-column-five.vercel.app -> mcp.brandcode.studio`.
+- Added Production `BRANDCODE_MCP_ENV=production`.
+
+Still blocked:
+
+- `dig +short mcp.brandcode.studio` returns no records.
+- `curl https://mcp.brandcode.studio/brandcode` still fails with
+  `Could not resolve host: mcp.brandcode.studio`.
+- Vercel says external DNS must set `A mcp.brandcode.studio 76.76.21.21`, or
+  the domain nameservers must move to Vercel.
+- Production still lacks `BRANDCODE_MCP_SERVICE_TOKEN`.
+- Production still lacks durable shared rate-limit env:
+  `BRANDCODE_MCP_RATE_LIMIT_REDIS_REST_*`, `UPSTASH_REDIS_REST_*`, or
+  `KV_REST_API_*`.
+- Production `BRANDCODE_MCP_TEST_KEYS` remains intentionally unset until L33
+  generates scoped `bck_live_` keys.
+
+Verification:
+
+- `vercel domains add mcp.brandcode.studio` succeeded.
+- `vercel domains inspect mcp.brandcode.studio` reports domain configuration
+  action required at the third-party DNS provider.
+- `vercel env ls production` lists `BRANDCODE_MCP_ENV`, `MCP_LOG_LEVEL`,
+  `NODE_ENV`, and `UCS_API_BASE_URL`.
+- Direct production deployment URL reaches the hosted app but returns a
+  misconfigured service-token response, so it is not yet the bearer gate.
+
+No `bck_live_` keys were generated. No production smoke was run. No release,
+npm publish, public MCP directory submission, public listing metadata change,
+hosted tool addition, selected-kit default behavior, custody relaxation,
+production client handoff, self-serve deletion/export operation, public SLA,
+legal terms, or public release proof happened.
+
+No next Ready lane remains because M001-L33 is blocked on external DNS and
+Production secret env provisioning.
