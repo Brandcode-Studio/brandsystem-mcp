@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- **`capture_taste` + `run_research_recipe` inbound write-back tools.** The first tools that send signals *into* a connected Brandcode brand's review queue (vs. the read/extract/feedback tools). `capture_taste` captures an attribute-level taste judgment (candidate_ref + verdict + a required attribute_reason — refused if blank) and posts it to the UCS `/runtime/taste-capture` route. `run_research_recipe` takes findings the agent gathered (each a statement + source citations) and posts them to `/runtime/intelligence-capture`, where the UCS evidence bar queues sourced findings, refuses unsourced ones (never fabricates a citation), and escalates direction-changing findings to a named decision. Both resolve the connected brand (or an explicit `brand`), require a Studio session (`brand_brandcode_auth`), post under the user's bearer token, and **QUEUE candidates for human review — they never promote canon or add anything to the brand.** Shared resolve+auth in `brand-capture-context.ts`.
+
 ### Changed
 - **GitHub Actions Node 24 compatibility.** CI now tests Node 20, 22, and 24; publish and benchmark workflows run on Node 24; first-party GitHub actions were updated to Node 24 runtime majors.
 
