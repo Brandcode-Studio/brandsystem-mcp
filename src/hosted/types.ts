@@ -3,7 +3,7 @@
  */
 import type { BrandPackagePayload } from "../connectors/brandcode/types.js";
 
-export type BrandcodeMcpScope = "read" | "check" | "feedback";
+export type BrandcodeMcpScope = "read" | "check" | "feedback" | "capture";
 
 export interface BrandcodeMcpAuthInfo {
   /** Full bearer token (redact in logs). */

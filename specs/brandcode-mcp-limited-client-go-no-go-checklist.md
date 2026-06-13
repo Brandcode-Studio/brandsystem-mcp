@@ -60,8 +60,8 @@ Staging can be marked go only when all required items below are satisfied.
 | Service token | Hosted route has `BRANDCODE_MCP_SERVICE_TOKEN` configured for UCS calls. |  |
 | Durable rate limit | Hosted `brand_status.rate_limits.status` reports `active_durable_shared` for the handoff route. |  |
 | Smoke proof | `npm run smoke:hosted-mcp -- --json` passes for the client slug with `fail: 0`. |  |
-| Tool surface | `tools/list` returns the locked 8-tool order: `brand_runtime`, `brand_search`, `brand_check`, `brand_status`, `list_brand_assets`, `get_brand_asset`, `brand_feedback`, `brand_history`. |  |
-| Scope proof | Read-only key can call read tools and receives structured `insufficient_scope` for `brand_check` and `brand_feedback`. |  |
+| Tool surface | `tools/list` returns the locked hosted order: `brand_runtime`, `brand_search`, `brand_check`, `brand_status`, `list_brand_assets`, `get_brand_asset`, `brand_feedback`, `capture_taste`, `brand_history`. |  |
+| Scope proof | Read-only key can call read tools and receives structured `insufficient_scope` for `brand_check`, `brand_feedback`, and `capture_taste`. |  |
 | Asset custody | Required assets are package-safe, or a named asset-custody blocker is accepted before handoff. No raw private/provider URLs are exposed. |  |
 | Feedback posture | Feedback append is approved and proves `append_status: recorded`, or feedback is intentionally skipped with a named reason. |  |
 | Client config proof | At least one intended MCP client path is proven or the handoff is explicitly operator-only. |  |
@@ -112,7 +112,7 @@ accepted as a named blocker:
 - hosted route reports no durable shared rate-limit enforcement for client
   handoff;
 - hosted smoke fails or cannot run for the target brand/endpoint;
-- `tools/list` does not match the locked 8-tool surface;
+- `tools/list` does not match the locked hosted surface;
 - read-only scope proof does not return structured `insufficient_scope` for
   check/feedback tools;
 - a required asset exposes raw private/provider URLs, private Blob URLs,
@@ -171,7 +171,7 @@ an evergreen claim.
 | Service token | Pass. Authenticated `brand_history` returned scoped hosted MCP history shape and `brand_feedback` append returned `append_status: "recorded"`. |
 | Durable rate limit | Pass. Authenticated `brand_status` returned `rate_limits.status: "active_durable_shared"` and `enforcement: "durable_shared_redis_fixed_window"`. |
 | Smoke proof | Pass. Hosted smoke returned `ok: true`, `status: "pass"`, `fail: 0`, `blocked: 0`, and `skipped: 0` at `2026-05-12T02:25:44.680Z`. |
-| Tool surface | Pass. `tools/list` returned the locked 8-tool order. |
+| Tool surface | Pass. `tools/list` returned the locked hosted order. |
 | Scope proof | Pass. Read-only key returned structured `insufficient_scope` payloads with status `403` for `brand_check` and `brand_feedback`. |
 | Asset custody | Pass. `get_brand_asset` for `brandcode:logo:c5-logomark-red.svg` returned package-safe custody, `safe_for_mcp: true`, and no raw private/provider URL exposure. |
 | Feedback posture | Pass. `brand_feedback` append returned `append_status: "recorded"`. |

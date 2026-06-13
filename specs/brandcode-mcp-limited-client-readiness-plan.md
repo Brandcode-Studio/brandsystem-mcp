@@ -140,13 +140,14 @@ Jason approves production access for that client/brand.
 Minimum acceptance:
 
 - MCP initialize succeeds for the brand-scoped route.
-- `tools/list` returns the locked 8-tool order:
+- `tools/list` returns the locked hosted order:
   `brand_runtime`, `brand_search`, `brand_check`, `brand_status`,
-  `list_brand_assets`, `get_brand_asset`, `brand_feedback`, `brand_history`.
+  `list_brand_assets`, `get_brand_asset`, `brand_feedback`, `capture_taste`,
+  `brand_history`.
 - `brand_status` reports the expected brand slug and rate-limit posture.
 - Read key can call read-scope tools.
-- Read-only key receives structured `insufficient_scope` for `brand_check` and
-  `brand_feedback`.
+- Read-only key receives structured `insufficient_scope` for `brand_check`,
+  `brand_feedback`, and `capture_taste`.
 - Full or approved scoped key can call `brand_check` when check scope is
   present.
 - Feedback append is either recorded with `append_status: recorded` or skipped

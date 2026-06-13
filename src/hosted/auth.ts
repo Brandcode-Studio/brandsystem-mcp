@@ -50,6 +50,7 @@ export const TOOL_SCOPE_REQUIREMENTS: Record<string, BrandcodeMcpScope> = {
   brand_history: "read",
   brand_check: "check",
   brand_feedback: "feedback",
+  capture_taste: "capture",
 };
 
 export function toolHasScope(
@@ -62,8 +63,11 @@ export function toolHasScope(
   if (required === "check") {
     return scopes.includes("check");
   }
-  // feedback: must have feedback explicitly; read alone is insufficient
-  return scopes.includes("feedback");
+  if (required === "feedback") {
+    return scopes.includes("feedback");
+  }
+  // capture is the hosted contribute tier; read/check/feedback are insufficient.
+  return scopes.includes("capture");
 }
 
 export function tokenEnvironment(
@@ -106,7 +110,12 @@ export function buildDefaultValidator(environment: "staging" | "production") {
       if (slug) slugs.add(slug);
       for (const scope of (scopeCsv ?? "").split(",")) {
         const trimmed = scope.trim() as BrandcodeMcpScope;
-        if (trimmed === "read" || trimmed === "check" || trimmed === "feedback") {
+        if (
+          trimmed === "read" ||
+          trimmed === "check" ||
+          trimmed === "feedback" ||
+          trimmed === "capture"
+        ) {
           scopes.add(trimmed);
         }
       }

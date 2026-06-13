@@ -98,6 +98,7 @@ describe("brand_brandcode_status tool", () => {
       "list_brand_assets",
       "get_brand_asset",
       "brand_feedback",
+      "capture_taste",
       "brand_history",
     ]);
     await cleanup();

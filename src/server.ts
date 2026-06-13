@@ -46,8 +46,6 @@ import { register as registerBrandcodeLive } from "./tools/brand-brandcode-live.
 import { register as registerRepoConnect } from "./tools/brand-repo-connect.js";
 import { register as registerRepoStatus } from "./tools/brand-repo-status.js";
 import { register as registerEnrichSkill } from "./tools/brand-enrich-skill.js";
-import { register as registerCaptureTaste } from "./tools/brand-capture-taste.js";
-import { register as registerRunResearchRecipe } from "./tools/brand-run-research-recipe.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -115,8 +113,6 @@ export function createServer(): McpServer {
   registerExport(server);      // Generate portable brand files
   registerEnrichSkill(server); // Enrich an auto-SKILL.md against .brand/governance/
   registerFeedback(server);    // Bug reports + feature ideas
-  registerCaptureTaste(server);        // Capture attribute-level taste → brand review queue
-  registerRunResearchRecipe(server);   // Run a research recipe → intelligence candidates in review queue
 
   // ── Resources (read-only, subscribable brand data) ──
   const brandDir = new BrandDir(process.cwd());

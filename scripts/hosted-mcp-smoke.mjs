@@ -10,6 +10,7 @@ const LOCKED_TOOL_ORDER = [
   "list_brand_assets",
   "get_brand_asset",
   "brand_feedback",
+  "capture_taste",
   "brand_history",
 ];
 
@@ -295,8 +296,8 @@ async function run() {
         "tools/list locked order",
         matches ? "pass" : "fail",
         matches
-          ? "tools/list returned the locked 8-tool surface in Phase 0 order"
-          : "tools/list drifted from the locked 8-tool Phase 0 order",
+          ? "tools/list returned the locked hosted surface order"
+          : "tools/list drifted from the locked hosted surface order",
         { expected: LOCKED_TOOL_ORDER, actual: names },
       ),
     );
@@ -517,6 +518,15 @@ async function run() {
         "brand_feedback",
         "feedback",
         { summary: "Read-only key should be blocked." },
+      ],
+      [
+        "capture_taste",
+        "capture",
+        {
+          candidate_ref: "smoke-read-only",
+          verdict: "generic",
+          attribute_reason: "Read-only key should be blocked before capture.",
+        },
       ],
     ]) {
       const payload = await callTool(readConnection.client, toolName, toolArgs);

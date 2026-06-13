@@ -1,5 +1,5 @@
 /**
- * Register the 8-tool hosted surface onto an McpServer scoped to a single
+ * Register the hosted surface onto an McpServer scoped to a single
  * brand context. Registration order matches the Phase 0 lock table so clients
  * see tools in a stable, documented sequence.
  *
@@ -16,6 +16,7 @@ import { registerCheck } from "./tools/check.js";
 import { registerStatus } from "./tools/status.js";
 import { registerGetAsset, registerListAssets } from "./tools/assets.js";
 import { registerFeedback } from "./tools/feedback.js";
+import { registerCaptureTaste } from "./tools/capture-taste.js";
 import { registerHistory } from "./tools/history.js";
 
 export const HOSTED_TOOL_ORDER = [
@@ -26,6 +27,7 @@ export const HOSTED_TOOL_ORDER = [
   "list_brand_assets",
   "get_brand_asset",
   "brand_feedback",
+  "capture_taste",
   "brand_history",
 ] as const;
 
@@ -41,5 +43,6 @@ export function registerHostedTools(
   registerListAssets(server, context);
   registerGetAsset(server, context);
   registerFeedback(server, context);
+  registerCaptureTaste(server, context);
   registerHistory(server, context);
 }

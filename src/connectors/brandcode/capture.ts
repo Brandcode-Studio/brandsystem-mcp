@@ -7,8 +7,9 @@
  *   POST /api/brand/{slug}/runtime/intelligence-capture
  *
  * These routes QUEUE candidates for human review in the brand's refinery — they
- * never promote to canon. This client carries the user's session bearer token;
- * the route enforces brand-runtime authority and refuses before any write.
+ * never promote to canon. This client carries either a hosted MCP service token
+ * or a signed-in user's session bearer token; the route enforces brand-runtime
+ * authority and refuses before any write.
  */
 
 import { BrandcodeClientError } from "./client.js";

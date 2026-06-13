@@ -15,6 +15,7 @@ const BRANDCODE_MCP_TOOL_SURFACE = [
   "list_brand_assets",
   "get_brand_asset",
   "brand_feedback",
+  "capture_taste",
   "brand_history",
 ] as const;
 
@@ -58,7 +59,7 @@ async function handler() {
     "── Brandcode MCP ─────────────────────",
     "Status:      Phase 0 locked; staging prototype next",
     `URL:         ${brandcodeMcpUrl}`,
-    `Tools:       ${BRANDCODE_MCP_TOOL_SURFACE.length} read/append-only tools`,
+    `Tools:       ${BRANDCODE_MCP_TOOL_SURFACE.length} scoped hosted tools`,
   ];
 
   if (lastEvent) {

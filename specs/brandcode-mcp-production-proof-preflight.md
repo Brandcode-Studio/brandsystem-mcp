@@ -67,7 +67,7 @@ Before generating `bck_live_` keys or running production smoke:
 Production proof must show:
 
 - `ok: true`, `status: "pass"`, `fail: 0`;
-- locked 8-tool order;
+- locked hosted tool order;
 - `brand_status.rate_limits.status: "active_durable_shared"`;
 - package-safe `get_brand_asset` custody for
   `brandcode:logo:c5-logomark-red.svg`;

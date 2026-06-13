@@ -21,7 +21,7 @@ import type {
 interface ToolImplementationEntry {
   tool: string;
   implementation: "real" | "stub";
-  write_behavior: "read-only" | "append-only";
+  write_behavior: "read-only" | "append-only" | "review-queue";
 }
 
 const TOOL_IMPLEMENTATION_MATRIX: ToolImplementationEntry[] = [
@@ -32,6 +32,7 @@ const TOOL_IMPLEMENTATION_MATRIX: ToolImplementationEntry[] = [
   { tool: "list_brand_assets", implementation: "real", write_behavior: "read-only" },
   { tool: "get_brand_asset", implementation: "real", write_behavior: "read-only" },
   { tool: "brand_feedback", implementation: "real", write_behavior: "append-only" },
+  { tool: "capture_taste", implementation: "real", write_behavior: "review-queue" },
   { tool: "brand_history", implementation: "real", write_behavior: "read-only" },
 ];
 

@@ -71,6 +71,11 @@ describe("toolHasScope", () => {
     expect(toolHasScope("brand_feedback", ["read", "check"])).toBe(false);
     expect(toolHasScope("brand_feedback", ["feedback"])).toBe(true);
   });
+  it("capture tools require explicit capture scope", () => {
+    expect(toolHasScope("capture_taste", ["read"])).toBe(false);
+    expect(toolHasScope("capture_taste", ["feedback"])).toBe(false);
+    expect(toolHasScope("capture_taste", ["capture"])).toBe(true);
+  });
   it("unknown tool rejects", () => {
     expect(toolHasScope("nonexistent_tool", ["read"])).toBe(false);
   });
@@ -81,7 +86,7 @@ describe("toolHasScope", () => {
       [...HOSTED_TOOL_ORDER].sort(),
     );
 
-    const matrix = (scopes: Array<"read" | "check" | "feedback">) =>
+    const matrix = (scopes: Array<"read" | "check" | "feedback" | "capture">) =>
       Object.fromEntries(
         tools.map((tool) => [tool, toolHasScope(tool, scopes)]),
       );
@@ -95,6 +100,7 @@ describe("toolHasScope", () => {
       brand_history: true,
       brand_check: false,
       brand_feedback: false,
+      capture_taste: false,
     });
     expect(matrix(["check"])).toEqual({
       brand_runtime: false,
@@ -105,6 +111,7 @@ describe("toolHasScope", () => {
       brand_history: false,
       brand_check: true,
       brand_feedback: false,
+      capture_taste: false,
     });
     expect(matrix(["feedback"])).toEqual({
       brand_runtime: false,
@@ -115,8 +122,20 @@ describe("toolHasScope", () => {
       brand_history: false,
       brand_check: false,
       brand_feedback: true,
+      capture_taste: false,
     });
-    expect(matrix(["read", "check", "feedback"])).toEqual({
+    expect(matrix(["capture"])).toEqual({
+      brand_runtime: false,
+      brand_search: false,
+      brand_status: false,
+      list_brand_assets: false,
+      get_brand_asset: false,
+      brand_history: false,
+      brand_check: false,
+      brand_feedback: false,
+      capture_taste: true,
+    });
+    expect(matrix(["read", "check", "feedback", "capture"])).toEqual({
       brand_runtime: true,
       brand_search: true,
       brand_status: true,
@@ -125,6 +144,7 @@ describe("toolHasScope", () => {
       brand_history: true,
       brand_check: true,
       brand_feedback: true,
+      capture_taste: true,
     });
   });
 });
@@ -211,7 +231,7 @@ describe("buildDefaultValidator (env-seeded staging keys)", () => {
 
   beforeEach(() => {
     process.env.BRANDCODE_MCP_TEST_KEYS =
-      "bck_test_primary:acme:read,check,feedback|bck_test_primary:pendium:read|bck_test_readonly:acme:read|bck_live_primary:acme:read,check,feedback";
+      "bck_test_primary:acme:read,check,feedback,capture|bck_test_primary:pendium:read|bck_test_readonly:acme:read|bck_live_primary:acme:read,check,feedback,capture";
   });
 
   afterEach(() => {
@@ -227,7 +247,7 @@ describe("buildDefaultValidator (env-seeded staging keys)", () => {
     const info = await v("bck_test_primary");
     expect(info).not.toBeNull();
     expect(info!.allowedSlugs.sort()).toEqual(["acme", "pendium"]);
-    expect(info!.scopes.sort()).toEqual(["check", "feedback", "read"]);
+    expect(info!.scopes.sort()).toEqual(["capture", "check", "feedback", "read"]);
   });
 
   it("rejects tokens whose prefix mismatches environment", async () => {
@@ -243,7 +263,7 @@ describe("buildDefaultValidator (env-seeded staging keys)", () => {
     expect(info).toMatchObject({
       allowedSlugs: ["acme"],
       environment: "production",
-      scopes: ["read", "check", "feedback"],
+      scopes: ["read", "check", "feedback", "capture"],
     });
   });
 

@@ -98,7 +98,7 @@ beforeEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("hosted server registers all 8 tools in locked order", () => {
+describe("hosted server registers the locked hosted tools in order", () => {
   it("listTools returns the Phase 0 locked surface", async () => {
     const { client } = await connectClient(buildContext(null));
     const { tools } = await client.listTools();
@@ -203,6 +203,184 @@ describe("hosted tool scope enforcement", () => {
     });
     expect(json.append_status).toBe("recorded");
     expect(json.canonical_mutation).toBe(false);
+  });
+
+  it("capture_taste requires explicit capture scope", async () => {
+    const readOnly = await connectClient(buildContext(null));
+    const denied = await call(readOnly.client, "capture_taste", {
+      candidate_ref: "variant-851",
+      verdict: "distinctive",
+      attribute_reason: "The asymmetric crop reads as ours.",
+    });
+    expect(denied.error).toBe("insufficient_scope");
+    expect(denied.status).toBe(403);
+    expect(denied.required_scope).toBe("capture");
+
+    const auth = buildAuth({ scopes: ["capture"] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            routed: "queued",
+            ref: "taste-ledger:edge-capture",
+            quarantined: false,
+            canonicalMutation: false,
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      ),
+    );
+    const allowed = await connectClient(buildContext(null, { auth }));
+    const json = await call(allowed.client, "capture_taste", {
+      candidate_ref: "variant-851",
+      verdict: "distinctive",
+      attribute_reason: "The asymmetric crop reads as ours.",
+    });
+    expect(json).toMatchObject({
+      captured: true,
+      routed: "queued",
+      brand: "acme",
+      canonical_mutation: false,
+    });
+  });
+});
+
+describe("capture_taste (hosted)", () => {
+  const captureAuth = buildAuth({ scopes: ["capture"] });
+
+  function stubCaptureResponse(body: unknown, init: ResponseInit = {}) {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(body), {
+        status: init.status ?? 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("queues a taste capture with hosted service authority and route-scoped brand", async () => {
+    const fetchMock = stubCaptureResponse({
+      ok: true,
+      routed: "queued",
+      ref: "taste-ledger:edge-capture",
+      quarantined: false,
+      canonicalMutation: false,
+    });
+    const { client } = await connectClient(
+      buildContext(null, { auth: captureAuth }),
+    );
+
+    const json = await call(client, "capture_taste", {
+      candidate_ref: "variant-851",
+      verdict: "distinctive",
+      attribute_reason: "The asymmetric crop and editorial caption read as ours.",
+      candidate_text: "Hero candidate with caption",
+      surface: "studio",
+    });
+
+    expect(json).toMatchObject({
+      captured: true,
+      routed: "queued",
+      brand: "acme",
+      candidate_ref: "variant-851",
+      verdict: "distinctive",
+      canonical_mutation: false,
+      ref: "taste-ledger:edge-capture",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe(
+      "https://www.brandcode.studio/api/brand/acme/runtime/taste-capture",
+    );
+    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).headers).toMatchObject({
+      authorization: "Bearer test-token",
+      "content-type": "application/json",
+    });
+
+    const body = JSON.parse(String((init as RequestInit).body)) as Record<
+      string,
+      unknown
+    >;
+    expect(body).toMatchObject({
+      candidateRef: "variant-851",
+      candidateText: "Hero candidate with caption",
+      verdict: "distinctive",
+      attributeReason: "The asymmetric crop and editorial caption read as ours.",
+      surface: "studio",
+      actor: "brandcode-mcp:bck_test_acme",
+    });
+    expect(body).not.toHaveProperty("brand");
+  });
+
+  it("refuses blank attribute reasons before reaching UCS", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = await connectClient(
+      buildContext(null, { auth: captureAuth }),
+    );
+    const result = await client.callTool({
+      name: "capture_taste",
+      arguments: {
+        candidate_ref: "variant-852",
+        verdict: "generic",
+        attribute_reason: "",
+      },
+    });
+    const content = result.content as Array<{ type: string; text: string }>;
+
+    expect(content[0].text).toContain("MCP error");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("maps UCS authority failures to a hosted service-token configuration error", async () => {
+    stubCaptureResponse({ error: "authority required" }, { status: 401 });
+    const { client } = await connectClient(
+      buildContext(null, { auth: captureAuth }),
+    );
+    const json = await call(client, "capture_taste", {
+      candidate_ref: "variant-853",
+      verdict: "flag",
+      attribute_reason: "The pattern is promising but needs human review.",
+    });
+
+    expect(json).toMatchObject({
+      error: "ucs_auth",
+      status: 502,
+      upstream_status: 401,
+      brand: "acme",
+      canonical_mutation: false,
+    });
+  });
+
+  it("returns route refusals without claiming a capture", async () => {
+    stubCaptureResponse(
+      { ok: false, code: "missing_reason", message: "attributeReason required" },
+      { status: 200 },
+    );
+    const { client } = await connectClient(
+      buildContext(null, { auth: captureAuth }),
+    );
+    const json = await call(client, "capture_taste", {
+      candidate_ref: "variant-854",
+      verdict: "distinctive",
+      attribute_reason: "Specific enough for the local schema.",
+    });
+
+    expect(json).toMatchObject({
+      error: "missing_reason",
+      brand: "acme",
+      candidate_ref: "variant-854",
+      canonical_mutation: false,
+    });
+    expect(json.captured).not.toBe(true);
   });
 });
 
@@ -1293,6 +1471,7 @@ describe("brand_status (hosted)", () => {
       ["list_brand_assets", "real"],
       ["get_brand_asset", "real"],
       ["brand_feedback", "real"],
+      ["capture_taste", "real"],
       ["brand_history", "real"],
     ]);
 
@@ -1306,6 +1485,9 @@ describe("brand_status (hosted)", () => {
     expect(
       scopeMatrix.find((tool) => tool.tool === "brand_feedback"),
     ).toMatchObject({ required_scope: "feedback", granted: false });
+    expect(
+      scopeMatrix.find((tool) => tool.tool === "capture_taste"),
+    ).toMatchObject({ required_scope: "capture", granted: false });
 
     const availability = json.capability_availability as Record<
       string,
