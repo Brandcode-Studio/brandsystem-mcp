@@ -432,7 +432,7 @@ describe("brand_feedback (hosted)", () => {
     expect(run.id).toMatch(/^mcp-feedback-observation-/);
     expect(run.provider).toBeUndefined();
     expect(run.status).toBe("completed");
-    expect(run.surface).toBe("runtime");
+    expect(run.surface).toBe("mcp-hosted");
     expect(run.taskPreset).toBe("mcp_feedback_observation");
     expect(run.resultSummary).toBe("Search result needs clearer provenance");
     expect(run.receiptIds).toHaveLength(1);
@@ -440,7 +440,7 @@ describe("brand_feedback (hosted)", () => {
     const context = run.context as Record<string, unknown>;
     expect(context).toMatchObject({
       brandSlug: "acme",
-      surface: "runtime",
+      surface: "mcp-hosted",
       surfaceId: "mcp-hosted",
       freshnessState: "live",
     });
@@ -1391,7 +1391,9 @@ describe("brand_history (hosted)", () => {
     const [url, init] = fetchMock.mock.calls[0];
     const requestedUrl = new URL(String(url));
     expect(requestedUrl.pathname).toBe("/api/brand/hosted/acme/agent/history");
-    expect(requestedUrl.searchParams.get("provider")).toBe("mcp");
+    // provider=mcp is intentionally not sent — UCS models provider as the
+    // downstream model, not the transport; surface is the discriminator.
+    expect(requestedUrl.searchParams.has("provider")).toBe(false);
     expect(requestedUrl.searchParams.get("surface")).toBe("mcp-hosted");
     expect(requestedUrl.searchParams.get("limit")).toBe("10");
     expect(requestedUrl.searchParams.has("cursor")).toBe(false);

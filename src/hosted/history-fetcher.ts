@@ -36,7 +36,10 @@ export async function fetchHostedAgentHistory(
     `/api/brand/hosted/${encodeURIComponent(opts.slug)}/agent/history`,
     opts.ucsBaseUrl,
   );
-  url.searchParams.set("provider", "mcp");
+  // Filter by the first-class `mcp-hosted` surface (UCS AgentSupportSurface).
+  // We intentionally do NOT send provider=mcp: UCS models provider as the
+  // downstream model (openai|claude|gemini), not the transport, so an "mcp"
+  // provider filter matches nothing. Surface is the correct discriminator.
   url.searchParams.set("surface", "mcp-hosted");
   url.searchParams.set("limit", String(opts.limit));
 
