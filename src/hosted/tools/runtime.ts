@@ -11,6 +11,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../../lib/response.js";
 import { ERROR_CODES } from "../../types/index.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
+import type { BrandInstancePayload } from "../../connectors/brandcode/knowledge-types.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
@@ -87,13 +88,19 @@ function pickString(...candidates: unknown[]): string {
  *   - version             ← pkg.runtimeVersion or manifest.brandcodeVersion
  *   - client_name         ← manifest.name, tokens.brandName, or slug
  *
- * visual/voice/strategy stay null until richer mappings land alongside the
- * real brand_check / brand_search implementations in Milestone B.
+ * voice  ← brandInstance.verbalIdentity + perspective + brandPhrases
+ * strategy ← brandInstance.narratives + applicationRules + proofPoints +
+ *            strategyMoves (governance summaries)
+ *
+ * visual stays null: the hosted brandInstance carries identity tokens (mapped
+ * above) but not the composition/anti-pattern structures the local compiler's
+ * RuntimeVisual models, so there is nothing honest to populate it with yet.
  */
 function normalizeBrandInstance(
   pkg: Record<string, unknown>,
   instance: Record<string, unknown>,
 ): Record<string, unknown> {
+  const inst = instance as BrandInstancePayload;
   const tokens = instance.tokens as Record<string, unknown> | undefined;
   const fonts = instance.fonts as Record<string, unknown> | undefined;
   const assets = instance.assets as unknown[] | undefined;
@@ -125,8 +132,94 @@ function normalizeBrandInstance(
       logo,
     },
     visual: null,
-    voice: null,
-    strategy: null,
+    voice: pickVoice(inst),
+    strategy: pickStrategy(inst),
+  };
+}
+
+const PROSE_LIMIT = 1500;
+const ARRAY_LIMIT = 20;
+
+function trimProse(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text) return null;
+  return text.length > PROSE_LIMIT ? `${text.slice(0, PROSE_LIMIT).trimEnd()}...` : text;
+}
+
+/** Voice slice from the hosted governance model: prose verbal identity +
+ *  perspective + deployable brand phrases. Null when none are present. */
+function pickVoice(inst: BrandInstancePayload): Record<string, unknown> | null {
+  const verbalIdentity = trimProse(inst.verbalIdentity);
+  const perspective = trimProse(inst.perspective);
+  const phrasesRaw = Array.isArray(inst.brandPhrases) ? inst.brandPhrases : [];
+  const brandPhrases = phrasesRaw
+    .filter((p) => p && typeof p.phrase === "string" && p.phrase.trim().length > 0)
+    .slice(0, ARRAY_LIMIT)
+    .map((p) => ({
+      phrase: p.phrase,
+      usage: typeof p.usage === "string" ? p.usage : undefined,
+      deploy_verbatim: p.deploy_verbatim === true,
+    }));
+
+  if (!verbalIdentity && !perspective && brandPhrases.length === 0) return null;
+  return {
+    verbal_identity: verbalIdentity,
+    perspective,
+    brand_phrases: brandPhrases,
+    brand_phrase_total: phrasesRaw.length,
+  };
+}
+
+/** Strategy slice from the hosted governance model: narratives, application
+ *  rules, proof points, and strategy moves — summarized for context injection. */
+function pickStrategy(inst: BrandInstancePayload): Record<string, unknown> | null {
+  const narrativesRaw = Array.isArray(inst.narratives) ? inst.narratives : [];
+  const rulesRaw = Array.isArray(inst.applicationRules) ? inst.applicationRules : [];
+  const proofRaw = Array.isArray(inst.proofPoints) ? inst.proofPoints : [];
+  const movesRaw = Array.isArray(inst.strategyMoves) ? inst.strategyMoves : [];
+
+  if (
+    narrativesRaw.length === 0 &&
+    rulesRaw.length === 0 &&
+    proofRaw.length === 0 &&
+    movesRaw.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    narratives: narrativesRaw.slice(0, ARRAY_LIMIT).map((n) => ({
+      id: n.id,
+      name: n.name,
+      status: n.status,
+      type: n.type,
+    })),
+    application_rules: rulesRaw.slice(0, ARRAY_LIMIT).map((r) => ({
+      id: r.id,
+      content_type: r.content_type,
+      framework: r.framework,
+      touchpoint: r.touchpoint,
+      journey_stage: r.journey_stage,
+    })),
+    proof_points: proofRaw.slice(0, ARRAY_LIMIT).map((p) => ({
+      id: p.id,
+      claim: p.claim,
+      tier: p.tier,
+      status: p.status,
+    })),
+    strategy_moves: movesRaw.slice(0, ARRAY_LIMIT).map((m) => ({
+      move: m.move,
+      name: m.name,
+      status: m.status,
+      timeline: m.timeline,
+    })),
+    counts: {
+      narratives: narrativesRaw.length,
+      application_rules: rulesRaw.length,
+      proof_points: proofRaw.length,
+      strategy_moves: movesRaw.length,
+    },
   };
 }
 

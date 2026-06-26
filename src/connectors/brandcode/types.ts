@@ -1,7 +1,18 @@
 /**
  * Types matching the Brandcode Studio hosted brand API contract.
  * Contract version: 2026-04-05-connect
+ *
+ * The knowledge/retrieval contract carried inside the pull package lives in
+ * ./knowledge-types and is re-exported here for a single connector entry point.
  */
+
+import type {
+  BrandInstancePayload,
+  BrandKnowledgeCorpus,
+  BrandRetrievalManifest,
+} from "./knowledge-types.js";
+
+export * from "./knowledge-types.js";
 
 // ---------------------------------------------------------------------------
 // URL Resolution
@@ -132,9 +143,25 @@ export interface HostedBrandDelta {
   } | null;
 }
 
-/** The full brand package payload from a pull. Kept as a loose record
- *  so the MCP side stays decoupled from the full UCS type graph. */
-export type BrandPackagePayload = Record<string, unknown>;
+/** The full brand package payload from a pull. Typed-but-open: the known
+ *  fields the hosted tools consume are modeled (see knowledge-types.ts for the
+ *  knowledge/retrieval contract), while the index signature keeps the MCP
+ *  decoupled from the full UCS type graph and tolerant of new/unknown fields. */
+export interface BrandPackagePayload {
+  slug?: string;
+  runtimeVersion?: string;
+  runtime?: Record<string, unknown>;
+  identity?: Record<string, unknown>;
+  brandInstance?: BrandInstancePayload;
+  /** Prebuilt retrieval corpus UCS ships in the compiled package. */
+  brandKnowledgeCorpus?: BrandKnowledgeCorpus;
+  /** Retrieval coverage/confidence/blind-spot manifest, paired with the corpus. */
+  retrievalManifest?: BrandRetrievalManifest;
+  brandGraph?: Record<string, unknown>;
+  brandData?: Record<string, unknown>;
+  interactionPolicy?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 export interface PullResult {
   contractVersion: string;

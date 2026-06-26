@@ -854,6 +854,241 @@ describe("brand_search (hosted)", () => {
     expect(json.hits).toEqual([]);
     expect(json.searched_documents).toBe(0);
   });
+
+  it("tags the keyword fallback engine when no corpus is present", async () => {
+    const { client } = await connectClient(buildContext(SEARCH_PACKAGE));
+    const json = await call(client, "brand_search", { query: "governed AI" });
+    expect(json.retrieval_engine).toBe("keyword_fallback");
+  });
+});
+
+describe("brand_search corpus retrieval (hosted)", () => {
+  const CORPUS_PACKAGE: BrandPackagePayload = {
+    slug: "acme",
+    runtimeVersion: "2026-06-20",
+    brandKnowledgeCorpus: {
+      brandSlug: "acme",
+      runtimeVersion: "2026-06-20",
+      generatedAt: "2026-06-20T00:00:00.000Z",
+      documents: [
+        {
+          id: "proof:claim-001",
+          sourceKind: "proof_point",
+          title: "91% of teams need governed AI",
+          text: "Survey shows 91% of teams need governed AI before shipping.",
+          tags: ["Active", "Primary"],
+          facets: { sourceClass: "governance", approvalState: "approved" },
+          lineage: {
+            sourcePath: "governance/valid-proof-points.yaml",
+            sourceId: "claim-001",
+            sourceType: "governance",
+            confidence: "high",
+          },
+          freshness: { generatedAt: "2026-06-20T00:00:00.000Z" },
+        },
+        {
+          id: "narrative:nl-001",
+          sourceKind: "narrative",
+          title: "Flagship narrative",
+          text: "Acme helps teams ship governed AI work with confidence.",
+          tags: ["Active"],
+          facets: { sourceClass: "doctrine", approvalState: "approved" },
+          lineage: {
+            sourcePath: "governance/narrative-library.yaml",
+            sourceId: "nl-001",
+            sourceType: "governance",
+            confidence: "high",
+          },
+          freshness: { generatedAt: "2026-06-20T00:00:00.000Z" },
+        },
+        {
+          id: "asset:hero-1",
+          sourceKind: "asset_metadata",
+          title: "Runtime hero",
+          text: "hero illustration governed",
+          tags: ["illustration"],
+          facets: { sourceClass: "asset_metadata", approvalState: "approved" },
+          lineage: { sourceId: "hero-1", sourceType: "asset", confidence: "medium" },
+          freshness: { generatedAt: "2026-06-20T00:00:00.000Z" },
+        },
+      ],
+      summary: {
+        documentCount: 3,
+        bySourceKind: { proof_point: 1, narrative: 1, asset_metadata: 1 },
+      },
+    },
+    retrievalManifest: {
+      brandSlug: "acme",
+      runtimeVersion: "2026-06-20",
+      sourceCoverage: [
+        { sourceClass: "governance", status: "indexed", documentCount: 1 },
+        { sourceClass: "doctrine", status: "indexed", documentCount: 1 },
+        { sourceClass: "asset_metadata", status: "indexed", documentCount: 1 },
+        { sourceClass: "ocr", status: "missing", documentCount: 0 },
+      ],
+      confidenceSummary: { high: 2, medium: 1, low: 0 },
+      knownBlindSpots: ["Image and slide OCR is not searchable yet."],
+      warnings: [],
+    },
+  };
+
+  it("ranks the prebuilt knowledge corpus with provenance and confidence", async () => {
+    const { client } = await connectClient(buildContext(CORPUS_PACKAGE));
+    const json = await call(client, "brand_search", {
+      query: "governed AI proof",
+      mode: "fact_lookup",
+    });
+    expect(json.retrieval_engine).toBe("knowledge_corpus");
+    expect(json.retrieval_mode).toBe("fact_lookup");
+    const hits = json.hits as Array<Record<string, unknown>>;
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0]).toMatchObject({
+      id: "proof:claim-001",
+      source_kind: "proof_point",
+      source_class: "governance",
+      confidence: "high",
+      citation: "governance/valid-proof-points.yaml#claim-001",
+    });
+    expect(json.confidence_summary as Record<string, unknown>).toMatchObject({
+      high: expect.any(Number),
+    });
+    expect(Array.isArray(json.coverage)).toBe(true);
+    expect(json.blind_spots).toEqual(
+      expect.arrayContaining(["Image and slide OCR is not searchable yet."]),
+    );
+  });
+
+  it("scopes by query mode — doctrine_retrieval favors narratives and excludes proof-only kinds", async () => {
+    const { client } = await connectClient(buildContext(CORPUS_PACKAGE));
+    const json = await call(client, "brand_search", {
+      query: "governed AI",
+      mode: "doctrine_retrieval",
+    });
+    const hits = json.hits as Array<Record<string, unknown>>;
+    const kinds = hits.map((hit) => hit.source_kind);
+    expect(kinds).toContain("narrative");
+    expect(kinds).not.toContain("proof_point");
+  });
+
+  it("redacts URL-like citations and stays custody-safe", async () => {
+    const pkg = JSON.parse(JSON.stringify(CORPUS_PACKAGE)) as BrandPackagePayload;
+    const doc = (pkg.brandKnowledgeCorpus!.documents[0].lineage as Record<string, unknown>);
+    doc.sourcePath = "https://private-provider.example/raw";
+    const { client } = await connectClient(buildContext(pkg));
+    const json = await call(client, "brand_search", {
+      query: "governed",
+      mode: "fact_lookup",
+    });
+    expect(JSON.stringify(json)).not.toContain("private-provider.example");
+    expect(json.custody_safe).toBe(true);
+  });
+});
+
+describe("brand_runtime voice + strategy slices (hosted)", () => {
+  const GOV_PACKAGE: BrandPackagePayload = {
+    slug: "acme",
+    runtimeVersion: "2026-06-20",
+    brandInstance: {
+      manifest: { name: "Acme", brandcodeVersion: "2026-06-20" },
+      tokens: { colors: { primary: "#2563eb" }, brandName: "Acme" },
+      fonts: {
+        roles: {
+          display: { fontFamily: "Merriweather" },
+          body: { fontFamily: "Inter" },
+        },
+      },
+      assets: [],
+      verbalIdentity:
+        "Acme sounds confident, plain-spoken, and specific. We never hype.",
+      perspective: "Governed AI is the only durable way to scale brand work.",
+      brandPhrases: [
+        { phrase: "Governed AI, ready to ship", usage: "product CTAs", deploy_verbatim: true },
+      ],
+      narratives: [{ id: "nl-001", name: "Flagship", status: "Active", type: "Key Message" }],
+      applicationRules: [
+        {
+          id: "ar-001",
+          content_type: "Launch page",
+          framework: "Problem Guide Proof",
+          touchpoint: "web",
+          journey_stage: "Decision",
+        },
+      ],
+      proofPoints: [
+        { id: "claim-001", claim: "91% need governed AI", tier: "Primary", status: "Active" },
+      ],
+      strategyMoves: [
+        { move: 1, name: "Lead with governance", status: "Active", timeline: "Q3" },
+      ],
+    },
+  };
+
+  it("populates voice from verbal identity, perspective, and brand phrases", async () => {
+    const { client } = await connectClient(buildContext(GOV_PACKAGE));
+    const json = await call(client, "brand_runtime", { slice: "full" });
+    const runtime = json.runtime as Record<string, unknown>;
+    const voice = runtime.voice as Record<string, unknown>;
+    expect(voice.verbal_identity).toContain("confident");
+    expect(voice.perspective).toContain("Governed AI");
+    const phrases = voice.brand_phrases as Array<Record<string, unknown>>;
+    expect(phrases[0]).toMatchObject({
+      phrase: "Governed AI, ready to ship",
+      deploy_verbatim: true,
+    });
+  });
+
+  it("populates strategy from narratives, rules, proof points, and strategy moves", async () => {
+    const { client } = await connectClient(buildContext(GOV_PACKAGE));
+    const json = await call(client, "brand_runtime", { slice: "full" });
+    const runtime = json.runtime as Record<string, unknown>;
+    const strategy = runtime.strategy as Record<string, unknown>;
+    expect((strategy.narratives as Array<Record<string, unknown>>)[0]).toMatchObject({
+      id: "nl-001",
+      name: "Flagship",
+    });
+    expect((strategy.application_rules as Array<Record<string, unknown>>)[0]).toMatchObject({
+      id: "ar-001",
+      framework: "Problem Guide Proof",
+    });
+    expect((strategy.proof_points as Array<Record<string, unknown>>)[0]).toMatchObject({
+      id: "claim-001",
+      tier: "Primary",
+    });
+    expect((strategy.strategy_moves as Array<Record<string, unknown>>)[0]).toMatchObject({
+      move: 1,
+      name: "Lead with governance",
+    });
+    expect(strategy.counts as Record<string, unknown>).toMatchObject({
+      narratives: 1,
+      application_rules: 1,
+      proof_points: 1,
+      strategy_moves: 1,
+    });
+  });
+
+  it("voice slice carries voice + strategy", async () => {
+    const { client } = await connectClient(buildContext(GOV_PACKAGE));
+    const json = await call(client, "brand_runtime", { slice: "voice" });
+    const runtime = json.runtime as Record<string, unknown>;
+    expect(runtime.slice_type).toBe("voice");
+    expect(runtime.voice).toBeTruthy();
+    expect(runtime.strategy).toBeTruthy();
+  });
+
+  it("leaves voice/strategy null when the brand instance carries no governance", async () => {
+    const pkg: BrandPackagePayload = {
+      slug: "acme",
+      brandInstance: { tokens: { colors: { primary: "#000000" } }, fonts: {}, assets: [] },
+    };
+    const { client } = await connectClient(buildContext(pkg));
+    const json = await call(client, "brand_runtime", { slice: "full" });
+    const runtime = json.runtime as Record<string, unknown>;
+    expect(runtime.voice).toBeNull();
+    expect(runtime.strategy).toBeNull();
+    expect((runtime.identity as Record<string, unknown>).colors).toMatchObject({
+      primary: "#000000",
+    });
+  });
 });
 
 describe("hosted asset tools", () => {

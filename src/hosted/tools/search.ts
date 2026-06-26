@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../../lib/response.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
+import { queryBrandKnowledgeCorpus } from "../brand-retrieval.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
@@ -16,6 +17,18 @@ const paramsShape = {
   query: z
     .string()
     .describe("Natural-language query over hosted brand knowledge."),
+  mode: z
+    .enum([
+      "fact_lookup",
+      "doctrine_retrieval",
+      "asset_retrieval",
+      "evidence_retrieval",
+      "coverage_discovery",
+    ])
+    .optional()
+    .describe(
+      "Retrieval intent (matches UCS query modes). 'fact_lookup' (default) for proof points/stats/rules; 'doctrine_retrieval' for narratives/phrases/voice; 'asset_retrieval' for asset metadata; 'evidence_retrieval' for review evidence; 'coverage_discovery' to inspect what is and isn't indexed.",
+    ),
   limit: z
     .number()
     .int()
@@ -379,7 +392,7 @@ function rankDocs(
 export function registerSearch(server: McpServer, context: HostedBrandContext) {
   server.tool(
     "brand_search",
-    "Query narratives, proof points, application rules, and governed brand knowledge with provenance from the connected hosted brand. Read-only. Returns ranked hits with source labels and status.",
+    "Search the connected hosted brand's governed knowledge — narratives, proof points, application rules, brand phrases, stats, assets, and runtime-graph summaries — with provenance. Read-only. Ranks UCS's compiled knowledge corpus (same engine as Brand Console) and returns hits with citation, source_class, and confidence, plus coverage and blind_spots so answers can be hedged. Optional mode targets intent: fact_lookup, doctrine_retrieval, asset_retrieval, evidence_retrieval, coverage_discovery.",
     paramsShape,
     async (args) => {
       const scopeError = enforceToolScope("brand_search", context);
@@ -404,9 +417,74 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
         });
       }
 
-      const docs = collectDocs(pkg);
-      const hits = rankDocs(docs, parsed.data.query, parsed.data.limit);
       const trimmedQuery = parsed.data.query.trim();
+      const corpus = pkg?.brandKnowledgeCorpus;
+
+      // Primary path: rank UCS's prebuilt knowledge corpus with the same engine
+      // Brand Console uses — real provenance, confidence, coverage, blind spots.
+      if (corpus && Array.isArray(corpus.documents) && corpus.documents.length > 0) {
+        const result = queryBrandKnowledgeCorpus({
+          corpus,
+          manifest: pkg?.retrievalManifest ?? null,
+          query: {
+            text: trimmedQuery,
+            mode: parsed.data.mode,
+            topK: parsed.data.limit,
+          },
+        });
+        const hits = result.hits.map((hit) => ({
+          id: hit.id,
+          title: excerptFrom(hit.title),
+          source_kind: hit.sourceKind,
+          source_class: hit.sourceClass,
+          excerpt: excerptFrom(hit.excerpt),
+          score: hit.score,
+          confidence: hit.confidence,
+          approval_state: hit.approvalState,
+          citation: hit.citation ? stripUrls(hit.citation) : null,
+          reasons: hit.reasons,
+        }));
+
+        return buildResponse({
+          what_happened:
+            hits.length > 0
+              ? `Found ${hits.length} hosted brand knowledge hit${hits.length === 1 ? "" : "s"} for "${trimmedQuery}" (${result.query.mode})`
+              : trimmedQuery
+                ? `No hosted brand knowledge matched "${trimmedQuery}" (${result.query.mode})`
+                : "No hosted brand search query was provided",
+          next_steps:
+            hits.length > 0
+              ? [
+                  "Cite the citation, source_class, and confidence fields when applying this guidance",
+                  "Hedge low-confidence hits; check blind_spots for known gaps in coverage",
+                ]
+              : [
+                  "Try a different mode (doctrine_retrieval for voice/narratives, evidence_retrieval for proof)",
+                  "Check coverage and blind_spots — the gap may be unindexed rather than absent",
+                  "Call brand_runtime for compact runtime context when search has no match",
+                ],
+          data: {
+            query: trimmedQuery,
+            retrieval_engine: "knowledge_corpus",
+            retrieval_mode: result.query.mode,
+            hits,
+            total_hits: hits.length,
+            confidence_summary: result.confidenceSummary,
+            coverage: result.coverage,
+            blind_spots: result.blindSpots,
+            warnings: result.warnings,
+            searched_documents: corpus.documents.length,
+            custody_safe: true,
+            slug: context.slug,
+            environment: context.auth.environment,
+          },
+        });
+      }
+
+      // Fallback path: older/sparser packages with no prebuilt corpus. Keyword
+      // scan over whatever structured arrays the brandInstance carries.
+      const docs = collectDocs(pkg);
+      const hits = rankDocs(docs, trimmedQuery, parsed.data.limit);
 
       return buildResponse({
         what_happened:
@@ -426,6 +504,7 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
               ],
         data: {
           query: trimmedQuery,
+          retrieval_engine: "keyword_fallback",
           hits,
           total_hits: hits.length,
           searched_documents: docs.length,
