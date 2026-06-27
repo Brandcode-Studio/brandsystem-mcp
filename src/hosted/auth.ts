@@ -1,10 +1,14 @@
 /**
  * Bearer-token auth for the hosted Brandcode MCP.
  *
- * Phase 1 validator shape: a pluggable async function that accepts a raw token
- * and returns BrandcodeMcpAuthInfo or null. Phase 1 ships a deterministic
- * in-process validator for local dev + staging smoke against fixed test keys;
- * Phase 2 wires this to a UCS `/api/brandcode-mcp/keys/validate` lookup.
+ * Validator shape: a pluggable async function that accepts a raw token and
+ * returns BrandcodeMcpAuthInfo or null. Resolution order (see authorizeRequest):
+ *   1. options.validateToken — explicit injection (tests).
+ *   2. buildDefaultValidator — local env-seeded keys, only when
+ *      BRANDCODE_MCP_TEST_KEYS is set (local dev + staging smoke).
+ *   3. buildUcsValidator — the production path: POST the key to the UCS
+ *      `/api/brandcode-mcp/keys/validate` endpoint with the hosted service
+ *      token and map the response onto BrandcodeMcpAuthInfo.
  *
  * Not coupled to any HTTP framework. The router calls `parseBearer(headers)`
  * and `validateToken(token)` and dispatches 401/403 itself.
@@ -17,6 +21,10 @@ import type {
 
 const STAGING_PREFIX = "bck_test_";
 const PRODUCTION_PREFIX = "bck_live_";
+
+const DEFAULT_UCS_BASE_URL = "https://www.brandcode.studio";
+const VALIDATE_USER_AGENT = "brandcode-mcp";
+const VALIDATE_TIMEOUT_MS = 10_000;
 
 export class AuthError extends Error {
   constructor(
@@ -133,6 +141,129 @@ export function buildDefaultValidator(environment: "staging" | "production") {
   };
 }
 
+function isScope(value: unknown): value is BrandcodeMcpScope {
+  return (
+    value === "read" ||
+    value === "check" ||
+    value === "feedback" ||
+    value === "capture"
+  );
+}
+
+interface UcsKeyValidationOk {
+  valid: true;
+  keyId: string;
+  environment: "staging" | "production";
+  scopes: BrandcodeMcpScope[];
+  allowedSlugs: string[];
+}
+
+/** Defensive parse of the UCS validate response — never trust upstream blindly. */
+function parseUcsValidationOk(body: unknown): UcsKeyValidationOk | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  if (b.valid !== true) return null;
+  if (typeof b.keyId !== "string" || b.keyId.length === 0) return null;
+  if (b.environment !== "staging" && b.environment !== "production") return null;
+  if (!Array.isArray(b.scopes) || b.scopes.length === 0 || !b.scopes.every(isScope)) {
+    return null;
+  }
+  if (
+    !Array.isArray(b.allowedSlugs) ||
+    b.allowedSlugs.length === 0 ||
+    !b.allowedSlugs.every((s) => typeof s === "string" && s.length > 0)
+  ) {
+    return null;
+  }
+  return {
+    valid: true,
+    keyId: b.keyId,
+    environment: b.environment,
+    scopes: [...new Set(b.scopes as BrandcodeMcpScope[])],
+    allowedSlugs: [...new Set(b.allowedSlugs as string[])],
+  };
+}
+
+/**
+ * Production validator: resolves a per-brand key against UCS.
+ *
+ * POSTs `{ token }` to `${ucsBaseUrl}/api/brandcode-mcp/keys/validate` with the
+ * hosted MCP's service token as the caller credential. UCS hashes the token,
+ * looks up the (Blob-backed) key record, and returns its scopes + allowed
+ * slugs. Slug binding is enforced afterward by authorizeRequest, which yields a
+ * precise 403 slug_forbidden rather than a generic invalid_token — so we
+ * deliberately do NOT pass slug here.
+ *
+ * Fails closed: any upstream/parse failure returns null (→ 401 invalid_token).
+ * The raw token is never logged.
+ */
+export function buildUcsValidator(opts: {
+  ucsBaseUrl?: string;
+  ucsServiceToken: string;
+  environment: "staging" | "production";
+}) {
+  const baseUrl = opts.ucsBaseUrl ?? DEFAULT_UCS_BASE_URL;
+  const url = `${baseUrl}/api/brandcode-mcp/keys/validate`;
+
+  return async (token: string): Promise<BrandcodeMcpAuthInfo | null> => {
+    // Cheap prefix gate — skip the round trip for malformed / wrong-env tokens.
+    if (tokenEnvironment(token) !== opts.environment) return null;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "user-agent": VALIDATE_USER_AGENT,
+          authorization: `Bearer ${opts.ucsServiceToken}`,
+        },
+        body: JSON.stringify({ token }),
+        signal: AbortSignal.timeout(VALIDATE_TIMEOUT_MS),
+      });
+    } catch (err) {
+      // Upstream unreachable — fail closed, never leak the token.
+      console.error(
+        `[brandcode-mcp] key validation upstream error: ${(err as Error).message}`,
+      );
+      return null;
+    }
+
+    if (response.status === 401) {
+      // The hosted MCP's own service token was rejected — a config error, not
+      // an end-user key problem. Surface it in logs without the bearer token.
+      console.error(
+        "[brandcode-mcp] key validation rejected the caller (check BRANDCODE_MCP_SERVICE_TOKEN)",
+      );
+      return null;
+    }
+    if (!response.ok) {
+      console.error(`[brandcode-mcp] key validation returned ${response.status}`);
+      return null;
+    }
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      return null;
+    }
+
+    const ok = parseUcsValidationOk(body);
+    if (!ok) return null; // { valid: false } or malformed
+    if (ok.environment !== opts.environment) return null;
+
+    return {
+      token,
+      keyId: ok.keyId,
+      scopes: ok.scopes,
+      allowedSlugs: ok.allowedSlugs,
+      environment: ok.environment,
+    };
+  };
+}
+
 export async function authorizeRequest(
   headers: Headers,
   slug: string,
@@ -144,7 +275,15 @@ export async function authorizeRequest(
   }
 
   const environment = options.environment ?? "staging";
-  const validator = options.validateToken ?? buildDefaultValidator(environment);
+  const validator =
+    options.validateToken ??
+    (process.env.BRANDCODE_MCP_TEST_KEYS
+      ? buildDefaultValidator(environment)
+      : buildUcsValidator({
+          ucsBaseUrl: options.ucsBaseUrl,
+          ucsServiceToken: options.ucsServiceToken,
+          environment,
+        }));
   const info = await validator(token);
   if (!info) {
     throw new AuthError(401, "invalid_token", "Token is not valid");
