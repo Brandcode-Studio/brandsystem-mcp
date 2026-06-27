@@ -49,6 +49,8 @@ export interface HostedRuntimeOptions {
   environment?: "staging" | "production";
   /** Optional token validator override (tests inject a stub). */
   validateToken?: (token: string) => Promise<BrandcodeMcpAuthInfo | null>;
+  /** Explicitly permit env-seeded test keys in production smoke tests. */
+  allowEnvTestKeys?: boolean;
   /** Optional hosted rate-limit override (tests inject a deterministic store). */
   rateLimit?: HostedRateLimitOptions | false;
 }

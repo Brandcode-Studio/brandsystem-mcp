@@ -449,6 +449,80 @@ describe("authorizeRequest validator selection", () => {
       ),
     ).rejects.toMatchObject({ status: 403, code: "slug_forbidden" });
   });
+
+  it("uses env-seeded keys by default for staging smoke", async () => {
+    process.env.BRANDCODE_MCP_TEST_KEYS = "bck_test_primary:acme:read";
+
+    const info = await authorizeRequest(
+      new Headers({ authorization: "Bearer bck_test_primary" }),
+      "acme",
+      { environment: "staging", ucsServiceToken: "svc" },
+    );
+
+    expect(info).toMatchObject({
+      keyId: "bck_test_primary",
+      allowedSlugs: ["acme"],
+      environment: "staging",
+      scopes: ["read"],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let BRANDCODE_MCP_TEST_KEYS silently override production UCS validation", async () => {
+    process.env.BRANDCODE_MCP_TEST_KEYS = "bck_live_primary:local-only:read";
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          valid: true,
+          keyId: "bck_live_abcd1234",
+          environment: "production",
+          scopes: ["read", "check"],
+          allowedSlugs: ["acme"],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const info = await authorizeRequest(
+      new Headers({ authorization: "Bearer bck_live_abcd1234secret" }),
+      "acme",
+      {
+        environment: "production",
+        ucsBaseUrl: "https://ucs.test",
+        ucsServiceToken: "svc",
+      },
+    );
+
+    expect(info).toMatchObject({
+      keyId: "bck_live_abcd1234",
+      allowedSlugs: ["acme"],
+      environment: "production",
+      scopes: ["read", "check"],
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("allows production env-seeded keys only through an explicit smoke-test opt-in", async () => {
+    process.env.BRANDCODE_MCP_TEST_KEYS = "bck_live_primary:acme:read";
+
+    const info = await authorizeRequest(
+      new Headers({ authorization: "Bearer bck_live_primary" }),
+      "acme",
+      {
+        environment: "production",
+        ucsServiceToken: "svc",
+        allowEnvTestKeys: true,
+      },
+    );
+
+    expect(info).toMatchObject({
+      keyId: "bck_live_primary",
+      allowedSlugs: ["acme"],
+      environment: "production",
+      scopes: ["read"],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 // Keep AuthError import used so TS tree-shake doesn't warn
