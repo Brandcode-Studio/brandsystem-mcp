@@ -138,7 +138,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_extract_site",
-    "Deeply extract brand evidence from a website by discovering representative pages, rendering them in headless Chrome across desktop and mobile, capturing screenshots, and sampling computed styles from multiple components. Use when a homepage scan is not enough or when you want richer evidence before compiling tokens.",
+    "Deeply extract brand evidence from a website by discovering representative pages, rendering them in headless Chrome across desktop and mobile, capturing screenshots, and sampling computed styles from multiple components. Use when a homepage scan is not enough or when you want richer evidence before compiling tokens. NOT for a fast single-page scan — use brand_extract_web for quick static CSS parsing with no browser required.",
     paramsShape,
     async (args) => {
       const parsed = ParamsSchema.safeParse(args);

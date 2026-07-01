@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { readFile, access } from "node:fs/promises";
+import { readFile, access, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { copyFixture, connectWithCwd, callTool } from "../helpers.js";
 
@@ -69,6 +70,76 @@ describe("brand_status", () => {
       expect(status).toContain("Session: 1");
       expect(status).toContain("Session 2: Full Visual Identity → Ready");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// brand_status — tool_sessions (session/phase taxonomy)
+//
+// Surfaces the same grouping as the inline `// ── Section ──` comments in
+// src/server.ts so a connecting agent/client can query the phase structure
+// instead of it existing only as source comments.
+// ---------------------------------------------------------------------------
+
+describe("brand_status tool_sessions", () => {
+  it("includes non-empty, tool-covering groups when .brand/ exists", async () => {
+    const tmpDir = await copyFixture("brand-complete");
+    const conn = await connectWithCwd(tmpDir);
+    try {
+      const result = await callTool(conn.client, "brand_status");
+      const toolSessions = result.tool_sessions as Array<{ name: string; tools: string[] }>;
+
+      expect(Array.isArray(toolSessions)).toBe(true);
+      expect(toolSessions.length).toBeGreaterThan(0);
+
+      const allGroupedTools = new Set<string>();
+      for (const group of toolSessions) {
+        expect(typeof group.name).toBe("string");
+        expect(group.name.length).toBeGreaterThan(0);
+        expect(Array.isArray(group.tools)).toBe(true);
+        expect(group.tools.length).toBeGreaterThan(0);
+        for (const toolName of group.tools) {
+          allGroupedTools.add(toolName);
+        }
+      }
+
+      // Cross-check against the live tool registry: every registered tool
+      // should appear in exactly one group, and the taxonomy shouldn't
+      // reference tools that don't exist.
+      const { tools } = await conn.client.listTools();
+      const registeredNames = new Set(tools.map((t) => t.name));
+
+      const missingFromTaxonomy = [...registeredNames].filter(
+        (name) => !allGroupedTools.has(name),
+      );
+      const staleInTaxonomy = [...allGroupedTools].filter(
+        (name) => !registeredNames.has(name),
+      );
+
+      expect(missingFromTaxonomy, "registered tools missing from tool_sessions").toEqual([]);
+      expect(staleInTaxonomy, "tool_sessions references tools that are not registered").toEqual([]);
+    } finally {
+      await conn.cleanup();
+      await rm(tmpDir, { recursive: true });
+    }
+  });
+
+  it("includes the same tool_sessions field in the no-.brand/ getting-started response", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "brand-integ-empty-"));
+    const conn = await connectWithCwd(tmpDir);
+    try {
+      const result = await callTool(conn.client, "brand_status");
+      expect(result.error).toBeDefined(); // not_found — no .brand/ dir
+      const toolSessions = result.tool_sessions as Array<{ name: string; tools: string[] }>;
+      expect(Array.isArray(toolSessions)).toBe(true);
+      expect(toolSessions.length).toBeGreaterThan(0);
+      for (const group of toolSessions) {
+        expect(group.tools.length).toBeGreaterThan(0);
+      }
+    } finally {
+      await conn.cleanup();
+      await rm(tmpDir, { recursive: true });
+    }
   });
 });
 
