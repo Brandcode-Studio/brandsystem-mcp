@@ -237,10 +237,10 @@ export function registerFeedback(server: McpServer, context: HostedBrandContext)
             "Feedback entries use the UCS AgentRun runtime surface because mcp-hosted is not an allowed AgentSupportSurface value",
           stored: body && typeof body === "object",
           telemetry: {
-            general_post_active: false,
-            status: "deferred",
+            general_post_active: true,
+            status: "active",
             detail:
-              "brand_feedback appends this explicit feedback entry only; general hosted AgentRun telemetry POST remains deferred",
+              "brand_feedback appends this explicit feedback entry, and general hosted AgentRun telemetry now also POSTs a record for every hosted tool call",
           },
           slug: context.slug,
           environment: context.auth.environment,

@@ -1415,8 +1415,8 @@ describe("brand_history (hosted)", () => {
     expect(json.cursor_support).toBe("not_reported_by_ucs");
     expect(json.cursor_requested).toBe("ignored-cursor");
     expect(json.telemetry).toMatchObject({
-      write_active: false,
-      status: "deferred",
+      write_active: true,
+      status: "active",
     });
 
     const history = json.history as Array<Record<string, unknown>>;

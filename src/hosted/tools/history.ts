@@ -268,7 +268,7 @@ export function registerHistory(server: McpServer, context: HostedBrandContext) 
           ? `UCS history for "${context.slug}" did not include a usable history array`
           : `Loaded ${projected.history.length} hosted MCP history entr${projected.history.length === 1 ? "y" : "ies"} for "${context.slug}"`,
         next_steps: [
-          "Use history entries as read-only run/receipt context; telemetry writes remain deferred",
+          "Use history entries as read-only run/receipt context; hosted AgentRun telemetry writes are active",
           params.cursor
             ? "UCS history GET does not report cursor support yet, so next_cursor is null"
             : "Call brand_status for implementation and telemetry posture",
@@ -285,10 +285,10 @@ export function registerHistory(server: McpServer, context: HostedBrandContext) 
           limit: params.limit,
           malformed_history: projected.malformed,
           telemetry: {
-            write_active: false,
-            status: "deferred",
+            write_active: true,
+            status: "active",
             detail:
-              "brand_history reads UCS AgentRun history; hosted telemetry POST remains deferred",
+              "brand_history reads UCS AgentRun history; hosted telemetry POST now writes a record for every hosted tool call",
           },
           slug: context.slug,
           environment: context.auth.environment,
