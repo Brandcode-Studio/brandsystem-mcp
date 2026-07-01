@@ -1,0 +1,44 @@
+name: Hosted MCP Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:17 UTC daily (off-peak, minute offset to avoid the top-of-hour GitHub Actions queue)
+    - cron: "17 6 * * *"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build
+      - name: Run hosted MCP smoke test
+        id: smoke
+        env:
+          BRANDCODE_MCP_SMOKE_URL: ${{ secrets.BRANDCODE_MCP_SMOKE_URL }}
+          BRANDCODE_MCP_SMOKE_FULL_KEY: ${{ secrets.BRANDCODE_MCP_SMOKE_FULL_KEY }}
+          BRANDCODE_MCP_SMOKE_READ_KEY: ${{ secrets.BRANDCODE_MCP_SMOKE_READ_KEY }}
+          BRANDCODE_MCP_SMOKE_ASSET_ID: ${{ secrets.BRANDCODE_MCP_SMOKE_ASSET_ID }}
+          BRANDCODE_MCP_SMOKE_SKIP_FEEDBACK: ${{ secrets.BRANDCODE_MCP_SMOKE_SKIP_FEEDBACK }}
+          BRANDCODE_MCP_SMOKE_TIMEOUT_MS: ${{ secrets.BRANDCODE_MCP_SMOKE_TIMEOUT_MS }}
+        run: |
+          set -o pipefail
+          npm run smoke:hosted-mcp -- --strict --json | tee smoke-output.json
+      - name: Publish smoke result to job summary
+        if: always()
+        run: |
+          if [ -f smoke-output.json ]; then
+            {
+              echo "### Hosted MCP smoke result"
+              echo '```json'
+              cat smoke-output.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Hosted MCP smoke result" >> "$GITHUB_STEP_SUMMARY"
+            echo "No output captured (smoke step likely failed before producing JSON)." >> "$GITHUB_STEP_SUMMARY"
+          fi
