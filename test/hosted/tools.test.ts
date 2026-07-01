@@ -294,7 +294,10 @@ describe("capture_taste (hosted)", () => {
       ref: "taste-ledger:edge-capture",
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 2 calls: the tool's own UCS taste-capture POST (calls[0]), then the
+    // hosted AgentRun telemetry POST fired by the server.tool wrapper after
+    // the tool handler resolves (calls[1]).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe(
       "https://www.brandcode.studio/api/brand/acme/runtime/taste-capture",
@@ -412,7 +415,10 @@ describe("brand_feedback (hosted)", () => {
       evidence_refs: ["package://runtime/search", "https://private-provider.example/raw"],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 2 calls: the tool's own explicit feedback-append POST (calls[0]), then
+    // the hosted AgentRun telemetry POST fired by the server.tool wrapper
+    // after the tool handler resolves (calls[1]).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe(
       "https://www.brandcode.studio/api/brand/hosted/acme/agent/history",
@@ -1387,7 +1393,10 @@ describe("brand_history (hosted)", () => {
       cursor: "ignored-cursor",
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 2 calls: the tool's own UCS history GET (calls[0]), then the hosted
+    // AgentRun telemetry POST fired by the server.tool wrapper after the
+    // tool handler resolves (calls[1]).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     const requestedUrl = new URL(String(url));
     expect(requestedUrl.pathname).toBe("/api/brand/hosted/acme/agent/history");
