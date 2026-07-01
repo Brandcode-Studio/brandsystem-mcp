@@ -1,0 +1,373 @@
+{
+  "contractVersion": "2026-04-05-connect",
+  "source": "brandcode-studio",
+  "requestedSyncToken": "riverline:12:2026-06-18T09:30:00.000Z",
+  "upToDate": false,
+  "brand": {
+    "slug": "riverline",
+    "name": "Riverline",
+    "updatedAt": "2026-06-20T14:05:00.000Z",
+    "revisionCount": 13,
+    "readinessStage": "usable",
+    "narrativeCount": 6,
+    "assetCount": 9,
+    "enabledCapabilityCount": 5,
+    "primaryConcern": "Needs more governed proof points before wide distribution",
+    "nextUnlock": "Voice pack review",
+    "syncToken": "riverline:13:2026-06-20T14:05:00.000Z",
+    "transport": "blob",
+    "lastAction": "updated",
+    "access": {
+      "mode": "listed",
+      "requiresToken": false,
+      "listedInFeed": true
+    },
+    "links": {
+      "self": "https://brandcode.studio/api/brand/hosted/riverline",
+      "connect": "https://brandcode.studio/api/brand/hosted/riverline/connect",
+      "pull": "https://brandcode.studio/api/brand/hosted/riverline/pull",
+      "package": "https://brandcode.studio/api/brand/hosted/riverline/package",
+      "assetManifest": "https://brandcode.studio/api/brand/hosted/riverline/assets",
+      "studio": "https://brandcode.studio/start/brands/riverline",
+      "detail": "https://brandcode.studio/api/brand/hosted/riverline"
+    }
+  },
+  "delta": {
+    "fromRevision": 12,
+    "toRevision": 13,
+    "changedAreas": ["narratives", "tokens"],
+    "current": {
+      "assetCount": 9,
+      "narrativeCount": 6,
+      "proofPointCount": 4,
+      "deployablePhraseCount": 3,
+      "enabledCapabilityCount": 5
+    },
+    "previous": {
+      "assetCount": 9,
+      "narrativeCount": 5,
+      "proofPointCount": 4,
+      "deployablePhraseCount": 3,
+      "enabledCapabilityCount": 5
+    }
+  },
+  "package": {
+    "slug": "riverline",
+    "runtimeVersion": "2026-06-20",
+    "brandInstance": {
+      "manifest": {
+        "name": "Riverline",
+        "brandcodeVersion": "2026-06-20",
+        "version": "0.9.3"
+      },
+      "perspective": "Governed brand systems are the only durable way to scale content without losing distinctiveness.",
+      "verbalIdentity": "Riverline sounds calm, specific, and unhurried. We explain before we assert. We never hype and we never use filler adjectives.",
+      "proofPoints": [
+        {
+          "id": "claim-101",
+          "claim": "87% of governed content teams ship faster after adopting a runtime brand contract",
+          "type": "stat",
+          "status": "Active",
+          "tier": "Primary",
+          "narrative": "nl-201",
+          "notes": "Sourced from the 2026 governed-content benchmark survey."
+        },
+        {
+          "id": "claim-102",
+          "claim": "Early signal from three pilot accounts suggests reduced review cycles",
+          "type": "observation",
+          "status": "Watch",
+          "tier": "Secondary",
+          "notes": "Not yet powered for a general claim; keep scoped to pilot contexts."
+        }
+      ],
+      "narratives": [
+        {
+          "id": "nl-201",
+          "name": "Governed by default",
+          "status": "Active",
+          "type": "Key Message",
+          "description": "Every piece of content inherits the brand contract automatically instead of relying on manual review.",
+          "key_messages": [
+            "Brand rules travel with the content, not the reviewer.",
+            "Governance should be invisible until something drifts."
+          ],
+          "content_types": ["landing page", "case study", "sales deck"],
+          "target_personas": ["brand-ops-lead", "content-director"]
+        },
+        {
+          "id": "nl-202",
+          "name": "Distinctive, not decorative",
+          "status": "Draft",
+          "type": "Supporting Message",
+          "description": "Visual distinctiveness should come from structural choices, not surface decoration.",
+          "key_messages": ["Distinctiveness is a structural property, not a filter."],
+          "content_types": ["blog post"],
+          "target_personas": ["design-lead"]
+        }
+      ],
+      "brandPhrases": [
+        {
+          "phrase": "Governed by default",
+          "arc_position": "hook",
+          "usage": "Use in headlines and hero statements when introducing the runtime contract concept.",
+          "deploy_verbatim": true
+        },
+        {
+          "phrase": "Rules that travel with the work",
+          "arc_position": "proof",
+          "usage": "Use when explaining portability across tools.",
+          "deploy_verbatim": false
+        }
+      ],
+      "stats": [
+        {
+          "stat": "87%",
+          "explainer": "of governed content teams ship faster after adopting a runtime brand contract",
+          "tier": "Primary",
+          "proof_point": "claim-101"
+        }
+      ],
+      "applicationRules": [
+        {
+          "id": "ar-301",
+          "content_type": "Landing page",
+          "touchpoint": "web",
+          "framework": "Problem Guide Proof",
+          "required_elements": ["governed proof point", "clear next step", "runtime contract mention"],
+          "tone": "calm, specific",
+          "guidance": "Lead with the runtime contract concept before any feature list.",
+          "journey_stage": "Decision"
+        }
+      ],
+      "strategyMoves": [
+        {
+          "move": 1,
+          "name": "Lead with governance, not features",
+          "status": "Active",
+          "timeline": "Q3 2026",
+          "rules": ["Never open with a feature list.", "Always name the runtime contract by move two."]
+        }
+      ],
+      "tokens": {
+        "brandName": "Riverline",
+        "colors": {
+          "primary": "#1d4ed8",
+          "secondary": "#0f172a",
+          "accent": "#f97316",
+          "surface": "#f8fafc"
+        },
+        "typography": {
+          "fontFamily": "Inter, system-ui, sans-serif"
+        }
+      },
+      "fonts": {
+        "roles": {
+          "display": { "fontFamily": "Fraunces, Georgia, serif" },
+          "heading": { "fontFamily": "Fraunces, Georgia, serif" },
+          "body": { "fontFamily": "Inter, system-ui, sans-serif" },
+          "mono": { "fontFamily": "IBM Plex Mono, monospace" }
+        }
+      },
+      "assets": [
+        {
+          "id": "logo-primary",
+          "title": "Riverline primary logo",
+          "category": "logo",
+          "lifecycle": "official",
+          "format": "svg",
+          "width": 480,
+          "height": 120,
+          "kind": "logo",
+          "deliveryRef": {
+            "packagePath": "riverline/runtime/assets/logo-primary.svg",
+            "posture": "package_safe"
+          },
+          "tags": ["identity", "runtime"],
+          "official": true,
+          "inRuntimePackage": true
+        },
+        {
+          "id": "hero-illustration",
+          "title": "Runtime hero illustration",
+          "category": "illustration",
+          "lifecycle": "runtime",
+          "format": "png",
+          "kind": "illustration",
+          "deliveryRef": {
+            "packagePath": "riverline/runtime/assets/hero-illustration.png",
+            "posture": "package_safe"
+          },
+          "inRuntimePackage": true
+        }
+      ],
+      "libraryAssets": [],
+      "readiness": {
+        "stage": "usable",
+        "primaryConcern": "Needs more governed proof points before wide distribution"
+      },
+      "capabilities": {
+        "enabled": ["runtime", "content", "search"],
+        "blocked": ["autonomous trading claims"]
+      }
+    },
+    "brandKnowledgeCorpus": {
+      "brandSlug": "riverline",
+      "runtimeVersion": "2026-06-20",
+      "generatedAt": "2026-06-20T14:05:00.000Z",
+      "syncToken": "riverline:13:2026-06-20T14:05:00.000Z",
+      "documents": [
+        {
+          "id": "proof:claim-101",
+          "corpusId": "riverline-corpus-2026-06-20",
+          "sourceKind": "proof_point",
+          "title": "87% of governed content teams ship faster",
+          "text": "87% of governed content teams ship faster after adopting a runtime brand contract, per the 2026 governed-content benchmark survey.",
+          "embeddingText": "governed content teams ship faster runtime brand contract benchmark survey",
+          "tags": ["Active", "Primary"],
+          "facets": {
+            "brandSlug": "riverline",
+            "surface": "runtime",
+            "sourceClass": "governance",
+            "approvalState": "approved",
+            "language": "en"
+          },
+          "lineage": {
+            "graphNodeId": "node-claim-101",
+            "sourcePath": "governance/valid-proof-points.yaml",
+            "sourceId": "claim-101",
+            "sourceType": "governance",
+            "confidence": "high",
+            "derivedFrom": ["survey-2026-benchmark"]
+          },
+          "freshness": {
+            "runtimeVersion": "2026-06-20",
+            "syncToken": "riverline:13:2026-06-20T14:05:00.000Z",
+            "generatedAt": "2026-06-20T14:05:00.000Z"
+          }
+        },
+        {
+          "id": "narrative:nl-201",
+          "corpusId": "riverline-corpus-2026-06-20",
+          "sourceKind": "narrative",
+          "title": "Governed by default",
+          "text": "Every piece of content inherits the brand contract automatically instead of relying on manual review.",
+          "tags": ["Active", "Key Message"],
+          "facets": {
+            "brandSlug": "riverline",
+            "surface": "runtime",
+            "sourceClass": "doctrine",
+            "approvalState": "approved",
+            "language": "en"
+          },
+          "lineage": {
+            "sourcePath": "governance/narrative-library.yaml",
+            "sourceId": "nl-201",
+            "sourceType": "governance",
+            "confidence": "high",
+            "derivedFrom": []
+          },
+          "freshness": {
+            "runtimeVersion": "2026-06-20",
+            "syncToken": "riverline:13:2026-06-20T14:05:00.000Z",
+            "generatedAt": "2026-06-20T14:05:00.000Z"
+          }
+        },
+        {
+          "id": "asset:logo-primary",
+          "sourceKind": "asset_metadata",
+          "title": "Riverline primary logo",
+          "text": "primary logo identity runtime svg",
+          "tags": ["identity", "runtime"],
+          "facets": {
+            "brandSlug": "riverline",
+            "surface": "runtime",
+            "assetCategory": "logo",
+            "sourceClass": "asset_metadata",
+            "approvalState": "approved",
+            "language": "en"
+          },
+          "lineage": {
+            "sourceId": "logo-primary",
+            "sourceType": "asset",
+            "confidence": "medium",
+            "derivedFrom": []
+          },
+          "freshness": {
+            "runtimeVersion": "2026-06-20",
+            "syncToken": "riverline:13:2026-06-20T14:05:00.000Z",
+            "generatedAt": "2026-06-20T14:05:00.000Z"
+          }
+        }
+      ],
+      "summary": {
+        "documentCount": 3,
+        "bySourceKind": {
+          "proof_point": 1,
+          "narrative": 1,
+          "asset_metadata": 1
+        }
+      }
+    },
+    "retrievalManifest": {
+      "brandSlug": "riverline",
+      "runtimeVersion": "2026-06-20",
+      "syncToken": "riverline:13:2026-06-20T14:05:00.000Z",
+      "generatedAt": "2026-06-20T14:05:00.000Z",
+      "sourceCoverage": [
+        {
+          "sourceClass": "governance",
+          "status": "indexed",
+          "documentCount": 1,
+          "confidence": { "high": 1, "medium": 0, "low": 0 },
+          "notes": []
+        },
+        {
+          "sourceClass": "doctrine",
+          "status": "indexed",
+          "documentCount": 1,
+          "confidence": { "high": 1, "medium": 0, "low": 0 },
+          "notes": []
+        },
+        {
+          "sourceClass": "asset_metadata",
+          "status": "indexed",
+          "documentCount": 1,
+          "confidence": { "high": 0, "medium": 1, "low": 0 },
+          "notes": []
+        },
+        {
+          "sourceClass": "ocr",
+          "status": "missing",
+          "documentCount": 0,
+          "notes": ["OCR pipeline not yet run for this brand."]
+        },
+        {
+          "sourceClass": "transcript",
+          "status": "missing",
+          "documentCount": 0,
+          "notes": []
+        }
+      ],
+      "confidenceSummary": { "high": 2, "medium": 1, "low": 0 },
+      "governancePaths": [
+        { "path": "governance/valid-proof-points.yaml", "documentCount": 1 },
+        { "path": "governance/narrative-library.yaml", "documentCount": 1 }
+      ],
+      "freshness": {
+        "oldestGeneratedAt": "2026-06-20T14:05:00.000Z",
+        "newestGeneratedAt": "2026-06-20T14:05:00.000Z"
+      },
+      "knownBlindSpots": [
+        "Image and slide OCR is not searchable yet.",
+        "Video transcripts have not been indexed for this brand."
+      ],
+      "warnings": []
+    },
+    "interactionPolicy": {
+      "version": "2026-06-20",
+      "neverSay": ["synergy", "revolutionary"],
+      "antiPatterns": ["Never use drop shadows on logo lockups."]
+    }
+  }
+}

@@ -1,18 +1,7 @@
 #!/usr/bin/env node
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-
-const LOCKED_TOOL_ORDER = [
-  "brand_runtime",
-  "brand_search",
-  "brand_check",
-  "brand_status",
-  "list_brand_assets",
-  "get_brand_asset",
-  "brand_feedback",
-  "capture_taste",
-  "brand_history",
-];
+import { HOSTED_TOOL_ORDER as LOCKED_TOOL_ORDER } from "../src/hosted/tool-order.mjs";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
