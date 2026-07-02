@@ -304,3 +304,73 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
     expect(body).toContain("synthetic tool failure");
   });
 });
+
+describe("wrapServerWithTelemetry — registration-time guards", () => {
+  it("throws when called twice on the same McpServer instance", () => {
+    const server = new McpServer({ name: "double-wrap-test", version: "1.0.0" });
+    const context = buildContext();
+
+    wrapServerWithTelemetry(server, context);
+
+    expect(() => wrapServerWithTelemetry(server, context)).toThrow(
+      /called twice/,
+    );
+  });
+
+  it("throws on an unrecognized server.tool() calling convention", () => {
+    const server = new McpServer({ name: "unrecognized-shape-test", version: "1.0.0" });
+    const context = buildContext();
+    wrapServerWithTelemetry(server, context);
+
+    const patchedTool = (
+      server as unknown as { tool: (...args: unknown[]) => unknown }
+    ).tool;
+
+    // Neither the 3-arg (name, description, callback) nor the 4-arg
+    // (name, description, paramsShape, callback) shape -- a 3rd positional
+    // argument that is itself neither a callback nor followed by one.
+    expect(() =>
+      patchedTool("bad_tool", "desc", "not-a-function-or-object"),
+    ).toThrow(/unrecognized server\.tool\(\) calling convention/);
+  });
+});
+
+describe("wrapServerWithTelemetry — brand_history contract-violation classification", () => {
+  it("classifies a malformed-but-200 UCS history body as outcome upstream_error, not ok", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method ?? "GET") === "GET") {
+          // UCS responds 200 OK but violates the history contract (no usable
+          // history array) -- a degraded response, not an HTTP failure.
+          return new Response(
+            JSON.stringify({ ok: true, history: { bad: true } }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify(DEFAULT_OK_BODY), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { client } = await connectClient(buildContext());
+    const json = await call(client, "brand_history", {});
+    expect(json.malformed_history).toBe(true);
+    expect(json.error).toBe("ucs_history_contract_error");
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const telemetryCall = fetchMock.mock.calls.find(([url, init]) => {
+      const isTelemetryPost =
+        String(url).endsWith("/api/brand/hosted/acme/agent/history") &&
+        (init as RequestInit | undefined)?.method === "POST";
+      return isTelemetryPost;
+    });
+    expect(telemetryCall).toBeDefined();
+    const body = String(
+      (telemetryCall?.[1] as RequestInit | undefined)?.body ?? "",
+    );
+    expect(body).toContain('"outcome":"upstream_error"');
+  });
+});

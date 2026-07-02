@@ -1450,6 +1450,10 @@ describe("brand_history (hosted)", () => {
     expect(json.history).toEqual([]);
     expect(json.malformed_history).toBe(true);
     expect(json.next_cursor).toBeNull();
+    // Surfaced so AgentRun telemetry classifies this as upstream_error
+    // instead of ok -- see test/hosted/server.test.ts for the telemetry
+    // classification assertion.
+    expect(json.error).toBe("ucs_history_contract_error");
   });
 
   it("returns structured errors for UCS not found and service-token failures", async () => {
@@ -1744,8 +1748,8 @@ describe("brand_status (hosted)", () => {
       version_hash: "abc123",
     });
     expect(json.telemetry).toMatchObject({
-      active: false,
-      status: "deferred",
+      active: true,
+      status: "active",
     });
     expect(json.rate_limits).toEqual(TEST_RATE_LIMIT);
 
@@ -1759,7 +1763,7 @@ describe("brand_status (hosted)", () => {
     });
     expect(json.status).toContain("Real tools:");
     expect(json.status).toContain("Stubs:        ");
-    expect(json.status).toContain("Telemetry:    deferred");
+    expect(json.status).toContain("Telemetry:    active");
     expect(json.status).toContain(
       "Rate limits:  active_pre_release_in_process",
     );

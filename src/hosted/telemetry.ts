@@ -14,6 +14,7 @@
  * ucsServiceToken are never interpolated into a log line.
  */
 import { randomUUID } from "node:crypto";
+import { waitUntil } from "@vercel/functions";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BrandcodeMcpAuthInfo, HostedBrandContext } from "./types.js";
 import { postUcsHistoryEntry } from "./ucs-history-post.js";
@@ -93,6 +94,13 @@ function buildAgentRunEntry(input: AgentRunRecordInput): Record<string, unknown>
  * caller's perspective: the returned promise resolves as soon as the POST is
  * dispatched to the event loop, not when the network call settles. Errors
  * (thrown or non-2xx) are caught inside and logged without the raw tokens.
+ *
+ * The dispatched promise is registered with Vercel's waitUntil() so a Fluid
+ * Compute isolate freezing immediately after the tool's response is sent
+ * doesn't kill the POST mid-flight -- without this, telemetry delivery would
+ * be a race against isolate teardown on every hosted request. waitUntil()
+ * is a safe no-op outside a real Vercel request context (tests, local/stdio
+ * mode), so this never affects non-hosted execution.
  */
 export async function emitAgentRunRecord(
   input: AgentRunRecordInput,
@@ -101,7 +109,7 @@ export async function emitAgentRunRecord(
 
   // Intentionally not awaited by the caller: this promise chain runs on its
   // own and can never delay or throw into the tool's actual MCP response.
-  void postUcsHistoryEntry({
+  const pending = postUcsHistoryEntry({
     ucsBaseUrl: input.ucsBaseUrl,
     ucsServiceToken: input.ucsServiceToken,
     slug: input.slug,
@@ -119,6 +127,8 @@ export async function emitAgentRunRecord(
         `[brandcode-mcp] AgentRun telemetry POST errored for tool "${input.tool}" (slug "${input.slug}"): ${(err as Error).message}`,
       );
     });
+
+  waitUntil(pending);
 }
 
 /**
@@ -144,6 +154,7 @@ const UPSTREAM_ERROR_CODES = new Set([
   "network_error",
   "hosted_brand_not_found",
   "ucs_history_contract_error",
+  "capture_failed",
 ]);
 
 function extractErrorCode(result: unknown): string | null {

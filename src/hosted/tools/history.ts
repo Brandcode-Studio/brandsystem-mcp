@@ -13,6 +13,7 @@ import {
   HistoryUpstreamError,
 } from "../history-fetcher.js";
 import { enforceToolScope } from "../scope.js";
+import { HOSTED_AGENT_RUN_TELEMETRY_STATUS } from "../telemetry.js";
 import type { HostedBrandContext } from "../types.js";
 
 const paramsShape = {
@@ -284,9 +285,16 @@ export function registerHistory(server: McpServer, context: HostedBrandContext) 
           surface: "mcp-hosted",
           limit: params.limit,
           malformed_history: projected.malformed,
+          // A malformed body is a 200 OK with a UCS contract violation, not
+          // an HTTP failure -- surfaced as `error` (rather than thrown) so
+          // AgentRun telemetry classifies it as upstream_error instead of
+          // silently recording a degraded response as outcome "ok".
+          ...(projected.malformed
+            ? { error: "ucs_history_contract_error" }
+            : {}),
           telemetry: {
-            write_active: true,
-            status: "active",
+            write_active: HOSTED_AGENT_RUN_TELEMETRY_STATUS === "active",
+            status: HOSTED_AGENT_RUN_TELEMETRY_STATUS,
             detail:
               "brand_history reads UCS AgentRun history; hosted telemetry POST now writes a record for every hosted tool call",
           },

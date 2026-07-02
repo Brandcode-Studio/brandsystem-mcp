@@ -168,14 +168,22 @@ export async function handleHostedRequest(
     rateLimit: rateLimit.snapshot,
   };
 
-  // Spin up per-request server + transport (stateless)
-  const server = createHostedServer(context);
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
+  // Spin up per-request server + transport (stateless). Both are
+  // constructed *inside* the try block: createHostedServer() runs
+  // wrapServerWithTelemetry(), which can throw at registration time (an
+  // unrecognized server.tool() calling convention, or a double-wrap guard)
+  // -- that throw must degrade to a scoped internal_error response like any
+  // other request-time failure, not escape as an unhandled exception that
+  // would take down every brand's requests.
+  let server: ReturnType<typeof createHostedServer> | undefined;
+  let transport: WebStandardStreamableHTTPServerTransport | undefined;
 
   try {
+    server = createHostedServer(context);
+    transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
     await server.connect(transport);
     const response = await transport.handleRequest(request);
     return withRateLimitHeaders(response, rateLimit.snapshot);
@@ -201,7 +209,7 @@ export async function handleHostedRequest(
       hostedRateLimitHeaders(rateLimit.snapshot),
     );
   } finally {
-    await transport.close().catch(() => {});
-    await server.close().catch(() => {});
+    await transport?.close().catch(() => {});
+    await server?.close().catch(() => {});
   }
 }
