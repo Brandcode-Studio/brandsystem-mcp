@@ -10,9 +10,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createHostedServer } from "../../src/hosted/server.js";
 import { HOSTED_TOOL_ORDER } from "../../src/hosted/registrations.js";
 import { wrapServerWithTelemetry } from "../../src/hosted/telemetry.js";
+import {
+  connectHostedClient as connectClient,
+  callHostedTool as call,
+  stubJsonFetch,
+} from "./helpers.js";
 import type {
   HostedBrandContext,
   BrandcodeMcpAuthInfo,
@@ -67,25 +71,6 @@ function buildContext(
   };
 }
 
-async function connectClient(context: HostedBrandContext) {
-  const server = createHostedServer(context);
-  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "hosted-server-telemetry-test", version: "1.0.0" });
-  await server.connect(serverT);
-  await client.connect(clientT);
-  return { server, client };
-}
-
-async function call(
-  client: Client,
-  name: string,
-  args: Record<string, unknown> = {},
-) {
-  const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type: string; text: string }>;
-  return JSON.parse(content[0].text) as Record<string, unknown>;
-}
-
 /** Minimal per-tool arguments that let each of the 9 hosted tools dispatch
  *  successfully against the fixture context above. */
 const TOOL_ARGS: Record<string, Record<string, unknown>> = {
@@ -104,23 +89,20 @@ const TOOL_ARGS: Record<string, Record<string, unknown>> = {
   brand_history: {},
 };
 
+/** Default OK body shared by this file's stubOkFetch() call sites (a generic
+ *  UCS append/ledger response shape; the specific fields aren't asserted on
+ *  by these tests, only that the call succeeded). */
+const DEFAULT_OK_BODY = {
+  ok: true,
+  routed: "queued",
+  ref: "taste-ledger:test",
+  canonicalMutation: false,
+  entry: {},
+  history: [],
+};
+
 function stubOkFetch() {
-  const fetchMock = vi.fn(
-    async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          routed: "queued",
-          ref: "taste-ledger:test",
-          canonicalMutation: false,
-          entry: {},
-          history: [],
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
+  return stubJsonFetch(DEFAULT_OK_BODY);
 }
 
 beforeEach(() => {

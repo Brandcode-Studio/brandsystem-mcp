@@ -3,6 +3,7 @@ import {
   emitAgentRunRecord,
   type AgentRunRecordInput,
 } from "../../src/hosted/telemetry.js";
+import { stubJsonFetch as stubFetch } from "./helpers.js";
 import type { BrandcodeMcpAuthInfo } from "../../src/hosted/types.js";
 
 function buildAuth(
@@ -32,18 +33,6 @@ function buildInput(
     requestId: "req-1",
     ...overrides,
   };
-}
-
-function stubFetch(body: unknown = { ok: true }, init: ResponseInit = {}) {
-  const fetchMock = vi.fn(
-    async () =>
-      new Response(JSON.stringify(body), {
-        status: init.status ?? 200,
-        headers: { "content-type": "application/json" },
-      }),
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
 }
 
 beforeEach(() => {

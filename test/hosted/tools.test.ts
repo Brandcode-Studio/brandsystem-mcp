@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createHostedServer } from "../../src/hosted/server.js";
 import { HOSTED_TOOL_ORDER } from "../../src/hosted/registrations.js";
+import {
+  connectHostedClient as connectClient,
+  callHostedTool as call,
+} from "./helpers.js";
 import type {
   HostedBrandContext,
   BrandcodeMcpAuthInfo,
@@ -73,25 +74,6 @@ function buildContext(
     rateLimit: TEST_RATE_LIMIT,
     ...overrides,
   };
-}
-
-async function connectClient(context: HostedBrandContext) {
-  const server = createHostedServer(context);
-  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "hosted-tool-test", version: "1.0.0" });
-  await server.connect(serverT);
-  await client.connect(clientT);
-  return { server, client };
-}
-
-async function call(
-  client: Client,
-  name: string,
-  args: Record<string, unknown> = {},
-) {
-  const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type: string; text: string }>;
-  return JSON.parse(content[0].text) as Record<string, unknown>;
 }
 
 beforeEach(() => {

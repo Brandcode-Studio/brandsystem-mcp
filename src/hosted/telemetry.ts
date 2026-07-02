@@ -1,11 +1,9 @@
 /**
  * Hosted MCP AgentRun telemetry.
  *
- * Emits one AgentRunHistoryEntry-shaped record to UCS per hosted tool call.
- * The POST body mirrors feedback-fetcher.ts's appendHostedFeedback() exactly:
- * same endpoint (`/api/brand/hosted/{slug}/agent/history`), same
- * `{ entry: <AgentRunHistoryEntry> }` envelope, same bearer auth header, same
- * AbortSignal.timeout usage.
+ * Emits one AgentRunHistoryEntry-shaped record to UCS per hosted tool call,
+ * via the same ucs-history-post.ts helper feedback-fetcher.ts's
+ * appendHostedFeedback() uses (same endpoint, envelope, auth, timeout).
  *
  * Fire-and-forget, fail-open: emitAgentRunRecord() intentionally does not
  * await the POST settling. The caller (the server.tool wrapper in server.ts)
@@ -18,9 +16,7 @@
 import { randomUUID } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BrandcodeMcpAuthInfo, HostedBrandContext } from "./types.js";
-
-const USER_AGENT = "brandcode-mcp";
-const DEFAULT_TIMEOUT_MS = 15_000;
+import { postUcsHistoryEntry } from "./ucs-history-post.js";
 
 export const HOSTED_AGENT_RUN_TELEMETRY_STATUS = "active";
 
@@ -101,24 +97,15 @@ function buildAgentRunEntry(input: AgentRunRecordInput): Record<string, unknown>
 export async function emitAgentRunRecord(
   input: AgentRunRecordInput,
 ): Promise<void> {
-  const url = new URL(
-    `/api/brand/hosted/${encodeURIComponent(input.slug)}/agent/history`,
-    input.ucsBaseUrl,
-  );
   const entry = buildAgentRunEntry(input);
 
   // Intentionally not awaited by the caller: this promise chain runs on its
   // own and can never delay or throw into the tool's actual MCP response.
-  void fetch(url, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      "user-agent": USER_AGENT,
-      authorization: `Bearer ${input.ucsServiceToken}`,
-    },
-    body: JSON.stringify({ entry }),
-    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  void postUcsHistoryEntry({
+    ucsBaseUrl: input.ucsBaseUrl,
+    ucsServiceToken: input.ucsServiceToken,
+    slug: input.slug,
+    entry,
   })
     .then((response) => {
       if (!response.ok) {
@@ -186,12 +173,21 @@ export function classifyToolOutcome(
   return "tool_error";
 }
 
-/** Minimal shape of the two server.tool() call conventions every hosted
- *  tool file actually uses:
- *    - tool(name, description, paramsShape, callback)  (8 of 9 tools)
- *    - tool(name, description, callback)                (brand_status)
- *  Anything else is passed through untouched — telemetry simply would not
- *  wrap a call shape none of the hosted tools use. */
+/**
+ * Minimal shape of the two `server.tool()` call conventions every hosted
+ * tool file actually uses today:
+ *   - tool(name, description, paramsShape, callback)  (8 of 9 tools)
+ *   - tool(name, description, callback)                (brand_status)
+ *
+ * The MCP SDK's real `.tool()` has 6 overloads total (including 5-arg forms
+ * that add per-tool `annotations`) and is itself `@deprecated` in favor of
+ * `registerTool()`, which this wrapper does not intercept at all. If a
+ * future hosted tool adopts either an unmodeled overload or `registerTool()`,
+ * `wrapForUnknownShape` below throws a clear, named error at registration
+ * time rather than silently skipping telemetry for that tool — a loud
+ * failure here is far cheaper to diagnose than a quiet observability gap
+ * discovered later.
+ */
 type AnyToolCallback = (...args: unknown[]) => unknown;
 
 interface TelemetryToolServer {
@@ -205,22 +201,39 @@ interface TelemetryToolServer {
 }
 
 /**
- * Wrap every `server.tool(...)` registration made through `registerFn` with
- * AgentRun telemetry timing + emission, without editing any of the 9
- * individual hosted tool files.
+ * Wraps every `server.tool(...)` registration with AgentRun telemetry
+ * timing + emission, without editing any of the 9 individual hosted tool
+ * files (KTD1's single choke point).
  *
- * This is the single choke point (KTD1): registrations.ts calls
- * `registerRuntime(server, context)` etc., and each of those calls
- * `server.tool(...)` on whatever `McpServer`-shaped object it is handed. By
- * substituting a proxy for `server` before those register functions run, we
- * intercept every one of the 9 tool.tool() calls generically — covering all
- * locked hosted tools, present and future, with one implementation.
+ * Call sequence (see server.ts's `createHostedServer`):
+ *   wrapServerWithTelemetry(server, context);  // patches server.tool in place
+ *   registerHostedTools(server, context);      // each registerXxx() call below
+ *                                               // now goes through the patched
+ *                                               // tool(), picking up telemetry
+ *
+ * Single-call invariant: this mutates `server.tool` in place and must be
+ * called exactly once per `McpServer` instance, before any tool
+ * registration. Today that holds because `createHostedServer` builds a
+ * fresh `McpServer` per HTTP request (see router.ts) and calls this
+ * function exactly once. Calling it twice on the same instance would
+ * double-wrap every subsequent registration, silently emitting two
+ * telemetry records per tool call.
  */
 export function wrapServerWithTelemetry(
   server: McpServer,
   context: HostedBrandContext,
 ): McpServer {
   const target = server as unknown as TelemetryToolServer;
+  const ALREADY_WRAPPED = Symbol.for("brandcode-mcp.telemetry-wrapped");
+  if ((target as unknown as Record<symbol, boolean>)[ALREADY_WRAPPED]) {
+    throw new Error(
+      "wrapServerWithTelemetry called twice on the same McpServer instance " +
+        "-- each hosted server must be wrapped exactly once, before any " +
+        "tool registration.",
+    );
+  }
+  (target as unknown as Record<symbol, boolean>)[ALREADY_WRAPPED] = true;
+
   const originalTool = target.tool.bind(target);
 
   function instrument(name: string, callback: AnyToolCallback): AnyToolCallback {
@@ -278,12 +291,25 @@ export function wrapServerWithTelemetry(
       // tool(name, description, callback) — the zero-arg-schema overload.
       return originalTool(name, description, instrument(name, third as AnyToolCallback));
     }
-    // tool(name, description, paramsShape, callback)
-    return originalTool(
-      name,
-      description,
-      third as Record<string, unknown>,
-      instrument(name, fourth as AnyToolCallback),
+    if (typeof fourth === "function" && third && typeof third === "object") {
+      // tool(name, description, paramsShape, callback)
+      return originalTool(
+        name,
+        description,
+        third as Record<string, unknown>,
+        instrument(name, fourth as AnyToolCallback),
+      );
+    }
+    // Neither modeled shape matched -- fail loudly rather than silently
+    // wrapping a non-function and losing telemetry for this tool. See the
+    // module-level comment on TelemetryToolServer for which SDK overloads
+    // this wrapper does and doesn't model.
+    throw new Error(
+      `wrapServerWithTelemetry: tool "${String(name)}" was registered with ` +
+        "an unrecognized server.tool() calling convention (expected " +
+        "(name, description, callback) or (name, description, paramsShape, " +
+        "callback)). Extend the wrapper in src/hosted/telemetry.ts before " +
+        "using a new overload here.",
     );
   }) as TelemetryToolServer["tool"];
 

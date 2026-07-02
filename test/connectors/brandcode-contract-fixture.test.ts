@@ -34,10 +34,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { fetchHostedBrandPackage } from "../../src/hosted/brand-fetcher.js";
-import { createHostedServer } from "../../src/hosted/server.js";
+import {
+  connectHostedClient as connectClient,
+  callHostedTool as call,
+  stubJsonFetch as stubPullResponse,
+} from "../hosted/helpers.js";
 import type {
   BrandPackagePayload,
   PullResult,
@@ -101,24 +103,6 @@ function buildContext(
   };
 }
 
-async function connectClient(context: HostedBrandContext) {
-  const server = createHostedServer(context);
-  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "contract-fixture-test", version: "1.0.0" });
-  await server.connect(serverT);
-  await client.connect(clientT);
-  return { server, client };
-}
-
-async function call(
-  client: Client,
-  name: string,
-  args: Record<string, unknown> = {},
-) {
-  const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type: string; text: string }>;
-  return JSON.parse(content[0].text) as Record<string, unknown>;
-}
 
 beforeEach(() => {
   vi.unstubAllGlobals();
@@ -196,16 +180,6 @@ describe("fixture loads as a well-formed PullResult", () => {
 });
 
 describe("fetchHostedBrandPackage parses a realistic UCS pull response", () => {
-  function stubPullResponse(body: unknown, init: ResponseInit = {}) {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify(body), {
-        status: init.status ?? 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    return fetchMock;
-  }
 
   it("returns the fixture's package field without throwing or dropping fields", async () => {
     const fixture = loadFixture();

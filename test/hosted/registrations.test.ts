@@ -73,6 +73,15 @@ function listHostedToolFiles(): string[] {
     .sort();
 }
 
+/** Each hosted tool file's source, read once and shared by every test below
+ *  (the per-file loop and the aggregate recompute both need it). */
+const HOSTED_TOOL_SOURCES: ReadonlyMap<string, string> = new Map(
+  listHostedToolFiles().map((file) => [
+    file,
+    readFileSync(join(HOSTED_TOOLS_DIR, file), "utf8"),
+  ]),
+);
+
 describe("hosted tool order — exact count lock", () => {
   it(`HOSTED_TOOL_ORDER has exactly ${EXPECTED_HOSTED_TOOL_COUNT} entries (hardcoded, not a floor)`, () => {
     // Deliberately toEqual/toBe on a literal, not toBeGreaterThanOrEqual —
@@ -100,7 +109,7 @@ describe("hosted tool files — per-file registration-call count lock", () => {
     EXPECTED_REGISTRATIONS_PER_FILE,
   )) {
     it(`${file} registers exactly ${expectedCount} tool(s) via server.tool(...)`, () => {
-      const source = readFileSync(join(HOSTED_TOOLS_DIR, file), "utf8");
+      const source = HOSTED_TOOL_SOURCES.get(file) ?? "";
       expect(countToolRegistrations(source)).toBe(expectedCount);
     });
   }
@@ -114,14 +123,16 @@ describe("hosted tool files — per-file registration-call count lock", () => {
   });
 
   it("actual on-disk registration-call total matches the expected total (independent of the fixture map)", () => {
-    // Recomputes the total directly from disk rather than from
-    // EXPECTED_REGISTRATIONS_PER_FILE, so a future PR can't "fix" this test
-    // by only editing the fixture map without anyone questioning why the
-    // count changed.
-    const actualTotal = listHostedToolFiles().reduce((sum, file) => {
-      const source = readFileSync(join(HOSTED_TOOLS_DIR, file), "utf8");
-      return sum + countToolRegistrations(source);
-    }, 0);
+    // Recomputes the total from the shared HOSTED_TOOL_SOURCES map rather
+    // than from EXPECTED_REGISTRATIONS_PER_FILE, so a future PR can't "fix"
+    // this test by only editing the fixture map without anyone questioning
+    // why the count changed. (Shares the cached file reads with the per-file
+    // loop above rather than re-reading disk -- same independence guarantee,
+    // no duplicate I/O.)
+    let actualTotal = 0;
+    for (const source of HOSTED_TOOL_SOURCES.values()) {
+      actualTotal += countToolRegistrations(source);
+    }
     expect(actualTotal).toBe(EXPECTED_HOSTED_TOOL_COUNT);
   });
 });

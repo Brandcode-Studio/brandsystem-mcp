@@ -28,6 +28,9 @@ import { createServer } from "../../src/server.js";
 
 // Same in-memory client/server setup pattern as test/tools/smoke.test.ts.
 let client: Client;
+// Registration doesn't change within a run, so every test below shares one
+// listTools() result instead of re-issuing the same RPC call.
+let tools: Awaited<ReturnType<Client["listTools"]>>["tools"];
 
 beforeAll(async () => {
   const server = createServer();
@@ -37,6 +40,7 @@ beforeAll(async () => {
   client = new Client({ name: "description-quality-test-client", version: "1.0.0" });
   await server.connect(serverTransport);
   await client.connect(clientTransport);
+  ({ tools } = await client.listTools());
 });
 
 const MAX_FIRST_SENTENCE_CHARS = 300;
@@ -130,8 +134,7 @@ function hasNotForCrossReference(description: string, otherToolName: string): bo
 }
 
 describe("tool description quality", () => {
-  it("every tool description starts with a capitalized verb", async () => {
-    const { tools } = await client.listTools();
+  it("every tool description starts with a capitalized verb", () => {
     const failures: string[] = [];
     for (const tool of tools) {
       const description = tool.description ?? "";
@@ -142,8 +145,7 @@ describe("tool description quality", () => {
     expect(failures, `Tools failing verb-start check:\n${failures.join("\n")}`).toEqual([]);
   });
 
-  it("every tool description's first sentence is under 300 characters", async () => {
-    const { tools } = await client.listTools();
+  it("every tool description's first sentence is under 300 characters", () => {
     const failures: string[] = [];
     for (const tool of tools) {
       const description = tool.description ?? "";
@@ -156,8 +158,7 @@ describe("tool description quality", () => {
   });
 
   describe.each(AMBIGUOUS_PAIRS)("ambiguous pair: %s / %s", (toolA, toolB) => {
-    it(`${toolA} disambiguates against ${toolB}`, async () => {
-      const { tools } = await client.listTools();
+    it(`${toolA} disambiguates against ${toolB}`, () => {
       const tool = tools.find((t) => t.name === toolA);
       expect(tool, `${toolA} is not registered`).toBeDefined();
       const description = tool!.description ?? "";
@@ -167,8 +168,7 @@ describe("tool description quality", () => {
       ).toBe(true);
     });
 
-    it(`${toolB} disambiguates against ${toolA}`, async () => {
-      const { tools } = await client.listTools();
+    it(`${toolB} disambiguates against ${toolA}`, () => {
       const tool = tools.find((t) => t.name === toolB);
       expect(tool, `${toolB} is not registered`).toBeDefined();
       const description = tool!.description ?? "";
