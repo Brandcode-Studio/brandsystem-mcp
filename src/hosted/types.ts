@@ -2,6 +2,7 @@
  * Shared types for the hosted Brandcode MCP surface (S009 G-5b Phase 1).
  */
 import type { BrandPackagePayload } from "../connectors/brandcode/types.js";
+import type { TasteGuidanceProjection } from "../connectors/brandcode/taste-guidance.js";
 
 export type BrandcodeMcpScope = "read" | "check" | "feedback" | "capture";
 
@@ -25,6 +26,8 @@ export interface HostedBrandContext {
   auth: BrandcodeMcpAuthInfo;
   /** Lazy getter for the hosted brand package. Cached per-request. */
   loadBrandPackage: () => Promise<BrandPackagePayload | null>;
+  /** Lazy approved-only Taste Memory projection. Cached per request. */
+  loadTasteGuidance: () => Promise<TasteGuidanceProjection | null>;
   /** Origin UCS API base — typically https://www.brandcode.studio. */
   ucsBaseUrl: string;
   /** Service token the hosted MCP uses to authenticate with UCS. */
@@ -74,7 +77,9 @@ export interface HostedRateLimitStore {
   mode: "in_process" | "durable_shared";
   enforcement: "in_process_fixed_window" | "durable_shared_redis_fixed_window";
   source: string;
-  check: (input: HostedRateLimitStoreInput) => Promise<HostedRateLimitStoreResult>;
+  check: (
+    input: HostedRateLimitStoreInput,
+  ) => Promise<HostedRateLimitStoreResult>;
   buckets?: Map<string, HostedRateLimitBucket>;
 }
 

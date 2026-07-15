@@ -16,12 +16,13 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { authorizeRequest, AuthError } from "./auth.js";
 import { fetchHostedBrandPackage, UpstreamError } from "./brand-fetcher.js";
-import {
-  checkHostedRateLimit,
-  hostedRateLimitHeaders,
-} from "./rate-limit.js";
+import { checkHostedRateLimit, hostedRateLimitHeaders } from "./rate-limit.js";
 import { createHostedServer } from "./server.js";
 import type { BrandPackagePayload } from "../connectors/brandcode/types.js";
+import {
+  fetchTasteGuidance,
+  type TasteGuidanceProjection,
+} from "../connectors/brandcode/taste-guidance.js";
 import type {
   BrandcodeMcpAuthInfo,
   HostedBrandContext,
@@ -31,7 +32,15 @@ import type {
 
 export interface RouterOptions extends HostedRuntimeOptions {
   /** Override the brand fetcher (tests supply a stub). */
-  fetchBrandPackage?: (slug: string, auth: BrandcodeMcpAuthInfo) => Promise<BrandPackagePayload | null>;
+  fetchBrandPackage?: (
+    slug: string,
+    auth: BrandcodeMcpAuthInfo,
+  ) => Promise<BrandPackagePayload | null>;
+  /** Override approved Taste Guidance fetcher (tests supply a stub). */
+  fetchTasteGuidance?: (
+    slug: string,
+    auth: BrandcodeMcpAuthInfo,
+  ) => Promise<TasteGuidanceProjection | null>;
 }
 
 export function extractSlug(pathname: string): string | null {
@@ -95,7 +104,8 @@ export async function handleHostedRequest(
   if (!slug) {
     return jsonError(404, {
       error: "brand_not_found",
-      message: "Expected URL shape /{slug} — slug must be lowercase alphanumeric",
+      message:
+        "Expected URL shape /{slug} — slug must be lowercase alphanumeric",
     });
   }
 
@@ -125,8 +135,7 @@ export async function handleHostedRequest(
   if (rateLimit.error === "rate_limit_store_unavailable") {
     return jsonError(503, {
       error: "rate_limit_unavailable",
-      message:
-        "Brandcode MCP durable shared rate-limit store is unavailable",
+      message: "Brandcode MCP durable shared rate-limit store is unavailable",
       slug,
       rate_limits: rateLimit.snapshot,
     });
@@ -156,12 +165,27 @@ export async function handleHostedRequest(
       }));
 
   let cached: Promise<BrandPackagePayload | null> | null = null;
+  const fetchTasteImpl =
+    options.fetchTasteGuidance ??
+    ((s: string, _info: BrandcodeMcpAuthInfo) =>
+      fetchTasteGuidance({
+        baseUrl: options.ucsBaseUrl ?? "https://www.brandcode.studio",
+        authToken: options.ucsServiceToken,
+        slug: s,
+      }));
+  let cachedTasteGuidance: Promise<TasteGuidanceProjection | null> | null =
+    null;
   const context: HostedBrandContext = {
     slug,
     auth,
     loadBrandPackage: () => {
       if (!cached) cached = fetchImpl(slug, auth);
       return cached;
+    },
+    loadTasteGuidance: () => {
+      if (!cachedTasteGuidance)
+        cachedTasteGuidance = fetchTasteImpl(slug, auth);
+      return cachedTasteGuidance;
     },
     ucsBaseUrl: options.ucsBaseUrl ?? "https://www.brandcode.studio",
     ucsServiceToken: options.ucsServiceToken,

@@ -12,6 +12,7 @@ import { buildResponse, safeParseParams } from "../../lib/response.js";
 import { ERROR_CODES } from "../../types/index.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
 import type { BrandInstancePayload } from "../../connectors/brandcode/knowledge-types.js";
+import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
@@ -106,8 +107,7 @@ function normalizeBrandInstance(
   const assets = instance.assets as unknown[] | undefined;
   const manifest = instance.manifest as Record<string, unknown> | undefined;
 
-  const colors =
-    (tokens?.colors as Record<string, string> | undefined) ?? {};
+  const colors = (tokens?.colors as Record<string, string> | undefined) ?? {};
   const typography = pickTypography(fonts, tokens);
   const logo = pickLogo(assets);
 
@@ -144,7 +144,9 @@ function trimProse(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const text = value.trim();
   if (!text) return null;
-  return text.length > PROSE_LIMIT ? `${text.slice(0, PROSE_LIMIT).trimEnd()}...` : text;
+  return text.length > PROSE_LIMIT
+    ? `${text.slice(0, PROSE_LIMIT).trimEnd()}...`
+    : text;
 }
 
 /** Voice slice from the hosted governance model: prose verbal identity +
@@ -154,7 +156,9 @@ function pickVoice(inst: BrandInstancePayload): Record<string, unknown> | null {
   const perspective = trimProse(inst.perspective);
   const phrasesRaw = Array.isArray(inst.brandPhrases) ? inst.brandPhrases : [];
   const brandPhrases = phrasesRaw
-    .filter((p) => p && typeof p.phrase === "string" && p.phrase.trim().length > 0)
+    .filter(
+      (p) => p && typeof p.phrase === "string" && p.phrase.trim().length > 0,
+    )
     .slice(0, ARRAY_LIMIT)
     .map((p) => ({
       phrase: p.phrase,
@@ -173,9 +177,13 @@ function pickVoice(inst: BrandInstancePayload): Record<string, unknown> | null {
 
 /** Strategy slice from the hosted governance model: narratives, application
  *  rules, proof points, and strategy moves — summarized for context injection. */
-function pickStrategy(inst: BrandInstancePayload): Record<string, unknown> | null {
+function pickStrategy(
+  inst: BrandInstancePayload,
+): Record<string, unknown> | null {
   const narrativesRaw = Array.isArray(inst.narratives) ? inst.narratives : [];
-  const rulesRaw = Array.isArray(inst.applicationRules) ? inst.applicationRules : [];
+  const rulesRaw = Array.isArray(inst.applicationRules)
+    ? inst.applicationRules
+    : [];
   const proofRaw = Array.isArray(inst.proofPoints) ? inst.proofPoints : [];
   const movesRaw = Array.isArray(inst.strategyMoves) ? inst.strategyMoves : [];
 
@@ -229,8 +237,7 @@ function pickTypography(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   const roles = fonts?.roles as
-    | Record<string, Record<string, unknown>>
-    | undefined;
+    Record<string, Record<string, unknown>> | undefined;
   if (roles) {
     // Canonical order — display first so minimal slice picks it as "heading".
     const order = ["display", "heading", "body", "mono"];
@@ -297,9 +304,9 @@ function sliceRuntime(
         ? {
             colors: identity.colors
               ? Object.fromEntries(
-                  Object.entries(identity.colors as Record<string, string>).filter(
-                    ([k]) => k === "primary",
-                  ),
+                  Object.entries(
+                    identity.colors as Record<string, string>,
+                  ).filter(([k]) => k === "primary"),
                 )
               : {},
             typography: identity.typography
@@ -321,6 +328,31 @@ function sliceRuntime(
     return { ...base, voice: runtime.voice, strategy: runtime.strategy };
   }
   return runtime;
+}
+
+function compactTasteGuidance(projection: TasteGuidanceProjection | null) {
+  if (!projection) return null;
+  return {
+    schema_version: projection.schemaVersion,
+    taste_revision: projection.tasteRevision,
+    updated_at: projection.updatedAt,
+    approved_count: projection.counts.approved,
+    guidance: projection.guidance.slice(0, 12).map((item) => ({
+      id: item.id,
+      directive: item.directive,
+      polarity: item.polarity,
+      reason: item.reason,
+      scope: {
+        artifact_kind: item.scope.artifactKind,
+        pattern_ref: item.scope.patternRef,
+        surfaces: item.scope.surfaces,
+      },
+      provenance: item.provenance,
+      reviewed_at: item.reviewedAt,
+      canonical_mutation: false,
+    })),
+    boundary: projection.boundary,
+  };
 }
 
 export function registerRuntime(
@@ -366,7 +398,27 @@ export function registerRuntime(
         });
       }
 
-      const sliced = sliceRuntime(runtime, parsed.data.slice);
+      let tasteGuidance: TasteGuidanceProjection | null = null;
+      let tasteGuidanceStatus:
+        "available" | "empty" | "unavailable" | "not_requested" =
+        "not_requested";
+      if (parsed.data.slice === "full" || parsed.data.slice === "voice") {
+        try {
+          tasteGuidance = await context.loadTasteGuidance();
+          tasteGuidanceStatus = tasteGuidance?.guidance.length
+            ? "available"
+            : "empty";
+        } catch {
+          tasteGuidanceStatus = "unavailable";
+        }
+      }
+
+      const sliced = {
+        ...sliceRuntime(runtime, parsed.data.slice),
+        ...(parsed.data.slice === "full" || parsed.data.slice === "voice"
+          ? { taste_guidance: compactTasteGuidance(tasteGuidance) }
+          : {}),
+      };
       const estimatedTokens =
         parsed.data.slice === "full"
           ? "~1200"
@@ -389,6 +441,7 @@ export function registerRuntime(
           runtime_origin: "hosted",
           slug: context.slug,
           environment: context.auth.environment,
+          taste_guidance_status: tasteGuidanceStatus,
         },
       });
     },

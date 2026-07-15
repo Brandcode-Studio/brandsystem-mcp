@@ -65,6 +65,7 @@ function buildContext(
     slug: "acme",
     auth,
     loadBrandPackage: async () => pkg,
+    loadTasteGuidance: async () => null,
     ucsBaseUrl: "https://www.brandcode.studio",
     ucsServiceToken: "test-service-token",
     ...overrides,
@@ -218,14 +219,18 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
       String(url).endsWith("/api/brand/hosted/acme/agent/history"),
     );
     expect(telemetryCall).toBeDefined();
-    const body = String((telemetryCall?.[1] as RequestInit | undefined)?.body ?? "");
+    const body = String(
+      (telemetryCall?.[1] as RequestInit | undefined)?.body ?? "",
+    );
     expect(body).toContain('"outcome":"ok"');
   });
 
   it("classifies a scope-denied call as outcome auth_error", async () => {
     const fetchMock = stubOkFetch();
     const readOnlyAuth = buildAuth({ scopes: ["read"] });
-    const { client } = await connectClient(buildContext({ auth: readOnlyAuth }));
+    const { client } = await connectClient(
+      buildContext({ auth: readOnlyAuth }),
+    );
 
     await call(client, "brand_check", { color: "#000000" });
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -234,7 +239,9 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
       String(url).endsWith("/api/brand/hosted/acme/agent/history"),
     );
     expect(telemetryCall).toBeDefined();
-    const body = String((telemetryCall?.[1] as RequestInit | undefined)?.body ?? "");
+    const body = String(
+      (telemetryCall?.[1] as RequestInit | undefined)?.body ?? "",
+    );
     expect(body).toContain('"outcome":"auth_error"');
   });
 
@@ -257,7 +264,9 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
       String(url).endsWith("/api/brand/hosted/acme/agent/history"),
     );
     expect(telemetryCall).toBeDefined();
-    const body = String((telemetryCall?.[1] as RequestInit | undefined)?.body ?? "");
+    const body = String(
+      (telemetryCall?.[1] as RequestInit | undefined)?.body ?? "",
+    );
     expect(body).toContain('"outcome":"upstream_error"');
   });
 
@@ -272,7 +281,10 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
     vi.spyOn(console, "error").mockImplementation(() => {});
     const context = buildContext();
 
-    const server = new McpServer({ name: "telemetry-throw-test", version: "1.0.0" });
+    const server = new McpServer({
+      name: "telemetry-throw-test",
+      version: "1.0.0",
+    });
     wrapServerWithTelemetry(server, context);
     server.tool(
       "throwing_probe",
@@ -288,7 +300,10 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
     await server.connect(serverT);
     await client.connect(clientT);
 
-    const result = await client.callTool({ name: "throwing_probe", arguments: {} });
+    const result = await client.callTool({
+      name: "throwing_probe",
+      arguments: {},
+    });
     // The MCP SDK surfaces a thrown handler error as an isError tool result,
     // not a rejected callTool promise — confirm the failure still reaches
     // the client rather than being swallowed by the telemetry wrapper.
@@ -299,7 +314,9 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
       String(url).endsWith("/api/brand/hosted/acme/agent/history"),
     );
     expect(telemetryCall).toBeDefined();
-    const body = String((telemetryCall?.[1] as RequestInit | undefined)?.body ?? "");
+    const body = String(
+      (telemetryCall?.[1] as RequestInit | undefined)?.body ?? "",
+    );
     expect(body).toContain('"outcome":"tool_error"');
     expect(body).toContain("synthetic tool failure");
   });
@@ -307,7 +324,10 @@ describe("wrapServerWithTelemetry — outcome classification at the server bound
 
 describe("wrapServerWithTelemetry — registration-time guards", () => {
   it("throws when called twice on the same McpServer instance", () => {
-    const server = new McpServer({ name: "double-wrap-test", version: "1.0.0" });
+    const server = new McpServer({
+      name: "double-wrap-test",
+      version: "1.0.0",
+    });
     const context = buildContext();
 
     wrapServerWithTelemetry(server, context);
@@ -318,7 +338,10 @@ describe("wrapServerWithTelemetry — registration-time guards", () => {
   });
 
   it("throws on an unrecognized server.tool() calling convention", () => {
-    const server = new McpServer({ name: "unrecognized-shape-test", version: "1.0.0" });
+    const server = new McpServer({
+      name: "unrecognized-shape-test",
+      version: "1.0.0",
+    });
     const context = buildContext();
     wrapServerWithTelemetry(server, context);
 

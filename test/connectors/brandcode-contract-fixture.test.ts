@@ -96,13 +96,13 @@ function buildContext(
     slug: "riverline",
     auth,
     loadBrandPackage: async () => pkg,
+    loadTasteGuidance: async () => null,
     ucsBaseUrl: "https://www.brandcode.studio",
     ucsServiceToken: "test-token",
     rateLimit: TEST_RATE_LIMIT,
     ...overrides,
   };
 }
-
 
 beforeEach(() => {
   vi.unstubAllGlobals();
@@ -180,7 +180,6 @@ describe("fixture loads as a well-formed PullResult", () => {
 });
 
 describe("fetchHostedBrandPackage parses a realistic UCS pull response", () => {
-
   it("returns the fixture's package field without throwing or dropping fields", async () => {
     const fixture = loadFixture();
     const fetchMock = stubPullResponse(fixture);
@@ -254,7 +253,9 @@ describe("hosted brand_runtime consumes the fixture end to end", () => {
     const runtime = json.runtime as Record<string, unknown>;
     const identity = runtime.identity as Record<string, unknown>;
     expect(identity.colors).toMatchObject({ primary: "#1d4ed8" });
-    expect(identity.typography).toMatchObject({ display: "Fraunces, Georgia, serif" });
+    expect(identity.typography).toMatchObject({
+      display: "Fraunces, Georgia, serif",
+    });
 
     const voice = runtime.voice as Record<string, unknown>;
     expect(voice.verbal_identity).toContain("calm, specific");

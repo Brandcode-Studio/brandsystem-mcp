@@ -40,23 +40,65 @@ const paramsShape = {
     .string()
     .max(4000)
     .optional()
-    .describe("Optional candidate copy or layout notes. Images should be referenced by candidate_ref."),
+    .describe(
+      "Optional candidate copy or layout notes. Images should be referenced by candidate_ref.",
+    ),
   surface: z
     .enum(["chat", "code", "studio"])
     .optional()
     .describe("Where the judgment was made. Defaults to chat."),
+  artifact_kind: z
+    .string()
+    .min(1)
+    .max(120)
+    .optional()
+    .describe(
+      "Optional artifact class such as social-copy, social-layout, illustration, or code.",
+    ),
+  proposed_scope: z
+    .array(z.string().min(1).max(80))
+    .max(12)
+    .optional()
+    .describe(
+      "Optional creation surfaces where this guidance may apply, such as chef or social.",
+    ),
+  runtime_version: z
+    .string()
+    .max(160)
+    .optional()
+    .describe(
+      "Optional Brandcode runtime version used when the judgment was made.",
+    ),
+  turn_id: z
+    .string()
+    .max(160)
+    .optional()
+    .describe("Optional AI-tool turn identifier."),
+  session_id: z
+    .string()
+    .max(160)
+    .optional()
+    .describe("Optional AI-tool session identifier."),
 };
 
 const ParamsSchema = z.object(paramsShape);
 type Params = z.infer<typeof ParamsSchema>;
 
-function buildPayload(input: Params, context: HostedBrandContext): TasteCapturePayload {
+function buildPayload(
+  input: Params,
+  context: HostedBrandContext,
+): TasteCapturePayload {
   return {
     candidateRef: input.candidate_ref,
     candidateText: input.candidate_text ?? null,
     verdict: input.verdict,
     attributeReason: input.attribute_reason,
     surface: input.surface ?? "chat",
+    artifactKind: input.artifact_kind,
+    proposedScope: input.proposed_scope,
+    runtimeVersion: input.runtime_version,
+    turnId: input.turn_id,
+    sessionId: input.session_id,
     actor: `brandcode-mcp:${context.auth.keyId}`,
   };
 }
@@ -146,6 +188,7 @@ export function registerCaptureTaste(
             quarantined: result.quarantined,
             canonical_mutation: false,
             ref: result.ref,
+            review_url: result.reviewUrl ?? null,
           },
         });
       } catch (err) {
@@ -154,7 +197,9 @@ export function registerCaptureTaste(
         }
         return buildResponse({
           what_happened: `Could not reach UCS taste capture for "${context.slug}": ${(err as Error).message}`,
-          next_steps: ["Check hosted connectivity and retry. The capture was not recorded."],
+          next_steps: [
+            "Check hosted connectivity and retry. The capture was not recorded.",
+          ],
           data: {
             error: "network_error",
             brand: context.slug,
