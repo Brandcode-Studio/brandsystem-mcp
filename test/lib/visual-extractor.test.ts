@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyPageType,
+  chromeLaunchArgs,
   findChrome,
   isVisualExtractionAvailable,
   inferRolesFromVisual,
   selectRepresentativePages,
+  validateBrowserRequestUrl,
   type ComputedElement,
 } from "../../src/lib/visual-extractor.js";
 
@@ -20,6 +22,36 @@ describe("findChrome", () => {
 
   it("isVisualExtractionAvailable matches findChrome", () => {
     expect(isVisualExtractionAvailable()).toBe(findChrome() !== null);
+  });
+});
+
+describe("browser extraction security policy", () => {
+  it("keeps the Chromium sandbox enabled by default", () => {
+    const args = chromeLaunchArgs({}, { includeWindowSize: true });
+    expect(args).not.toContain("--no-sandbox");
+    expect(args).not.toContain("--disable-setuid-sandbox");
+    expect(args).toContain("--window-size=1280,800");
+  });
+
+  it("requires an explicit unsafe opt-in to disable the sandbox", () => {
+    const args = chromeLaunchArgs({
+      BRANDSYSTEM_UNSAFE_DISABLE_CHROME_SANDBOX: "1",
+    });
+    expect(args).toContain("--no-sandbox");
+    expect(args).toContain("--disable-setuid-sandbox");
+  });
+
+  it("blocks loopback, private-network, metadata, and non-browser protocols", async () => {
+    await expect(validateBrowserRequestUrl("http://127.0.0.1/admin")).rejects.toThrow("SSRF blocked");
+    await expect(validateBrowserRequestUrl("http://10.0.0.1/internal")).rejects.toThrow("SSRF blocked");
+    await expect(validateBrowserRequestUrl("http://169.254.169.254/latest/meta-data/")).rejects.toThrow("SSRF blocked");
+    await expect(validateBrowserRequestUrl("file:///etc/passwd")).rejects.toThrow("SSRF blocked");
+  });
+
+  it("allows browser-local URLs without a network lookup", async () => {
+    await expect(validateBrowserRequestUrl("about:blank")).resolves.toBeUndefined();
+    await expect(validateBrowserRequestUrl("data:text/plain,brand")).resolves.toBeUndefined();
+    await expect(validateBrowserRequestUrl("blob:https://example.com/id")).resolves.toBeUndefined();
   });
 });
 

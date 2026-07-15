@@ -13,7 +13,7 @@
 import * as cheerio from "cheerio";
 import { existsSync } from "node:fs";
 import { platform } from "node:os";
-import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES } from "./url-validator.js";
+import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, validateUrl } from "./url-validator.js";
 import { getVersion } from "./version.js";
 import { summarizeVisualTokens, type VisualTokenSummary } from "./visual-tokens.js";
 
@@ -142,6 +142,83 @@ export function findChrome(): string | null {
     if (p && existsSync(p)) return p;
   }
   return null;
+}
+
+/**
+ * Build Chromium arguments with the browser sandbox enabled by default.
+ *
+ * Some constrained containers cannot start Chromium's sandbox. They must make
+ * the security downgrade explicit instead of silently exposing every local MCP
+ * user to an unsandboxed browser process.
+ */
+export function chromeLaunchArgs(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { includeWindowSize?: boolean } = {},
+): string[] {
+  const args = [
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--disable-extensions",
+  ];
+
+  if (options.includeWindowSize) {
+    args.push("--window-size=1280,800");
+  }
+
+  if (env.BRANDSYSTEM_UNSAFE_DISABLE_CHROME_SANDBOX === "1") {
+    args.unshift("--no-sandbox", "--disable-setuid-sandbox");
+  }
+
+  return args;
+}
+
+const LOCAL_BROWSER_PROTOCOLS = new Set(["about:", "blob:", "data:"]);
+
+/**
+ * Validate every browser navigation and subresource before Chromium can fetch
+ * it. Redirect targets also pass through request interception, which prevents a
+ * public page from pivoting the extractor into loopback, private-network, or
+ * cloud-metadata services.
+ */
+export async function validateBrowserRequestUrl(url: string): Promise<void> {
+  const protocol = new URL(url).protocol;
+  if (LOCAL_BROWSER_PROTOCOLS.has(protocol)) return;
+  await validateUrl(url);
+}
+
+type InterceptedRequest = {
+  abort(errorCode?: string): Promise<void>;
+  continue(): Promise<void>;
+  resourceType(): string;
+  url(): string;
+};
+
+async function handleBrowserRequest(req: InterceptedRequest): Promise<void> {
+  const type = req.resourceType();
+  if (type === "media" || type === "websocket") {
+    await req.abort("blockedbyclient");
+    return;
+  }
+
+  try {
+    await validateBrowserRequestUrl(req.url());
+    await req.continue();
+  } catch {
+    await req.abort("blockedbyclient");
+  }
+}
+
+function installBrowserRequestPolicy(page: {
+  on(event: "request", handler: (req: InterceptedRequest) => void): unknown;
+  setRequestInterception(enabled: boolean): Promise<void>;
+}): Promise<void> {
+  return page.setRequestInterception(true).then(() => {
+    page.on("request", (req) => {
+      // Chromium may close a page while an intercepted request is resolving.
+      // Treat that race as already handled rather than leaking a rejected task.
+      void handleBrowserRequest(req).catch(() => undefined);
+    });
+  });
 }
 
 /** Check if visual extraction is available on this system */
@@ -591,14 +668,7 @@ export async function extractVisual(url: string): Promise<VisualExtractionResult
     browser = await puppeteer.default.launch({
       executablePath: chromePath,
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--disable-extensions",
-        "--window-size=1280,800",
-      ],
+      args: chromeLaunchArgs(process.env, { includeWindowSize: true }),
       timeout: 20000,
     });
 
@@ -606,16 +676,8 @@ export async function extractVisual(url: string): Promise<VisualExtractionResult
     // 2x DPR for sharp text — critical for vision model analysis
     await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 });
 
-    // Block heavy resources to speed up loading
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const type = req.resourceType();
-      if (type === "media" || type === "websocket") {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
+    // Block heavy resources and reject internal-network pivots before fetch.
+    await installBrowserRequestPolicy(page);
 
     await page.goto(url, {
       waitUntil: "networkidle2",
@@ -709,23 +771,12 @@ export async function extractSite(
     browser = await puppeteer.default.launch({
       executablePath: chromePath,
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--disable-extensions",
-      ],
+      args: chromeLaunchArgs(),
       timeout: 20000,
     });
 
     const page = await browser.newPage();
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const type = req.resourceType();
-      if (type === "media" || type === "websocket") req.abort();
-      else req.continue();
-    });
+    await installBrowserRequestPolicy(page);
 
     const selectedPages: SitePageExtraction[] = [];
 
