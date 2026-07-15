@@ -723,6 +723,120 @@ describe("brand_check (hosted)", () => {
       font: { status: "review" },
     });
   });
+
+  it("returns only matching approved Taste Guidance as a revision counterprompt", async () => {
+    const tasteGuidance = {
+      schemaVersion: "s078-tmcp1-taste-memory-guidance/v0.1" as const,
+      brandSlug: "acme",
+      tasteRevision: `sha256:${"b".repeat(64)}`,
+      updatedAt: "2026-07-15T08:00:00.000Z",
+      guidance: [
+        {
+          id: "taste-social",
+          directive: "Use asymmetric crops when the subject stays legible.",
+          polarity: "use" as const,
+          reason: "Creates intentional tension.",
+          scope: {
+            artifactKind: "social-layout",
+            patternRef: "asymmetric-crop",
+            surfaces: ["social", "chef"],
+          },
+          provenance: "Reviewed external capture",
+          reviewedBy: "brand-admin" as const,
+          reviewedAt: "2026-07-15T08:00:00.000Z",
+          canonicalMutation: false as const,
+        },
+        {
+          id: "taste-deck",
+          directive: "Avoid centered title stacks in presentations.",
+          polarity: "avoid" as const,
+          reason: "The deck system uses editorial edge alignment.",
+          scope: {
+            artifactKind: "presentation",
+            patternRef: "centered-title-stack",
+            surfaces: ["slides"],
+          },
+          provenance: "Reviewed deck capture",
+          reviewedBy: "brand-admin" as const,
+          reviewedAt: "2026-07-15T08:00:00.000Z",
+          canonicalMutation: false as const,
+        },
+      ],
+      counts: { approved: 2 },
+      boundary:
+        "Reviewed Taste Memory guides creation without mutating Official Brand.",
+    };
+    const { client } = await connectClient(
+      buildContext(CHECK_PACKAGE, {
+        auth: checkAuth,
+        loadTasteGuidance: async () => tasteGuidance,
+      }),
+    );
+    const json = await call(client, "brand_check", {
+      text: "Governed AI, ready to ship",
+      artifact_kind: "social-layout",
+      surface: "social",
+    });
+    const counterprompt = json.taste_counterprompt as Record<string, unknown>;
+    const guidance = counterprompt.guidance as Array<Record<string, unknown>>;
+
+    expect(json.verdict).toBe("pass");
+    expect(counterprompt).toMatchObject({
+      status: "available",
+      semantic_verdict: "not_evaluated",
+      artifact_kind: "social-layout",
+      surface: "social",
+    });
+    expect(guidance.map((item) => item.id)).toEqual(["taste-social"]);
+    expect(counterprompt.boundary).toContain("not an automated semantic");
+    expect(json.recommendations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("revision counterprompt"),
+      ]),
+    );
+  });
+
+  it("keeps unavailable and unrequested Taste Guidance out of the verdict", async () => {
+    let tasteReads = 0;
+    const unrequested = await connectClient(
+      buildContext(CHECK_PACKAGE, {
+        auth: checkAuth,
+        loadTasteGuidance: async () => {
+          tasteReads += 1;
+          return null;
+        },
+      }),
+    );
+    const ordinary = await call(unrequested.client, "brand_check", {
+      color: "#2563eb",
+    });
+    expect(ordinary.verdict).toBe("pass");
+    expect(tasteReads).toBe(0);
+    expect(ordinary.taste_counterprompt).toMatchObject({
+      status: "not_requested",
+      semantic_verdict: "not_evaluated",
+      guidance: [],
+    });
+
+    const unavailableClient = await connectClient(
+      buildContext(CHECK_PACKAGE, {
+        auth: checkAuth,
+        loadTasteGuidance: async () => {
+          throw new Error("temporary outage");
+        },
+      }),
+    );
+    const unavailable = await call(unavailableClient.client, "brand_check", {
+      color: "#2563eb",
+      artifact_kind: "social-layout",
+    });
+    expect(unavailable.verdict).toBe("pass");
+    expect(unavailable.taste_counterprompt).toMatchObject({
+      status: "unavailable",
+      semantic_verdict: "not_evaluated",
+      guidance: [],
+    });
+  });
 });
 
 describe("brand_search (hosted)", () => {

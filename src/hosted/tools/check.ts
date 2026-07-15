@@ -9,14 +9,45 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../../lib/response.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
+import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
 const paramsShape = {
-  text: z.string().optional().describe("Copy to check for voice and claim governance."),
-  color: z.string().optional().describe("Hex color to check against hosted brand colors."),
-  font: z.string().optional().describe("Font family to check against hosted typography."),
-  css: z.string().optional().describe("CSS snippet to check for color/font usage and governed styling anti-patterns."),
+  text: z
+    .string()
+    .optional()
+    .describe("Copy to check for voice and claim governance."),
+  color: z
+    .string()
+    .optional()
+    .describe("Hex color to check against hosted brand colors."),
+  font: z
+    .string()
+    .optional()
+    .describe("Font family to check against hosted typography."),
+  css: z
+    .string()
+    .optional()
+    .describe(
+      "CSS snippet to check for color/font usage and governed styling anti-patterns.",
+    ),
+  artifact_kind: z
+    .string()
+    .min(1)
+    .max(120)
+    .optional()
+    .describe(
+      "Optional artifact class used to select relevant approved Taste Guidance, such as social-layout or illustration.",
+    ),
+  surface: z
+    .string()
+    .min(1)
+    .max(80)
+    .optional()
+    .describe(
+      "Optional creation surface used to select relevant approved Taste Guidance, such as social, chef, or web.",
+    ),
 };
 
 const ParamsSchema = z.object(paramsShape);
@@ -121,17 +152,16 @@ function normalizeHex(value: string): string | null {
   if (!match) return null;
   const hex = match[1];
   if (hex.length === 3) {
-    return `#${hex.split("").map((char) => `${char}${char}`).join("")}`;
+    return `#${hex
+      .split("")
+      .map((char) => `${char}${char}`)
+      .join("")}`;
   }
   return `#${hex}`;
 }
 
 function normalizeFont(value: string): string {
-  return value
-    .split(",")[0]
-    .replace(/["']/g, "")
-    .trim()
-    .toLowerCase();
+  return value.split(",")[0].replace(/["']/g, "").trim().toLowerCase();
 }
 
 function statusOf(item: Record<string, unknown>): string | undefined {
@@ -273,7 +303,14 @@ function collectStructuredText(
             item.required_elements,
             item.requiredElements,
           );
-    const label = pickString(item.id, item.key, item.title, item.name, item.phrase, item.claim);
+    const label = pickString(
+      item.id,
+      item.key,
+      item.title,
+      item.name,
+      item.phrase,
+      item.claim,
+    );
     const term = sourceTerm(text, source, kind, {
       label: label || text,
       status: statusOf(item),
@@ -288,9 +325,7 @@ function prohibitionMatchValue(value: string): string {
     /\b(?:never|avoid|do not|don't|dont|must not)\s+(.+)/i,
   );
   if (prohibition?.[1]) return prohibition[1].trim();
-  return cleaned
-    .replace(/^(forbidden|blocked|unsupported)\s+/i, "")
-    .trim();
+  return cleaned.replace(/^(forbidden|blocked|unsupported)\s+/i, "").trim();
 }
 
 function extractForbiddenTerms(
@@ -328,7 +363,13 @@ function extractForbiddenTerms(
   );
   if (text) {
     const matchValue = prohibitionMatchValue(text);
-    const label = pickString(value.id, value.key, value.name, value.title, text);
+    const label = pickString(
+      value.id,
+      value.key,
+      value.name,
+      value.title,
+      text,
+    );
     const term = sourceTerm(text, source, kind, {
       label: label || text,
       matchValue,
@@ -351,10 +392,15 @@ function scanForbiddenFields(
   if (!isRecord(value) || depth > 4) return;
   for (const [key, raw] of Object.entries(value)) {
     const nextSource = `${source}.${key}`;
-    if (/(never|forbidden|blocked|anti.?pattern|do.?not|dont|disallow|unsupported)/i.test(key)) {
+    if (
+      /(never|forbidden|blocked|anti.?pattern|do.?not|dont|disallow|unsupported)/i.test(
+        key,
+      )
+    ) {
       extractForbiddenTerms(raw, nextSource, "forbidden", out, sources);
     }
-    if (isRecord(raw)) scanForbiddenFields(raw, nextSource, out, sources, depth + 1);
+    if (isRecord(raw))
+      scanForbiddenFields(raw, nextSource, out, sources, depth + 1);
   }
 }
 
@@ -400,7 +446,12 @@ function collectGovernance(pkg: BrandPackagePayload | null): GovernanceModel {
     colors,
     sources,
   );
-  collectColorTerms(identity.colors, "runtime.identity.colors", colors, sources);
+  collectColorTerms(
+    identity.colors,
+    "runtime.identity.colors",
+    colors,
+    sources,
+  );
   collectColorTerms(
     instanceRuntimeIdentity.colors,
     "brandInstance.runtime.identity.colors",
@@ -415,7 +466,12 @@ function collectGovernance(pkg: BrandPackagePayload | null): GovernanceModel {
     fonts,
     sources,
   );
-  collectFontTerms(identity.typography, "runtime.identity.typography", fonts, sources);
+  collectFontTerms(
+    identity.typography,
+    "runtime.identity.typography",
+    fonts,
+    sources,
+  );
   collectFontTerms(
     instanceRuntimeIdentity.typography,
     "brandInstance.runtime.identity.typography",
@@ -448,7 +504,9 @@ function collectGovernance(pkg: BrandPackagePayload | null): GovernanceModel {
     sources,
   );
 
-  const capabilities = isRecord(instance.capabilities) ? instance.capabilities : {};
+  const capabilities = isRecord(instance.capabilities)
+    ? instance.capabilities
+    : {};
   for (const key of ["blocked", "disabled", "unsupported", "disallowed"]) {
     extractForbiddenTerms(
       capabilities[key],
@@ -465,23 +523,38 @@ function collectGovernance(pkg: BrandPackagePayload | null): GovernanceModel {
         term.value,
       )
     ) {
-      const forbiddenTerm = sourceTerm(term.value, term.source, "application_rule", {
-        label: term.label,
-        status: term.status,
-        matchValue: prohibitionMatchValue(term.value),
-      });
+      const forbiddenTerm = sourceTerm(
+        term.value,
+        term.source,
+        "application_rule",
+        {
+          label: term.label,
+          status: term.status,
+          matchValue: prohibitionMatchValue(term.value),
+        },
+      );
       if (forbiddenTerm) forbidden.push(forbiddenTerm);
     }
   }
 
-  scanForbiddenFields(instance.voice, "brandInstance.voice", forbidden, sources);
+  scanForbiddenFields(
+    instance.voice,
+    "brandInstance.voice",
+    forbidden,
+    sources,
+  );
   scanForbiddenFields(
     instance.verbalIdentity,
     "brandInstance.verbalIdentity",
     forbidden,
     sources,
   );
-  scanForbiddenFields(record.interactionPolicy, "interactionPolicy", forbidden, sources);
+  scanForbiddenFields(
+    record.interactionPolicy,
+    "interactionPolicy",
+    forbidden,
+    sources,
+  );
   scanForbiddenFields(runtime.voice, "runtime.voice", forbidden, sources);
   scanForbiddenFields(runtime.policy, "runtime.policy", forbidden, sources);
 
@@ -524,7 +597,10 @@ function statusFromFindings(findings: Finding[], fallback: Verdict): Verdict {
   return fallback;
 }
 
-function checkText(input: string, governance: GovernanceModel): {
+function checkText(
+  input: string,
+  governance: GovernanceModel,
+): {
   check: FieldCheck;
   findings: Finding[];
 } {
@@ -554,7 +630,8 @@ function checkText(input: string, governance: GovernanceModel): {
       check: {
         status: "review",
         input: compact(input),
-        message: "Text needs review because hosted text governance is incomplete",
+        message:
+          "Text needs review because hosted text governance is incomplete",
         sources,
       },
       findings,
@@ -658,7 +735,10 @@ function checkText(input: string, governance: GovernanceModel): {
   };
 }
 
-function checkColorValue(input: string, governance: GovernanceModel): {
+function checkColorValue(
+  input: string,
+  governance: GovernanceModel,
+): {
   status: Verdict;
   matched?: SourceTerm;
   finding?: Finding;
@@ -687,7 +767,9 @@ function checkColorValue(input: string, governance: GovernanceModel): {
       },
     };
   }
-  const matched = governance.colors.find((term) => term.matchValue === normalized);
+  const matched = governance.colors.find(
+    (term) => term.matchValue === normalized,
+  );
   if (matched) {
     return { status: "pass", matched, normalized };
   }
@@ -704,7 +786,10 @@ function checkColorValue(input: string, governance: GovernanceModel): {
   };
 }
 
-function checkColor(input: string, governance: GovernanceModel): {
+function checkColor(
+  input: string,
+  governance: GovernanceModel,
+): {
   check: FieldCheck;
   findings: Finding[];
 } {
@@ -734,7 +819,10 @@ function checkColor(input: string, governance: GovernanceModel): {
   };
 }
 
-function checkFontValue(input: string, governance: GovernanceModel): {
+function checkFontValue(
+  input: string,
+  governance: GovernanceModel,
+): {
   status: Verdict;
   matched?: SourceTerm;
   finding?: Finding;
@@ -747,7 +835,8 @@ function checkFontValue(input: string, governance: GovernanceModel): {
       finding: {
         code: "unsupported_font_format",
         level: "warning",
-        message: "Font input is empty or not a family name hosted brand_check can evaluate",
+        message:
+          "Font input is empty or not a family name hosted brand_check can evaluate",
       },
     };
   }
@@ -765,7 +854,11 @@ function checkFontValue(input: string, governance: GovernanceModel): {
   }
   const matched = governance.fonts.find((term) => {
     const known = normalizeFont(term.matchValue);
-    return normalized === known || normalized.includes(known) || known.includes(normalized);
+    return (
+      normalized === known ||
+      normalized.includes(known) ||
+      known.includes(normalized)
+    );
   });
   if (matched) return { status: "pass", matched, normalized };
   return {
@@ -781,7 +874,10 @@ function checkFontValue(input: string, governance: GovernanceModel): {
   };
 }
 
-function checkFont(input: string, governance: GovernanceModel): {
+function checkFont(
+  input: string,
+  governance: GovernanceModel,
+): {
   check: FieldCheck;
   findings: Finding[];
 } {
@@ -805,7 +901,11 @@ function checkFont(input: string, governance: GovernanceModel): {
         result.status === "pass"
           ? "Font is present in hosted brand typography"
           : "Font needs review against hosted brand typography",
-      sources: ["brandInstance.fonts.roles", "brandInstance.tokens.typography", "runtime.identity.typography"],
+      sources: [
+        "brandInstance.fonts.roles",
+        "brandInstance.tokens.typography",
+        "runtime.identity.typography",
+      ],
     },
     findings,
   };
@@ -832,13 +932,18 @@ function cssAntiPatternFindings(
   const findings: Finding[] = [];
   const text = input.toLowerCase();
   const governedTerms = governance.forbidden
-    .filter((term) => /shadow|gradient|blur|opacity|radius/.test(term.value.toLowerCase()))
+    .filter((term) =>
+      /shadow|gradient|blur|opacity|radius/.test(term.value.toLowerCase()),
+    )
     .map((term) => term.value.toLowerCase());
   if (governedTerms.length === 0) return findings;
 
   const patterns = [
     { css: /box-shadow|text-shadow/, label: "shadow" },
-    { css: /linear-gradient|radial-gradient|conic-gradient/, label: "gradient" },
+    {
+      css: /linear-gradient|radial-gradient|conic-gradient/,
+      label: "gradient",
+    },
     { css: /filter\s*:\s*blur|backdrop-filter\s*:\s*blur/, label: "blur" },
     { css: /opacity\s*:\s*(0?\.\d+|0)/, label: "opacity" },
     { css: /border-radius/, label: "radius" },
@@ -860,7 +965,10 @@ function cssAntiPatternFindings(
   return findings;
 }
 
-function checkCss(input: string, governance: GovernanceModel): {
+function checkCss(
+  input: string,
+  governance: GovernanceModel,
+): {
   check: FieldCheck;
   findings: Finding[];
 } {
@@ -871,7 +979,11 @@ function checkCss(input: string, governance: GovernanceModel): {
 
   for (const color of colors) {
     const result = checkColorValue(color, governance);
-    if (result.finding) addFinding(findings, { ...result.finding, code: `css_${result.finding.code}` });
+    if (result.finding)
+      addFinding(findings, {
+        ...result.finding,
+        code: `css_${result.finding.code}`,
+      });
     if (result.matched) {
       matched.push({
         kind: "color",
@@ -883,7 +995,11 @@ function checkCss(input: string, governance: GovernanceModel): {
   }
   for (const font of fonts) {
     const result = checkFontValue(font, governance);
-    if (result.finding) addFinding(findings, { ...result.finding, code: `css_${result.finding.code}` });
+    if (result.finding)
+      addFinding(findings, {
+        ...result.finding,
+        code: `css_${result.finding.code}`,
+      });
     if (result.matched) {
       matched.push({
         kind: "font",
@@ -904,7 +1020,10 @@ function checkCss(input: string, governance: GovernanceModel): {
     });
   }
 
-  const status = statusFromFindings(findings, matched.length > 0 ? "pass" : "review");
+  const status = statusFromFindings(
+    findings,
+    matched.length > 0 ? "pass" : "review",
+  );
   return {
     check: {
       status,
@@ -941,20 +1060,30 @@ function aggregateVerdict(checks: Record<string, FieldCheck>): Verdict {
 
 function recommendationsFor(verdict: Verdict, findings: Finding[]): string[] {
   if (findings.length === 0 && verdict === "pass") {
-    return ["Proceed using the cited hosted package sources as the governance basis"];
+    return [
+      "Proceed using the cited hosted package sources as the governance basis",
+    ];
   }
   const recommendations = new Set<string>();
   for (const finding of findings) {
     if (finding.level === "error") {
-      recommendations.add("Remove or rewrite failing copy/styles before production use");
+      recommendations.add(
+        "Remove or rewrite failing copy/styles before production use",
+      );
     } else if (finding.level === "warning") {
-      recommendations.add("Treat warning findings as review gates before publishing");
+      recommendations.add(
+        "Treat warning findings as review gates before publishing",
+      );
     } else if (/unavailable|no_governed/.test(finding.code)) {
-      recommendations.add("Call brand_runtime or brand_status to inspect available hosted governance before relying on this check");
+      recommendations.add(
+        "Call brand_runtime or brand_status to inspect available hosted governance before relying on this check",
+      );
     }
   }
   if (recommendations.size === 0) {
-    recommendations.add("Use matched sources as provenance when applying this guidance");
+    recommendations.add(
+      "Use matched sources as provenance when applying this guidance",
+    );
   }
   return Array.from(recommendations);
 }
@@ -963,6 +1092,55 @@ function hasInput(params: Params): boolean {
   return [params.text, params.color, params.font, params.css].some(
     (value) => typeof value === "string" && value.trim().length > 0,
   );
+}
+
+function normalizeScope(value: string | undefined) {
+  return value?.trim().toLowerCase() ?? null;
+}
+
+function buildTasteCounterprompt(
+  projection: TasteGuidanceProjection | null,
+  input: Pick<Params, "artifact_kind" | "surface">,
+) {
+  const artifactKind = normalizeScope(input.artifact_kind);
+  const surface = normalizeScope(input.surface);
+  const guidance = (projection?.guidance ?? []).filter((item) => {
+    const itemArtifactKind = normalizeScope(
+      item.scope.artifactKind ?? undefined,
+    );
+    const itemSurfaces = item.scope.surfaces.map((value) =>
+      value.trim().toLowerCase(),
+    );
+    const globallyScoped = !itemArtifactKind && itemSurfaces.length === 0;
+    return (
+      globallyScoped ||
+      (artifactKind !== null && itemArtifactKind === artifactKind) ||
+      (surface !== null && itemSurfaces.includes(surface))
+    );
+  });
+
+  return {
+    status: guidance.length > 0 ? "available" : "empty",
+    artifact_kind: input.artifact_kind ?? null,
+    surface: input.surface ?? null,
+    semantic_verdict: "not_evaluated",
+    guidance: guidance.slice(0, 12).map((item) => ({
+      id: item.id,
+      directive: item.directive,
+      polarity: item.polarity,
+      reason: item.reason,
+      scope: {
+        artifact_kind: item.scope.artifactKind,
+        pattern_ref: item.scope.patternRef,
+        surfaces: item.scope.surfaces,
+      },
+      provenance: item.provenance,
+      reviewed_at: item.reviewedAt,
+      canonical_mutation: false,
+    })),
+    boundary:
+      "Human-reviewed Taste Guidance is a revision counterprompt, not an automated semantic or visual compliance verdict.",
+  };
 }
 
 export function registerCheck(server: McpServer, context: HostedBrandContext) {
@@ -979,7 +1157,9 @@ export function registerCheck(server: McpServer, context: HostedBrandContext) {
       if (!hasInput(parsed.data)) {
         return buildResponse({
           what_happened: "brand_check needs at least one field to evaluate",
-          next_steps: ["Provide text, color, font, css, or a combination of fields"],
+          next_steps: [
+            "Provide text, color, font, css, or a combination of fields",
+          ],
           data: {
             error: "no_input",
             verdict: "review",
@@ -1043,17 +1223,65 @@ export function registerCheck(server: McpServer, context: HostedBrandContext) {
       }
 
       const verdict = aggregateVerdict(checks);
+      const wantsTasteCounterprompt = Boolean(
+        parsed.data.artifact_kind || parsed.data.surface,
+      );
+      let tasteCounterprompt:
+        | ReturnType<typeof buildTasteCounterprompt>
+        | {
+            status: "unavailable" | "not_requested";
+            semantic_verdict: "not_evaluated";
+            guidance: never[];
+            boundary: string;
+          };
+      if (!wantsTasteCounterprompt) {
+        tasteCounterprompt = {
+          status: "not_requested",
+          semantic_verdict: "not_evaluated",
+          guidance: [],
+          boundary:
+            "Provide artifact_kind or surface to request scoped human-reviewed Taste Guidance.",
+        };
+      } else {
+        try {
+          tasteCounterprompt = buildTasteCounterprompt(
+            await context.loadTasteGuidance(),
+            parsed.data,
+          );
+        } catch {
+          tasteCounterprompt = {
+            status: "unavailable",
+            semantic_verdict: "not_evaluated",
+            guidance: [],
+            boundary:
+              "Taste Guidance was unavailable; the ordinary hosted governance verdict remains valid and no semantic Taste verdict was inferred.",
+          };
+        }
+      }
+      const recommendations = recommendationsFor(verdict, findings);
+      if (tasteCounterprompt.guidance.length > 0) {
+        recommendations.push(
+          "Use the matching human-reviewed Taste Guidance as a revision counterprompt before publishing",
+        );
+      }
       return buildResponse({
         what_happened: `Hosted brand_check returned ${verdict} for "${context.slug}"`,
-        next_steps:
+        next_steps: [
           verdict === "pass"
-            ? ["Use the checks and sources_consulted fields as hosted governance provenance"]
-            : ["Review findings and recommendations before applying this brand work"],
+            ? "Use the checks and sources_consulted fields as hosted governance provenance"
+            : "Review findings and recommendations before applying this brand work",
+          ...(tasteCounterprompt.guidance.length > 0
+            ? [
+                "Revise with the scoped Taste counterprompt, then check the artifact again",
+              ]
+            : []),
+        ],
         data: {
           verdict,
           checks,
           findings,
-          recommendations: recommendationsFor(verdict, findings),
+          recommendations,
+          taste_counterprompt: tasteCounterprompt,
           sources_consulted: governance.sources,
           runtime_origin: "hosted",
           custody_safe: true,
