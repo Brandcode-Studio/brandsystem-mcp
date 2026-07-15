@@ -355,6 +355,32 @@ function compactTasteGuidance(projection: TasteGuidanceProjection | null) {
   };
 }
 
+function tasteWorkflow(captureAvailable: boolean) {
+  return {
+    schema_version: "brandcode-taste-workflow/v0.1",
+    apply_reviewed_guidance:
+      "Apply only approved guidance that matches the current artifact kind or surface. Honor an explicit fresh-direction request by not applying saved taste guidance.",
+    capture: captureAvailable
+      ? {
+          available: true,
+          tool: "capture_taste",
+          when_to_offer:
+            "After the person expresses a concrete judgment about an artifact, ask whether they want that judgment queued in Brandcode for review.",
+          required_detail:
+            "Record the candidate reference, verdict, and a specific attribute-level reason; include artifact, surface, runtime, turn, and session context when available.",
+          result:
+            "The capture remains review-only. Return the successful tool response's review_url so the person can review the exact queued item in Brandcode.",
+        }
+      : {
+          available: false,
+          reason:
+            "This MCP connection has read access but not capture access. Do not claim that a taste judgment was recorded.",
+        },
+    never:
+      "Never passively capture a conversation, infer silence as approval, or claim a queued judgment changed Official Brand or approved guidance.",
+  };
+}
+
 export function registerRuntime(
   server: McpServer,
   context: HostedBrandContext,
@@ -416,7 +442,12 @@ export function registerRuntime(
       const sliced = {
         ...sliceRuntime(runtime, parsed.data.slice),
         ...(parsed.data.slice === "full" || parsed.data.slice === "voice"
-          ? { taste_guidance: compactTasteGuidance(tasteGuidance) }
+          ? {
+              taste_guidance: compactTasteGuidance(tasteGuidance),
+              taste_workflow: tasteWorkflow(
+                context.auth.scopes.includes("capture"),
+              ),
+            }
           : {}),
       };
       const estimatedTokens =
@@ -432,6 +463,13 @@ export function registerRuntime(
         what_happened: `Loaded live runtime for "${context.slug}" — ${parsed.data.slice} slice (${estimatedTokens} tokens)`,
         next_steps: [
           "Inject this into your sub-agent's prompt as brand context",
+          ...(parsed.data.slice === "full" || parsed.data.slice === "voice"
+            ? [
+                context.auth.scopes.includes("capture")
+                  ? "Apply relevant approved Taste Guidance; after a concrete user judgment, offer to queue it with capture_taste for Brandcode review"
+                  : "Apply relevant approved Taste Guidance; this connection is read-only for taste capture",
+              ]
+            : []),
           parsed.data.slice === "full"
             ? "Use slice='visual' or 'voice' for smaller hand-offs"
             : "Use slice='full' for complete context",

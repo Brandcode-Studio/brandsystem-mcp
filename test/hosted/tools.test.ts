@@ -1245,6 +1245,43 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
     ).toBeTruthy();
   });
 
+  it("teaches capture-scoped agents the explicit review-only taste workflow", async () => {
+    const auth = buildAuth({ scopes: ["read", "capture"] });
+    const { client } = await connectClient(buildContext(GOV_PACKAGE, { auth }));
+    const json = await call(client, "brand_runtime", { slice: "full" });
+    const runtime = json.runtime as Record<string, unknown>;
+    const workflow = runtime.taste_workflow as Record<string, unknown>;
+    const capture = workflow.capture as Record<string, unknown>;
+
+    expect(workflow.schema_version).toBe("brandcode-taste-workflow/v0.1");
+    expect(workflow.apply_reviewed_guidance).toContain("approved guidance");
+    expect(workflow.apply_reviewed_guidance).toContain("fresh-direction");
+    expect(capture).toMatchObject({
+      available: true,
+      tool: "capture_taste",
+    });
+    expect(capture.when_to_offer).toContain("concrete judgment");
+    expect(capture.result).toContain("review_url");
+    expect(workflow.never).toContain("Never passively capture");
+    expect((json._metadata as Record<string, unknown>).next_steps).toEqual(
+      expect.arrayContaining([expect.stringContaining("offer to queue")]),
+    );
+  });
+
+  it("keeps read-only agents truthful about unavailable taste capture", async () => {
+    const { client } = await connectClient(buildContext(GOV_PACKAGE));
+    const json = await call(client, "brand_runtime", { slice: "voice" });
+    const runtime = json.runtime as Record<string, unknown>;
+    const workflow = runtime.taste_workflow as Record<string, unknown>;
+    const capture = workflow.capture as Record<string, unknown>;
+
+    expect(capture).toMatchObject({ available: false });
+    expect(capture.reason).toContain("read access but not capture access");
+    expect((json._metadata as Record<string, unknown>).next_steps).toEqual(
+      expect.arrayContaining([expect.stringContaining("read-only")]),
+    );
+  });
+
   it("minimal runtime stays small and does not fetch Taste Guidance", async () => {
     let tasteReads = 0;
     const { client } = await connectClient(
@@ -1260,6 +1297,9 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
     expect(json.taste_guidance_status).toBe("not_requested");
     expect(json.runtime as Record<string, unknown>).not.toHaveProperty(
       "taste_guidance",
+    );
+    expect(json.runtime as Record<string, unknown>).not.toHaveProperty(
+      "taste_workflow",
     );
   });
 
