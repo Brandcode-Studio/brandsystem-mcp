@@ -2,7 +2,7 @@
  * External consumer types pinned to the UCS-owned Runtime Contract V1.
  *
  * Canonical source: UCS app/tools/lib/runtime-contract/schema.ts
- * Canonical implementation commit: 1c919eac48fd4bd54f8be39a0c2288df2f53b8a9
+ * Canonical implementation commit: 068f06ed31df568986f045753fd7ef7166c14d1e
  * Do not evolve this copy independently; adopt a new UCS fixture bundle.
  */
 export const BRANDCODE_RUNTIME_CONTRACT_V1 =
@@ -12,6 +12,16 @@ export const BRANDCODE_RUNTIME_CONTRACT_PREVIOUS =
 
 export type RuntimeContractProvenanceClass =
   "official_source" | "compiled_source" | "reviewed_memory" | "package_overlay";
+
+export type RuntimeContractDeliveryHandle = {
+  assetId: string;
+  brandSlug: string;
+  resolverRef: string;
+  transport: "package_path" | "trusted_brandcode_url";
+  posture: "package_non_expiring" | "signed_expiring";
+  integritySha256: string | null;
+  expiresAt: string | null;
+};
 
 export type RuntimeContractV1 = {
   schemaVersion: typeof BRANDCODE_RUNTIME_CONTRACT_V1;
@@ -61,6 +71,7 @@ export type RuntimeContractV1 = {
     approvalState: "approved";
     provenanceClass: RuntimeContractProvenanceClass;
     deliveryRef: string | null;
+    deliveryHandle: RuntimeContractDeliveryHandle | null;
     runtimeRoles: string[];
   }>;
   kits: {
@@ -70,6 +81,7 @@ export type RuntimeContractV1 = {
       name: string;
       authority: "selected_context";
       provenanceClass: RuntimeContractProvenanceClass;
+      memberAssetIds: string[];
     } | null;
     campaigns: Array<{
       objectType: "campaign_exploratory_kit";
@@ -164,7 +176,41 @@ export const RUNTIME_CONTRACT_V1_JSON_SCHEMA = {
     },
     assets: {
       type: "array",
-      items: { type: "object", additionalProperties: true },
+      items: {
+        type: "object",
+        additionalProperties: true,
+        required: [
+          "objectType",
+          "id",
+          "name",
+          "category",
+          "authority",
+          "approvalState",
+          "provenanceClass",
+          "deliveryRef",
+          "runtimeRoles",
+        ],
+        properties: {
+          deliveryHandle: {
+            anyOf: [
+              { type: "null" },
+              {
+                type: "object",
+                additionalProperties: true,
+                required: [
+                  "assetId",
+                  "brandSlug",
+                  "resolverRef",
+                  "transport",
+                  "posture",
+                  "integritySha256",
+                  "expiresAt",
+                ],
+              },
+            ],
+          },
+        },
+      },
     },
     kits: { type: "object", required: ["selected", "campaigns"] },
     tasteGuidance: {

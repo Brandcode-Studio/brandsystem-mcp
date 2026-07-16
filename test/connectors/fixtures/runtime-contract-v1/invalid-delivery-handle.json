@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "brandcode-runtime-contract/v1",
+  "manifest": {
+    "objectType": "full_brand_runtime",
+    "runtimeId": "acme@invalid-delivery",
+    "brandSlug": "acme",
+    "brandName": "Acme",
+    "runtimeVersion": "invalid-delivery",
+    "generatedAt": "2026-07-16T00:00:00.000Z",
+    "authority": "compiled_runtime",
+    "provenanceClass": "compiled_source"
+  },
+  "officialBrand": {
+    "objectType": "official_brand",
+    "slug": "acme",
+    "name": "Acme",
+    "version": "1.4.0",
+    "authority": "official",
+    "provenanceClass": "official_source"
+  },
+  "voice": { "verbalIdentity": "Direct.", "phrases": [] },
+  "strategy": { "perspective": null, "moves": [] },
+  "knowledge": { "corpusId": null, "documentCount": 0, "descriptors": [] },
+  "interactionPolicy": {
+    "mutability": "read_only",
+    "defaultSurface": "kitchen",
+    "supportedSurfaces": ["kitchen"],
+    "rules": []
+  },
+  "assets": [
+    {
+      "objectType": "production_approved_asset",
+      "id": "logo-primary",
+      "name": "Primary logo",
+      "category": "logo",
+      "authority": "production_approved",
+      "approvalState": "approved",
+      "provenanceClass": "official_source",
+      "deliveryRef": null,
+      "deliveryHandle": {
+        "assetId": "other-asset",
+        "brandSlug": "wrong-brand",
+        "resolverRef": "https://private-provider.example/logo.svg?token=secret",
+        "transport": "trusted_brandcode_url",
+        "posture": "package_non_expiring",
+        "integritySha256": null,
+        "expiresAt": "2027-01-01T00:00:00.000Z"
+      },
+      "runtimeRoles": ["identity"]
+    }
+  ],
+  "kits": { "selected": null, "campaigns": [] },
+  "tasteGuidance": [],
+  "capabilityWarnings": []
+}

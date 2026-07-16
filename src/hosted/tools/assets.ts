@@ -9,13 +9,20 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../../lib/response.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
+import {
+  normalizeRuntimeContractFromPackage,
+  type RuntimeContractV1,
+} from "../../connectors/brandcode/runtime-contract/index.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
 const listParamsShape = {
   category: z.string().optional().describe("Filter by asset category."),
   lifecycle: z.string().optional().describe("Filter by lifecycle status."),
-  cursor: z.string().optional().describe("Pagination cursor from a prior list response."),
+  cursor: z
+    .string()
+    .optional()
+    .describe("Pagination cursor from a prior list response."),
   limit: z.number().int().min(1).max(100).default(25).describe("Page size."),
 };
 
@@ -44,6 +51,8 @@ interface HostedAsset {
     blocked_private_provider_url: boolean;
   };
   delivery_ref: Record<string, unknown>;
+  delivery_handle: Record<string, unknown> | null;
+  selected_kit_context: Record<string, unknown> | null;
   package_posture: Record<string, unknown>;
   metadata: Record<string, unknown>;
 }
@@ -90,7 +99,9 @@ function safeTags(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function dimensionsFrom(asset: Record<string, unknown>): Record<string, unknown> | null {
+function dimensionsFrom(
+  asset: Record<string, unknown>,
+): Record<string, unknown> | null {
   const dimensions = asset.dimensions;
   if (isRecord(dimensions)) {
     return sanitizeMetadata(dimensions, ["url", "provider", "private", "blob"]);
@@ -118,8 +129,13 @@ function lifecycleOf(asset: Record<string, unknown>): string | null {
 
 function categoryOf(asset: Record<string, unknown>): string | null {
   return (
-    pickString(asset.category, asset.kind, asset.type, asset.role, asset.assetType) ||
-    null
+    pickString(
+      asset.category,
+      asset.kind,
+      asset.type,
+      asset.role,
+      asset.assetType,
+    ) || null
   );
 }
 
@@ -138,8 +154,16 @@ function governancePosture(asset: Record<string, unknown>): string {
     asset.approvedForProduction,
     asset.approved_for_production,
   );
-  const official = pickBoolean(asset.official, asset.isOfficial, asset.canonical);
-  const runtime = pickBoolean(asset.runtime, asset.inRuntime, asset.runtimeAsset);
+  const official = pickBoolean(
+    asset.official,
+    asset.isOfficial,
+    asset.canonical,
+  );
+  const runtime = pickBoolean(
+    asset.runtime,
+    asset.inRuntime,
+    asset.runtimeAsset,
+  );
 
   if (official || lifecycle.includes("official")) return "official";
   if (productionApproved || lifecycle.includes("production")) {
@@ -168,7 +192,8 @@ function isTrustedBrandcodePackageUrl(value: string): boolean {
     const hostname = parsed.hostname.toLowerCase();
     return (
       parsed.protocol === "https:" &&
-      (hostname === "brandcode.studio" || hostname.endsWith(".brandcode.studio"))
+      (hostname === "brandcode.studio" ||
+        hostname.endsWith(".brandcode.studio"))
     );
   } catch {
     return false;
@@ -235,13 +260,18 @@ function deliveryRef(asset: Record<string, unknown>): {
     return {
       ref: {
         posture: "blocked_private_provider_url",
-        reason: "No package-safe delivery reference is available for this asset",
+        reason:
+          "No package-safe delivery reference is available for this asset",
       },
       blockedPrivateProviderUrl: true,
     };
   }
 
-  if (packageUrl && isUrl(packageUrl) && isTrustedBrandcodePackageUrl(packageUrl)) {
+  if (
+    packageUrl &&
+    isUrl(packageUrl) &&
+    isTrustedBrandcodePackageUrl(packageUrl)
+  ) {
     return {
       ref: { posture: "package_safe", package_url: packageUrl },
       blockedPrivateProviderUrl: false,
@@ -252,7 +282,8 @@ function deliveryRef(asset: Record<string, unknown>): {
     return {
       ref: {
         posture: "blocked_untrusted_package_url",
-        reason: "Package delivery URL is not hosted on a trusted Brandcode origin",
+        reason:
+          "Package delivery URL is not hosted on a trusted Brandcode origin",
       },
       blockedPrivateProviderUrl: true,
     };
@@ -275,7 +306,8 @@ function deliveryRef(asset: Record<string, unknown>): {
     return {
       ref: {
         posture: "blocked_private_provider_url",
-        reason: "No package-safe delivery reference is available for this asset",
+        reason:
+          "No package-safe delivery reference is available for this asset",
       },
       blockedPrivateProviderUrl: true,
     };
@@ -283,18 +315,22 @@ function deliveryRef(asset: Record<string, unknown>): {
   return {
     ref: {
       posture: "metadata_only",
-      reason: "No package-safe delivery reference is present in the hosted package",
+      reason:
+        "No package-safe delivery reference is present in the hosted package",
     },
     blockedPrivateProviderUrl: false,
   };
 }
 
-function packagePosture(asset: Record<string, unknown>, delivery: Record<string, unknown>) {
+function packagePosture(
+  asset: Record<string, unknown>,
+  delivery: Record<string, unknown>,
+) {
   return {
     in_runtime_package: Boolean(
       asset.inRuntimePackage ??
-        asset.in_runtime_package ??
-        pickString(asset.packagePath, asset.package_path),
+      asset.in_runtime_package ??
+      pickString(asset.packagePath, asset.package_path),
     ),
     delivery_posture: delivery.posture ?? "metadata_only",
     selected_kit_artifact_support: "not_implemented_in_v1",
@@ -310,7 +346,8 @@ function sanitizeMetadata(
     const lower = key.toLowerCase();
     if (blockedNeedles.some((needle) => lower.includes(needle))) continue;
     if (typeof value === "string") out[key] = stripUrls(value);
-    else if (typeof value === "number" || typeof value === "boolean") out[key] = value;
+    else if (typeof value === "number" || typeof value === "boolean")
+      out[key] = value;
   }
   return out;
 }
@@ -322,17 +359,34 @@ function toHostedAsset(
 ): HostedAsset | null {
   if (!isRecord(input)) return null;
   const id =
-    pickString(input.id, input.asset_id, input.assetId, input.key, input.slug) ||
-    `${source.replace(/[^a-z0-9]+/gi, "-")}-${index + 1}`;
+    pickString(
+      input.id,
+      input.asset_id,
+      input.assetId,
+      input.key,
+      input.slug,
+    ) || `${source.replace(/[^a-z0-9]+/gi, "-")}-${index + 1}`;
   const title =
-    pickString(input.title, input.name, input.label, input.filename, input.fileName) ||
-    id;
+    pickString(
+      input.title,
+      input.name,
+      input.label,
+      input.filename,
+      input.fileName,
+    ) || id;
   const category = categoryOf(input);
   const lifecycle = lifecycleOf(input);
   const delivery = deliveryRef(input);
-  const format = pickString(input.format, input.contentType, input.content_type, input.mimeType) || null;
+  const format =
+    pickString(
+      input.format,
+      input.contentType,
+      input.content_type,
+      input.mimeType,
+    ) || null;
   const description =
-    pickString(input.description, input.summary, input.alt, input.altText) || null;
+    pickString(input.description, input.summary, input.alt, input.altText) ||
+    null;
 
   return {
     id,
@@ -351,6 +405,8 @@ function toHostedAsset(
       blocked_private_provider_url: delivery.blockedPrivateProviderUrl,
     },
     delivery_ref: delivery.ref,
+    delivery_handle: null,
+    selected_kit_context: null,
     package_posture: packagePosture(input, delivery.ref),
     metadata: sanitizeMetadata(input, [
       "url",
@@ -362,6 +418,92 @@ function toHostedAsset(
       "package",
     ]),
   };
+}
+
+function toRuntimeContractAsset(
+  asset: RuntimeContractV1["assets"][number],
+  runtime: RuntimeContractV1,
+): HostedAsset {
+  const handle = asset.deliveryHandle;
+  const selected = runtime.kits.selected;
+  const selectedMember = selected?.memberAssetIds.includes(asset.id) ?? false;
+  const expired =
+    handle?.posture === "signed_expiring" &&
+    handle.expiresAt !== null &&
+    new Date(handle.expiresAt).getTime() <= Date.now();
+  const deliveryRef: Record<string, unknown> = !handle
+    ? {
+        posture: "metadata_only",
+        reason:
+          "No governed delivery handle is present in the runtime contract",
+      }
+    : expired
+      ? {
+          posture: "blocked_expired_handle",
+          reason: "The governed delivery handle has expired",
+        }
+      : {
+          posture: handle.posture,
+          transport: handle.transport,
+          resolver_ref: handle.resolverRef,
+          integrity_sha256: handle.integritySha256,
+          expires_at: handle.expiresAt,
+        };
+  const safeForMcp = Boolean(handle) && !expired;
+
+  return {
+    id: asset.id,
+    title: asset.name,
+    category: asset.category,
+    lifecycle: asset.approvalState,
+    governance_posture: asset.authority,
+    format: null,
+    dimensions: null,
+    description: null,
+    tags: asset.runtimeRoles,
+    source: "runtimeContract.assets",
+    custody: {
+      safe_for_mcp: safeForMcp,
+      posture: String(deliveryRef.posture),
+      blocked_private_provider_url: false,
+    },
+    delivery_ref: deliveryRef,
+    delivery_handle: safeForMcp
+      ? {
+          asset_id: handle?.assetId,
+          brand_slug: handle?.brandSlug,
+          resolver_ref: handle?.resolverRef,
+          transport: handle?.transport,
+          posture: handle?.posture,
+          integrity_sha256: handle?.integritySha256,
+          expires_at: handle?.expiresAt,
+        }
+      : null,
+    selected_kit_context: selected
+      ? {
+          is_member: selectedMember,
+          kit_id: selected.id,
+          kit_name: selected.name,
+          authority: selected.authority,
+        }
+      : null,
+    package_posture: {
+      in_runtime_package: handle?.transport === "package_path",
+      delivery_posture: deliveryRef.posture,
+      selected_kit_artifact_support: "implemented_contract_v1",
+    },
+    metadata: {
+      object_type: asset.objectType,
+      provenance_class: asset.provenanceClass,
+      approval_state: asset.approvalState,
+    },
+  };
+}
+
+function collectRuntimeContractAssets(
+  runtime: RuntimeContractV1,
+): HostedAsset[] {
+  return runtime.assets.map((asset) => toRuntimeContractAsset(asset, runtime));
 }
 
 function collectAssets(pkg: BrandPackagePayload | null): HostedAsset[] {
@@ -386,7 +528,10 @@ function collectAssets(pkg: BrandPackagePayload | null): HostedAsset[] {
   return out;
 }
 
-function filterAssets(assets: HostedAsset[], params: ListParams): HostedAsset[] {
+function filterAssets(
+  assets: HostedAsset[],
+  params: ListParams,
+): HostedAsset[] {
   const category = params.category?.trim().toLowerCase();
   const lifecycle = params.lifecycle?.trim().toLowerCase();
   return assets.filter((asset) => {
@@ -432,6 +577,8 @@ function listAssetSummary(asset: HostedAsset): Record<string, unknown> {
     governance_posture: asset.governance_posture,
     format: asset.format,
     delivery_ref: asset.delivery_ref,
+    delivery_handle: asset.delivery_handle,
+    selected_kit_context: asset.selected_kit_context,
     package_posture: asset.package_posture,
     custody: asset.custody,
     source: asset.source,
@@ -440,7 +587,16 @@ function listAssetSummary(asset: HostedAsset): Record<string, unknown> {
 
 async function loadAssets(context: HostedBrandContext) {
   const pkg = await context.loadBrandPackage();
-  return collectAssets(pkg);
+  const contractIngress = normalizeRuntimeContractFromPackage(pkg);
+  return contractIngress
+    ? {
+        assets: collectRuntimeContractAssets(contractIngress.runtime),
+        selectedKitArtifactSupport: "implemented_contract_v1" as const,
+      }
+    : {
+        assets: collectAssets(pkg),
+        selectedKitArtifactSupport: "not_implemented_in_v1" as const,
+      };
 }
 
 export function registerListAssets(
@@ -458,9 +614,9 @@ export function registerListAssets(
       const parsed = safeParseParams(ListParamsSchema, args);
       if (!parsed.success) return parsed.response;
 
-      let assets: HostedAsset[];
+      let loaded: Awaited<ReturnType<typeof loadAssets>>;
       try {
-        assets = await loadAssets(context);
+        loaded = await loadAssets(context);
       } catch (err) {
         return buildResponse({
           what_happened: `Failed to load hosted assets for "${context.slug}": ${(err as Error).message}`,
@@ -471,7 +627,7 @@ export function registerListAssets(
         });
       }
 
-      const filtered = filterAssets(assets, parsed.data);
+      const filtered = filterAssets(loaded.assets, parsed.data);
       const start = decodeCursor(parsed.data.cursor);
       const page = filtered.slice(start, start + parsed.data.limit);
       const nextIndex = start + page.length;
@@ -484,7 +640,9 @@ export function registerListAssets(
             : `No hosted brand assets matched the requested filters for "${context.slug}"`,
         next_steps:
           page.length > 0
-            ? ["Use get_brand_asset with an asset id for full metadata and delivery posture"]
+            ? [
+                "Use get_brand_asset with an asset id for full metadata and delivery posture",
+              ]
             : ["Try a broader category or lifecycle filter"],
         data: {
           assets: page.map(listAssetSummary),
@@ -495,7 +653,7 @@ export function registerListAssets(
             lifecycle: parsed.data.lifecycle ?? null,
           },
           custody_safe: true,
-          selected_kit_artifact_support: "not_implemented_in_v1",
+          selected_kit_artifact_support: loaded.selectedKitArtifactSupport,
           slug: context.slug,
           environment: context.auth.environment,
         },
@@ -519,9 +677,9 @@ export function registerGetAsset(
       const parsed = safeParseParams(GetParamsSchema, args);
       if (!parsed.success) return parsed.response;
 
-      let assets: HostedAsset[];
+      let loaded: Awaited<ReturnType<typeof loadAssets>>;
       try {
-        assets = await loadAssets(context);
+        loaded = await loadAssets(context);
       } catch (err) {
         return buildResponse({
           what_happened: `Failed to load hosted assets for "${context.slug}": ${(err as Error).message}`,
@@ -532,7 +690,9 @@ export function registerGetAsset(
         });
       }
 
-      const asset = assets.find((item) => item.id === parsed.data.asset_id);
+      const asset = loaded.assets.find(
+        (item) => item.id === parsed.data.asset_id,
+      );
       if (!asset) {
         return buildResponse({
           what_happened: `No hosted brand asset found for "${parsed.data.asset_id}"`,
@@ -555,7 +715,7 @@ export function registerGetAsset(
         data: {
           asset,
           custody_safe: true,
-          selected_kit_artifact_support: "not_implemented_in_v1",
+          selected_kit_artifact_support: loaded.selectedKitArtifactSupport,
           slug: context.slug,
           environment: context.auth.environment,
         },

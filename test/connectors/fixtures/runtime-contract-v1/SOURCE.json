@@ -1,12 +1,13 @@
 {
   "canonicalRepository": "/Users/jasonlankow/Desktop/UCS",
-  "canonicalImplementationCommit": "1c919eac48fd4bd54f8be39a0c2288df2f53b8a9",
-  "canonicalSynchronizedCommit": "f31009be51ef3e55eb195cb69163686299dbe8a7",
+  "canonicalImplementationCommit": "068f06ed31df568986f045753fd7ef7166c14d1e",
+  "canonicalSynchronizedCommit": "068f06ed31df568986f045753fd7ef7166c14d1e",
   "canonicalPath": "app/tools/lib/runtime-contract/fixtures",
   "copiedAt": "2026-07-16",
   "sha256": {
-    "current-producer.json": "f74a7079f814104d4db094ec231f7804fe1b196a6f5a98527a393cbff27fb0b0",
-    "manifest.json": "f80410e2826bd8851d59b6696a2f63cde7bb8c6ea2b4ae941390a6964119a1d0",
+    "current-producer.json": "cd9a03b63fdae886494b35e9b19b05948709c54e32322c4aecb4543068b882cf",
+    "invalid-delivery-handle.json": "00ea05aef8392b088d1489ba4971eb2272bcab666ccd4c6a1288339fa3aab1ff",
+    "manifest.json": "f717122de016a2df4773653de2440e881804575ddf5a8696ee1678639d25a9e6",
     "missing-required-semantic.json": "c8183bac5341dd6f7bbc3b98db74f64ce7359e6567e3e725af5dfa48a69c9316",
     "previous-producer.json": "eb3eca7b4cabbdafd1bbfbdef8bd3a8981327ff4430b2039d0e817927f0293d7",
     "unsupported-major.json": "8bbae82cf2798afd9b3729ceeab48a314d4e621033d2a3cb812aecb9fa1b5210"

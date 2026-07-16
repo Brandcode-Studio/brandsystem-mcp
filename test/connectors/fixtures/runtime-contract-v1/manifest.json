@@ -6,7 +6,8 @@
     "currentProducerCurrentConsumer": "current-producer.json",
     "previousProducerCurrentConsumer": "previous-producer.json",
     "missingRequiredSemantic": "missing-required-semantic.json",
-    "unsupportedMajor": "unsupported-major.json"
+    "unsupportedMajor": "unsupported-major.json",
+    "invalidDeliveryHandle": "invalid-delivery-handle.json"
   },
   "nonClaim": "These fixtures prove local contract compatibility, not external MCP adoption."
 }

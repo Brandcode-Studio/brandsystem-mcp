@@ -59,6 +59,15 @@
       "approvalState": "approved",
       "provenanceClass": "official_source",
       "deliveryRef": "/assets/logo.svg",
+      "deliveryHandle": {
+        "assetId": "logo-primary",
+        "brandSlug": "acme",
+        "resolverRef": "/assets/logo.svg",
+        "transport": "package_path",
+        "posture": "package_non_expiring",
+        "integritySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expiresAt": null
+      },
       "runtimeRoles": ["header", "identity"]
     }
   ],
@@ -68,7 +77,8 @@
       "id": "kit-social",
       "name": "Social launch kit",
       "authority": "selected_context",
-      "provenanceClass": "compiled_source"
+      "provenanceClass": "compiled_source",
+      "memberAssetIds": ["exploratory-concept", "logo-primary", "logo-primary"]
     },
     "campaigns": [
       {

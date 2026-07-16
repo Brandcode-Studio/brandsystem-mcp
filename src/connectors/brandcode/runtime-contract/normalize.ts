@@ -2,12 +2,13 @@
  * External consumer normalizer pinned to the UCS-owned Runtime Contract V1.
  *
  * Canonical source: UCS app/tools/lib/runtime-contract/normalize.ts lines 2-423
- * Canonical implementation commit: 1c919eac48fd4bd54f8be39a0c2288df2f53b8a9
+ * Canonical implementation commit: 068f06ed31df568986f045753fd7ef7166c14d1e
  * Producer projection remains UCS-only. Conformance is locked by copied fixtures.
  */
 import {
   BRANDCODE_RUNTIME_CONTRACT_PREVIOUS,
   BRANDCODE_RUNTIME_CONTRACT_V1,
+  type RuntimeContractDeliveryHandle,
   type RuntimeContractProvenanceClass,
   type RuntimeContractV1,
 } from "./schema.js";
@@ -59,6 +60,118 @@ function nullableString(
 ): string | null {
   if (value === null) return null;
   return stringValue(value, path, issues);
+}
+
+function isPackageResolverRef(value: string): boolean {
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\"))
+    return false;
+  try {
+    return !decodeURIComponent(value)
+      .split("/")
+      .some((segment) => segment === ".." || segment === ".");
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedBrandcodeResolverRef(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash &&
+      (hostname === "brandcode.studio" ||
+        hostname.endsWith(".brandcode.studio"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function deliveryHandle(
+  value: unknown,
+  path: string,
+  issues: string[],
+): RuntimeContractDeliveryHandle | null {
+  if (value === undefined || value === null) return null;
+  const item = record(value, path, issues);
+  const assetId = stringValue(item.assetId, `${path}.assetId`, issues);
+  const brandSlug = stringValue(item.brandSlug, `${path}.brandSlug`, issues);
+  const resolverRef = stringValue(
+    item.resolverRef,
+    `${path}.resolverRef`,
+    issues,
+  );
+  const transport =
+    item.transport === "trusted_brandcode_url"
+      ? "trusted_brandcode_url"
+      : literal(item.transport, "package_path", `${path}.transport`, issues);
+  const posture =
+    item.posture === "signed_expiring"
+      ? "signed_expiring"
+      : literal(
+          item.posture,
+          "package_non_expiring",
+          `${path}.posture`,
+          issues,
+        );
+  const integritySha256 =
+    item.integritySha256 === null
+      ? null
+      : stringValue(
+          item.integritySha256,
+          `${path}.integritySha256`,
+          issues,
+        ).toLowerCase();
+  const expiresAt =
+    item.expiresAt === null
+      ? null
+      : isoDateTime(item.expiresAt, `${path}.expiresAt`, issues);
+
+  if (transport === "package_path" && !isPackageResolverRef(resolverRef)) {
+    issues.push(
+      `${path}.resolverRef must be a safe root-relative package path`,
+    );
+  }
+  if (
+    transport === "trusted_brandcode_url" &&
+    !isTrustedBrandcodeResolverRef(resolverRef)
+  ) {
+    issues.push(
+      `${path}.resolverRef must use a trusted Brandcode HTTPS origin without credentials or query material`,
+    );
+  }
+  if (integritySha256 !== null && !/^[a-f0-9]{64}$/.test(integritySha256)) {
+    issues.push(
+      `${path}.integritySha256 must be a lowercase SHA-256 digest or null`,
+    );
+  }
+  if (posture === "package_non_expiring" && expiresAt !== null) {
+    issues.push(
+      `${path}.expiresAt must be null for package_non_expiring posture`,
+    );
+  }
+  if (posture === "package_non_expiring" && integritySha256 === null) {
+    issues.push(
+      `${path}.integritySha256 is required for package_non_expiring posture`,
+    );
+  }
+  if (posture === "signed_expiring" && expiresAt === null) {
+    issues.push(`${path}.expiresAt is required for signed_expiring posture`);
+  }
+  return {
+    assetId,
+    brandSlug,
+    resolverRef,
+    transport,
+    posture,
+    integritySha256,
+    expiresAt,
+  };
 }
 
 function isoDateTime(value: unknown, path: string, issues: string[]): string {
@@ -265,6 +378,11 @@ export function normalizeRuntimeContract(
         `assets[${index}].deliveryRef`,
         issues,
       ),
+      deliveryHandle: deliveryHandle(
+        item.deliveryHandle,
+        `assets[${index}].deliveryHandle`,
+        issues,
+      ),
       runtimeRoles: sorted(
         array(item.runtimeRoles, `assets[${index}].runtimeRoles`, issues).map(
           (value, roleIndex) =>
@@ -304,6 +422,26 @@ export function normalizeRuntimeContract(
               item.provenanceClass,
               "kits.selected.provenanceClass",
               issues,
+            ),
+            memberAssetIds: sorted(
+              (item.memberAssetIds === undefined
+                ? []
+                : array(
+                    item.memberAssetIds,
+                    "kits.selected.memberAssetIds",
+                    issues,
+                  )
+              ).map((value, index) =>
+                stringValue(
+                  value,
+                  `kits.selected.memberAssetIds[${index}]`,
+                  issues,
+                ),
+              ),
+              (value) => value,
+            ).filter(
+              (value, index, values) =>
+                index === 0 || value !== values[index - 1],
             ),
           };
         })();
@@ -521,6 +659,21 @@ export function normalizeRuntimeContract(
   }
   if (runtime.manifest.brandName !== runtime.officialBrand.name) {
     semanticIssues.push("manifest.brandName must match officialBrand.name");
+  }
+  for (const asset of runtime.assets) {
+    if (asset.deliveryHandle && asset.deliveryHandle.assetId !== asset.id) {
+      semanticIssues.push(
+        `assets.${asset.id}.deliveryHandle.assetId must match asset id`,
+      );
+    }
+    if (
+      asset.deliveryHandle &&
+      asset.deliveryHandle.brandSlug !== runtime.manifest.brandSlug
+    ) {
+      semanticIssues.push(
+        `assets.${asset.id}.deliveryHandle.brandSlug must match manifest.brandSlug`,
+      );
+    }
   }
   if (semanticIssues.length > 0) {
     throw new RuntimeContractValidationError(semanticIssues);

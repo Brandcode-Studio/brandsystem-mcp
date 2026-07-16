@@ -46,7 +46,7 @@ describe("UCS runtime contract V1 fixture pin", () => {
   it("matches the exact canonical MCPX-5A fixture bytes", async () => {
     const source = await fixture("SOURCE.json");
     expect(source.canonicalImplementationCommit).toBe(
-      "1c919eac48fd4bd54f8be39a0c2288df2f53b8a9",
+      "068f06ed31df568986f045753fd7ef7166c14d1e",
     );
     const hashes = source.sha256 as Record<string, string>;
     for (const [name, expected] of Object.entries(hashes)) {
@@ -84,7 +84,20 @@ describe("external runtime contract V1 normalization", () => {
     });
     expect(result.runtime.officialBrand.authority).toBe("official");
     expect(result.runtime.assets[0]?.authority).toBe("production_approved");
+    expect(result.runtime.assets[0]?.deliveryHandle).toEqual({
+      assetId: "logo-primary",
+      brandSlug: "acme",
+      resolverRef: "/assets/logo.svg",
+      transport: "package_path",
+      posture: "package_non_expiring",
+      integritySha256: "a".repeat(64),
+      expiresAt: null,
+    });
     expect(result.runtime.kits.selected?.authority).toBe("selected_context");
+    expect(result.runtime.kits.selected?.memberAssetIds).toEqual([
+      "exploratory-concept",
+      "logo-primary",
+    ]);
     expect(result.runtime.kits.campaigns[0]?.authority).toBe(
       "exploratory_context",
     );
@@ -166,6 +179,41 @@ describe("external runtime contract V1 normalization", () => {
     }
   });
 
+  it("fails unsafe, mismatched, and integrity-free delivery handles closed", async () => {
+    const source = await fixture("invalid-delivery-handle.json");
+    expect(() => normalizeRuntimeContract(source)).toThrow(
+      "must use a trusted Brandcode HTTPS origin",
+    );
+
+    const mismatch = await fixture("current-producer.json");
+    const assets = mismatch.assets as Array<Record<string, unknown>>;
+    const handle = assets[0]?.deliveryHandle as Record<string, unknown>;
+    handle.assetId = "other-asset";
+    handle.brandSlug = "wrong-brand";
+    try {
+      normalizeRuntimeContract(mismatch);
+      throw new Error("expected identity binding to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(RuntimeContractValidationError);
+      expect((error as RuntimeContractValidationError).issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("assetId must match"),
+          expect.stringContaining("brandSlug must match"),
+        ]),
+      );
+    }
+  });
+
+  it("rejects malformed or tampered integrity digests", async () => {
+    const source = await fixture("current-producer.json");
+    const assets = source.assets as Array<Record<string, unknown>>;
+    const handle = assets[0]?.deliveryHandle as Record<string, unknown>;
+    handle.integritySha256 = "tampered";
+    expect(() => normalizeRuntimeContract(source)).toThrow(
+      "must be a lowercase SHA-256 digest",
+    );
+  });
+
   it("rejects unreviewed Taste instead of inferring approved authority", async () => {
     const source = await fixture("current-producer.json");
     const guidance = source.tasteGuidance as Array<Record<string, unknown>>;
@@ -214,6 +262,64 @@ describe("hosted runtime ingress adoption", () => {
       "tasteGuidance",
     );
     expect(sliceRuntimeContract(runtime, "visual")).toHaveProperty("assets");
+  });
+
+  it("serves governed delivery and selected-kit context without authority inflation", async () => {
+    const source = await fixture("current-producer.json");
+    const pkg = { runtime: source } as BrandPackagePayload;
+    const { client } = await connectHostedClient(context(pkg));
+    const listed = await callHostedTool(client, "list_brand_assets", {});
+    expect(listed.selected_kit_artifact_support).toBe(
+      "implemented_contract_v1",
+    );
+    expect(listed.total_assets).toBe(1);
+    const assets = listed.assets as Array<Record<string, unknown>>;
+    expect(assets.map((asset) => asset.id)).toEqual(["logo-primary"]);
+    expect(assets[0]).toMatchObject({
+      governance_posture: "production_approved",
+      delivery_handle: {
+        asset_id: "logo-primary",
+        brand_slug: "acme",
+        transport: "package_path",
+        posture: "package_non_expiring",
+      },
+      selected_kit_context: {
+        is_member: true,
+        kit_id: "kit-social",
+        authority: "selected_context",
+      },
+    });
+    expect(JSON.stringify(listed)).not.toContain('exploratory-concept"');
+  });
+
+  it("blocks expired signed handles while retaining production authority metadata", async () => {
+    const source = await fixture("current-producer.json");
+    const assets = source.assets as Array<Record<string, unknown>>;
+    assets[0]!.deliveryHandle = {
+      assetId: "logo-primary",
+      brandSlug: "acme",
+      resolverRef:
+        "https://www.brandcode.studio/api/runtime/assets/logo-primary",
+      transport: "trusted_brandcode_url",
+      posture: "signed_expiring",
+      integritySha256: null,
+      expiresAt: "2020-01-01T00:00:00.000Z",
+    };
+    const { client } = await connectHostedClient(
+      context({ runtime: source } as BrandPackagePayload),
+    );
+    const response = await callHostedTool(client, "get_brand_asset", {
+      asset_id: "logo-primary",
+    });
+    expect(response.asset).toMatchObject({
+      governance_posture: "production_approved",
+      custody: { safe_for_mcp: false },
+      delivery_ref: { posture: "blocked_expired_handle" },
+      delivery_handle: null,
+    });
+    expect(JSON.stringify(response)).not.toContain(
+      "/api/runtime/assets/logo-primary",
+    );
   });
 
   it("returns a structured incompatibility instead of legacy fallback", async () => {
