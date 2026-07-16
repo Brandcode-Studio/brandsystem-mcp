@@ -6,12 +6,15 @@ on:
     # 06:17 UTC daily (off-peak, minute offset to avoid the top-of-hour GitHub Actions queue)
     - cron: "17 6 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
       - run: npm ci

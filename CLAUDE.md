@@ -15,6 +15,17 @@ npm start            # Start the server (stdio transport)
 
 Build must pass before committing. The entry point is `src/index.ts` (stdio transport) which creates the server from `src/server.ts`.
 
+## Branch and PR Workflow
+
+`main` is protected by a ruleset (`main-protection`): no direct pushes, no force-pushes, PR required, and the CI matrix (`build-and-test (20/22/24)`) must pass before merge. Zero human approvals are required — CI is the gate. To land changes:
+
+1. Create a branch (`feat/...`, `fix/...`) and commit there
+2. Push and open a PR against `main`
+3. Enable auto-merge: `gh pr merge --auto --squash` — the PR lands when CI is green
+4. The branch is deleted automatically on merge
+
+Do not attempt to push directly to `main`; the ruleset rejects it.
+
 ## Architecture
 
 ```

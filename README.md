@@ -16,7 +16,8 @@ AI tools default to category-average output because they have no brand context. 
 This MCP server is the authoring half of the **"Two MCPs, One Brand"** model. It extracts brand identity from live sources, compiles it into a `.brand/` directory with structured governance (anti-patterns, proof-point status, voice rules, application rules) plus DTCG tokens, brand-runtime.json, and interaction-policy.json. That directory is the **portable brand runtime** — the artifact that travels with your brand from surface to surface.
 
 - **Claude Design** reads the `.brand/` directory natively when pointed at a governed repo
-- **Claude Code**, **Cursor**, **ChatGPT**, **Windsurf**, and any other MCP client load `brand-runtime.json` at generation time
+- **Claude Code**, **Claude Desktop**, **Cursor**, and **Windsurf** connect to this server directly over stdio and load `brand-runtime.json` at generation time
+- **ChatGPT** and other remote-first clients consume the same runtime as an uploaded artifact (`brand-report.html` / `brand-runtime.json`) or via a remote MCP connection — see [Compatibility](#compatibility-at-a-glance)
 - **@brandcode/mcp** (the hosted Use MCP) serves the same runtime over HTTP for teams that want authenticated live reads at `mcp.brandcode.studio/{slug}`
 
 With brand-runtime.json loaded, agent prompts collapse from 200-400 tokens of inline brand context to just the delta. First output is on-brand. No review bottleneck.
@@ -118,20 +119,11 @@ The `.brand` runtime is the product. Two MCPs serve it:
 
 Same `.brand` runtime artifact. Two consumption paths. Build authors it; Use serves it.
 
-Phase 0 for Brandcode MCP is locked in [specs/brandcode-mcp-phase-0-lock.md](specs/brandcode-mcp-phase-0-lock.md) as the original 8-tool read/append-only surface. The current hosted implementation adds `capture_taste` as a scoped contribute-tier tool: it requires explicit `capture` scope, queues a review candidate through UCS, and never promotes canon. Staging proof is command-backed at `https://mcp.staging.brandcode.studio/{slug}`. The hosted-service posture is approved for pre-release authorized access, and the hosted router supports durable shared Redis REST rate limiting when the hosted store env is configured, with in-process fallback for local/pre-release development. Pre-release abuse response is owned by Jason Lankow / Brandcode Studio Ops at `jlankow@columnfive.com`. The hosted data-policy draft now states client-owned/client-controlled brand data, append-only feedback, scoped/redacted history, package-safe custody, and the accepted deletion/export operating posture: brand owner/admin, recorded legal/contract contact, or Jason authorization; manual ops review; curated support-packet export; and no public SLA or self-serve deletion/export. For v0.1 limited-client work, public `@brandcode/mcp` package/source distribution is deferred; approved clients use the hosted service with brand-scoped bearer keys only after client/brand approval, scoped key issuance, per-client smoke proof, support/abuse/deletion/export intake, package-safe custody checks, the key operations runbook, support intake ledger, and limited-client go/no-go checklist. The limited-client onboarding template is in [specs/brandcode-mcp-limited-client-onboarding-template.md](specs/brandcode-mcp-limited-client-onboarding-template.md), the key operations runbook is in [specs/brandcode-mcp-limited-client-key-ops-runbook.md](specs/brandcode-mcp-limited-client-key-ops-runbook.md), the support intake ledger is in [specs/brandcode-mcp-limited-client-support-intake-ledger.md](specs/brandcode-mcp-limited-client-support-intake-ledger.md), the go/no-go checklist is in [specs/brandcode-mcp-limited-client-go-no-go-checklist.md](specs/brandcode-mcp-limited-client-go-no-go-checklist.md), the deletion/export launch decision brief is in [specs/brandcode-mcp-deletion-export-launch-decision-brief.md](specs/brandcode-mcp-deletion-export-launch-decision-brief.md), and an internal Column Five Brandcode staging proof is in [specs/brandcode-mcp-column-five-brandcode-staging-onboarding-proof.md](specs/brandcode-mcp-column-five-brandcode-staging-onboarding-proof.md). The operational roadmap for the remainder of M001 through the first half of M003 is in [specs/brandcode-mcp-operational-roadmap-m001-m003.md](specs/brandcode-mcp-operational-roadmap-m001-m003.md). Production release is still gated by final legal/subprocessor launch language, future public package/source approval, directory metadata, and explicit Jason approval; see [specs/brandcode-mcp-limited-client-readiness-plan.md](specs/brandcode-mcp-limited-client-readiness-plan.md), [specs/brandcode-mcp-hosted-data-policy.md](specs/brandcode-mcp-hosted-data-policy.md), [specs/brandcode-mcp-hosted-terms-rate-limit-gate.md](specs/brandcode-mcp-hosted-terms-rate-limit-gate.md), and [specs/brandcode-mcp-hosted-service-terms-decision-brief.md](specs/brandcode-mcp-hosted-service-terms-decision-brief.md). Until the production launch, use `@brandsystem/mcp` for local build/sync, and Live Mode (`brand_brandcode_live`) for connected reads that refresh from the hosted runtime within a short cache TTL.
+Phase 0 for Brandcode MCP is locked in [specs/brandcode-mcp-phase-0-lock.md](specs/brandcode-mcp-phase-0-lock.md) as the original 8-tool read/append-only surface. The current hosted implementation adds `capture_taste` as a scoped contribute-tier tool: it requires explicit `capture` scope, queues a review candidate for human review, and never promotes canon.
 
-The Use MCP roadmap alignment lives in [specs/brandcode-mcp-use-roadmap-alignment.md](specs/brandcode-mcp-use-roadmap-alignment.md).
+**Hosted availability:** Brandcode MCP is pre-release and available to approved clients only — it is not yet publicly launched or registry-listed. Brand data on the hosted service is client-owned; feedback is append-only; agent history is scoped and redacted. Deletion and export requests are handled through your Brandcode Studio contact. Until public launch, use `@brandsystem/mcp` for local build/sync, and Live Mode (`brand_brandcode_live`) for connected reads that refresh from the hosted runtime within a short cache TTL.
 
-Hosted proof is command-backed through:
-
-```bash
-BRANDCODE_MCP_SMOKE_URL="https://mcp.staging.brandcode.studio/{slug}" \
-BRANDCODE_MCP_SMOKE_FULL_KEY="bck_test_..." \
-BRANDCODE_MCP_SMOKE_READ_KEY="bck_test_..." \
-npm run smoke:hosted-mcp
-```
-
-The smoke harness verifies MCP `initialize`, `tools/list`, the locked hosted order, core hosted tool calls, and read-only insufficient-scope behavior for `brand_check`, `brand_feedback`, and `capture_taste`. It never hardcodes keys; missing optional proof inputs are reported as `blocked` or `skipped` with the exact env or hosted dependency.
+Maintainers can verify a hosted deployment end-to-end with the smoke harness (`npm run smoke:hosted-mcp` with `BRANDCODE_MCP_SMOKE_URL` and scoped test keys). It verifies MCP `initialize`, `tools/list`, the locked hosted tool order, core hosted tool calls, and read-only insufficient-scope behavior. It never hardcodes keys; missing proof inputs are reported as `blocked` or `skipped`.
 
 ### Claude Design integration
 
@@ -350,6 +342,16 @@ Open Settings > Developer > Edit Config (`claude_desktop_config.json`):
   }
 }
 ```
+
+### Compatibility at a glance
+
+Three distinct ways to get your brand into an AI tool — don't conflate them:
+
+| Path | Clients | What it takes |
+|------|---------|---------------|
+| **Direct local MCP (stdio)** | Claude Code, Claude Desktop, Cursor, Windsurf | The `.mcp.json` config above — the server runs on your machine |
+| **Remote hosted MCP** | ChatGPT (developer mode) and other remote-MCP clients | An approved Brandcode Studio brand + bearer key (pre-release, approved clients only). ChatGPT connects to remote MCP servers, not local stdio processes; OpenAI documents a secure-tunnel option for private servers |
+| **Runtime artifact copy** | Any AI tool | Upload `brand-report.html` or `brand-runtime.json` to the conversation — no MCP connection needed |
 
 ### Claude Chat (no MCP)
 
@@ -599,7 +601,7 @@ npm start
 src/
   index.ts              # Entry point -- stdio transport
   cli.ts                # CLI entry point for brandcode connect/sync/status
-  server.ts             # MCP server creation and tool registration (29 tools)
+  server.ts             # MCP server creation and tool registration (all tools, priority order)
   tools/                # One file per tool
     brand-start.ts              # Entry point (Session 1)
     brand-status.ts             # Progress dashboard
@@ -663,6 +665,12 @@ test/
 ```
 
 ---
+
+## Security
+
+- **Report vulnerabilities privately** via the repository's Security page → Advisories → "Report a vulnerability". See [SECURITY.md](SECURITY.md). Please don't open public issues for suspected vulnerabilities.
+- **Local-first by design.** Extraction and compilation run on your machine. Network activity is limited to: fetching the sources you point the tools at (websites, Figma via your own Figma MCP), optional Brandcode Studio connector calls when you connect a hosted brand, and optional `brand_feedback` reports.
+- **What gets written locally:** everything lands in `.brand/` inside your working directory. Connector credentials are stored in `.brand/brandcode-auth.json` (gitignored).
 
 ## License
 
