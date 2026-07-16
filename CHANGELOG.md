@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.9.5 (2026-07-16)
+
 ### Added
 
 - **`brand_check` can return a scoped Taste counterprompt without faking semantic compliance.** Optional `artifact_kind` / `surface` context selects only matching approved Taste Guidance for revision. The ordinary text/color/font/CSS verdict stays independent, unavailable guidance fails soft, and every response labels Taste semantics `not_evaluated`.
@@ -41,6 +43,8 @@
 - **Tool descriptions sharpened across 6 tools** to improve agent disambiguation. `brand_resolve_conflicts` (was the lowest-scoring tool on Glama at 3.6/5): now describes both modes, when to call, what each returns, and how it relates to brand_audit. `brand_check` and `brand_check_compliance` now have crisp, mutually exclusive descriptions: `brand_check` is the inline linter you call WHILE writing (one or more fields, fast pass/fail per input); `brand_check_compliance` is the publish-time gate (single PASS/FAIL on a finished piece, optional strict mode). `brand_build_journey`, `brand_export`, and `brand_feedback` rewritten with explicit trigger phrases, mode/target enumerations, and NOT-for clarifications.
 - **`brand_compile_messaging` interview returns ONE section at a time** instead of all three. The conversation_guide always said "work through ONE section at a time" but the response shipped perspective + voice + brand_story upfront — ~10K chars per call, of which the agent could only act on the first. Now returns the first missing section with a `remaining_sections` list and a section-targeted intro. Response size dropped from ~9.9K to ~3.2K. Calling `mode='interview'` again after each `mode='record'` returns the next section. No schema break — agents that read the existing `interview` array still work because the agenda is still under `interview`, just narrowed.
 - **`brand_build_journey` interview drops the duplicate `defaults_full` field** and trims the conversation_guide. The response previously emitted both a stripped `default_stages` table and a full `defaults_full` array containing the same 4 stages with extra fields the server already auto-applies on `mode='record'` with no answers. Customizable field shape stays in the conversation_guide. Response size dropped from ~5.9K to under 5K.
+
+## 0.9.2 (2026-04-21)
 
 ### Added
 
