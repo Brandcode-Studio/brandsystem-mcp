@@ -51,6 +51,16 @@ export const BrandRuntimeSchema = z.object({
   client_name: z.string(),
   compiled_at: z.string(),
   sessions_completed: z.number(),
+  // Optional for runtimes compiled before 0.9.6; every new compile emits them.
+  approval: z
+    .enum(["provisional_extracted", "human_confirmed_local", "production_approved"])
+    .optional(),
+  provenance: z
+    .object({
+      sources: z.array(z.string()),
+      note: z.string(),
+    })
+    .optional(),
   identity: RuntimeIdentitySchema,
   visual: RuntimeVisualSchema.nullable(),
   voice: RuntimeVoiceSchema.nullable(),

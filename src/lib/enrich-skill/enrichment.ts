@@ -14,6 +14,7 @@
  */
 
 import { parseSkillMd, serializeSkillMd, slugifyHeading, type ParsedSkill } from "./parser.js";
+import { PROVISIONAL_ARTIFACT_NOTICE } from "../untrusted-text.js";
 
 // ── Governance shapes (permissive — governance YAML evolves) ──
 export interface GovernanceClaim {
@@ -289,7 +290,14 @@ export function enrichSkill(
   const footer = buildProvenanceFooter(bundle, diff);
   parsed.trailing = (parsed.trailing ? `${parsed.trailing}\n\n` : "") + footer;
 
-  return { enriched: serializeSkillMd(parsed), diff };
+  let enriched = serializeSkillMd(parsed);
+  // Stamp provenance once: injected governance text is machine-extracted and
+  // lands under imperative preambles ("hard rules"), so the artifact must say
+  // where it came from and what authority it does NOT carry.
+  if (!enriched.includes(PROVISIONAL_ARTIFACT_NOTICE)) {
+    enriched = `${enriched.trimEnd()}\n\n## Governance Provenance\n\n${PROVISIONAL_ARTIFACT_NOTICE}\n`;
+  }
+  return { enriched, diff };
 }
 
 export function formatDiffSummary(diff: EnrichmentDiff): string {

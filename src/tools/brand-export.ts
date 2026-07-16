@@ -4,6 +4,8 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
+import { sanitizeSvg } from "../lib/svg-resolver.js";
+import { PROVISIONAL_ARTIFACT_NOTICE } from "../lib/untrusted-text.js";
 import type {
   CoreIdentityData,
   VisualIdentityData,
@@ -97,7 +99,7 @@ function logoBlock(identity: CoreIdentityData, includeLogo: boolean): string {
       if (v.inline_svg) {
         lines.push(`### ${v.name} variant\n`);
         lines.push("```svg");
-        lines.push(v.inline_svg.trim());
+        lines.push(sanitizeSvg(v.inline_svg).trim());
         lines.push("```\n");
       }
       if (v.data_uri) {
@@ -245,6 +247,8 @@ export function generateChat(data: BrandData, includeLogo: boolean): string {
 
   lines.push(`# ${config.client_name} — Brand System`);
   lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
+  lines.push("");
   lines.push(
     "> **Portability notice:** This file is your complete brand system. Upload it to any AI conversation (Claude, ChatGPT, Gemini, etc.) and the AI will produce on-brand output."
   );
@@ -301,6 +305,8 @@ export function generateCode(data: BrandData): string {
 
   lines.push(`# ${config.client_name} — Brand System (Code Integration)`);
   lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
+  lines.push("");
   lines.push(
     "Two things to set up: (1) MCP server config so your AI coding tool can call brand tools, and (2) an instruction snippet for your project."
   );
@@ -331,6 +337,8 @@ export function generateCode(data: BrandData): string {
   lines.push("Paste this into your CLAUDE.md, .cursorrules, or project instructions:\n");
   lines.push("```markdown");
   lines.push(`# Brand System: ${config.client_name}`);
+  lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
   lines.push("");
   lines.push("This project uses a machine-readable brand system in `.brand/`.");
   lines.push("");
@@ -372,6 +380,8 @@ export function generateTeam(data: BrandData, includeLogo: boolean): string {
 
   lines.push(`# ${config.client_name} — Brand Guidelines`);
   lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
+  lines.push("");
   if (config.industry) {
     lines.push(`**Industry**: ${config.industry}`);
     lines.push("");
@@ -390,7 +400,7 @@ export function generateTeam(data: BrandData, includeLogo: boolean): string {
         if (v.inline_svg) {
           lines.push(`### ${v.name} variant\n`);
           lines.push("```svg");
-          lines.push(v.inline_svg.trim());
+          lines.push(sanitizeSvg(v.inline_svg).trim());
           lines.push("```\n");
         } else {
           lines.push(`- **${v.name}** variant available`);
@@ -479,6 +489,8 @@ export function generateEmail(data: BrandData): string {
   const lines: string[] = [];
 
   lines.push(`# ${config.client_name} — Brand System Summary`);
+  lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
   lines.push("");
   lines.push(
     `Here's the brand system for ${config.client_name}, built for AI tools and creative workflows. When generating content, visuals, or code for this brand, follow these guidelines to stay on-brand.`
@@ -581,6 +593,8 @@ export function generateClaudeSkill(data: BrandData, includeLogo: boolean): stri
 
   lines.push(`# ${brandName} Brand Identity Skill`);
   lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
+  lines.push("");
   lines.push("## When to Use");
   lines.push(`Use this skill whenever creating a visual artifact (HTML, React/JSX, SVG) for ${brandName}. This includes: dashboards, landing pages, social graphics, reports, interactive tools, presentations rendered as HTML, or any UI prototype.`);
   lines.push("");
@@ -597,7 +611,7 @@ export function generateClaudeSkill(data: BrandData, includeLogo: boolean): stri
           lines.push(`### Primary Logo (SVG — ${logo.type})`);
           lines.push("");
           lines.push("```svg");
-          lines.push(v.inline_svg.trim());
+          lines.push(sanitizeSvg(v.inline_svg).trim());
           lines.push("```");
           lines.push("");
         }

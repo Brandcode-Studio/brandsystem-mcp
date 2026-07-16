@@ -30,7 +30,7 @@ export function generateBrandInstructions(config: BrandConfig, identity: CoreIde
     lines.push(`IMPORTANT: Always use the SVG below for the ${config.client_name} logo. Never type the company name in a font — always embed this vector markup. For dark backgrounds, add fill="#ffffff" to override the path fills.`);
     lines.push("");
     lines.push("```svg");
-    lines.push(logoVariant.inline_svg.trim());
+    lines.push(sanitizeSvg(logoVariant.inline_svg).trim());
     lines.push("```");
     if (logoVariant.data_uri) {
       lines.push("");
@@ -93,7 +93,8 @@ function escapeHtml(str: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function confidenceBadge(c: string): string {
@@ -181,9 +182,9 @@ function buildLogoSection(identity: CoreIdentity): string {
         </div>
       </div>
       <div class="logo-meta-row">
-        <span>Type: ${logo.type}</span>
+        <span>Type: ${escapeHtml(logo.type)}</span>
         <span>${confidenceBadge(logo.confidence)}</span>
-        <span class="source">via ${logo.source}</span>
+        <span class="source">via ${escapeHtml(logo.source)}</span>
       </div>`);
     }
   }
@@ -296,7 +297,7 @@ function buildComparisonSection(config: BrandConfig, identity: CoreIdentity): st
             <span class="comp-row-label">Fonts</span>
             <span class="comp-row-value">${
               brandFonts.length > 0
-                ? brandFonts.map((f) => f.family).join(", ")
+                ? escapeHtml(brandFonts.map((f) => f.family).join(", "))
                 : `<span class="comp-missing">Not yet extracted</span>`
             }</span>
           </div>

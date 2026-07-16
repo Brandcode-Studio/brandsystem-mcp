@@ -10,6 +10,7 @@ import { generateAndPersistDesignArtifacts } from "../lib/design-synthesis.js";
 import { ERROR_CODES, type ClarificationItem } from "../types/index.js";
 import { invalidateCheckCache } from "../lib/brand-check-engine.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
+import { fenceUntrusted } from "../lib/untrusted-text.js";
 
 async function handler(server: McpServer) {
   const brandDir = new BrandDir(process.cwd());
@@ -97,7 +98,7 @@ async function handler(server: McpServer) {
       clarifications.push({
         id: `clarify-${++itemId}`,
         field: `colors.${color.role}`,
-        question: `Color ${color.value} (${color.name}) has low confidence. Is this correct and what role does it play?`,
+        question: `Color ${color.value} (name: ${fenceUntrusted(color.name, 60)}) has low confidence. Is this correct and what role does it play?`,
         source: color.source,
         priority: "medium",
       });
@@ -119,7 +120,7 @@ async function handler(server: McpServer) {
       clarifications.push({
         id: `clarify-${++itemId}`,
         field: `typography.${typo.family}`,
-        question: `Font "${typo.family}" has low confidence. Is this your brand font?`,
+        question: `Font ${fenceUntrusted(typo.family, 60)} has low confidence. Is this your brand font?`,
         source: typo.source,
         priority: "medium",
       });

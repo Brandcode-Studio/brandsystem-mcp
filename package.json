@@ -1,6 +1,6 @@
 {
   "name": "@brandsystem/mcp",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "mcpName": "io.github.Brandcode-Studio/brandsystem-mcp",
   "description": "Author a portable .brand runtime — the governance layer that travels with your brand. Extract identity from websites, Figma, and PDFs; compile tokens, anti-patterns, and voice rules into a single .brand/ directory; connect directly to MCP clients like Claude Code, Claude Desktop, Cursor, and Windsurf, or carry the compiled runtime into any AI tool. One artifact, every surface on brand.",
   "type": "module",
@@ -45,7 +45,9 @@
   },
   "files": [
     "dist",
-    "bin"
+    "!dist/hosted",
+    "bin/brandsystem-mcp.mjs",
+    "llms.txt"
   ],
   "keywords": [
     "mcp",

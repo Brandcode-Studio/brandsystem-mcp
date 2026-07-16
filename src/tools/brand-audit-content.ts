@@ -8,7 +8,7 @@ import {
   scoreContent,
   isHtmlContent,
 } from "../lib/content-scorer.js";
-import { isPathWithinBase } from "../lib/path-security.js";
+import { isRealPathWithinBase } from "../lib/path-security.js";
 import { ERROR_CODES } from "../types/index.js";
 import {
   ensureLiveFreshness,
@@ -24,7 +24,7 @@ async function resolveContent(input: string): Promise<{ content: string; isHtml:
   if (/\.(html?|md|txt)$/i.test(input.trim()) && !input.includes("\n") && input.length < 500) {
     const { resolve } = await import("node:path");
     const resolvedPath = resolve(process.cwd(), input.trim());
-    if (isPathWithinBase(resolvedPath, process.cwd())) {
+    if (isRealPathWithinBase(resolvedPath, process.cwd())) {
       try {
         const content = await readFile(resolvedPath, "utf-8");
         return { content, isHtml: /\.html?$/i.test(input.trim()) || isHtmlContent(content) };

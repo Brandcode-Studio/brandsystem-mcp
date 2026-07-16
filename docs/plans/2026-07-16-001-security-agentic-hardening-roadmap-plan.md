@@ -42,7 +42,9 @@
 6. **`Brand-System` org ownership continuity** (org exists; maintainer is active admin): retain the org, document its legacy purpose, require MFA, keep at least two recovery-capable owners if possible.
 7. **Provisional poisoned-runtime response runbook (internal).** Written response steps now (re-extract, re-approve, notify affected clients). The provenance-integrity *detector* does not exist yet — `brand_audit_drift` scores content compliance, not policy-vs-provenance — and is built in 0.9.6/0.10. Exercise the runbook before making any public incident-readiness claim; a note alone does not complete a public security posture.
 
-## 0.9.6 — Security & distribution integrity
+## 0.9.6 — Security & distribution integrity — SHIPPED 2026-07-16
+
+(Items 1–8 landed; item 9 — the provenance-integrity detector — moved to 0.10, where the promotion gate it depends on lands. Remaining MEDIUM taint findings — creation-brief evidence envelope, color-namer passthrough, interaction-policy rule presentation — tracked for 0.10. See CHANGELOG 0.9.6.)
 
 1. **Slim the npm package to the Build MCP only:** exclude `dist/hosted/**` and `bin/brandcode-mcp.mjs` **from the tarball** (the repository build can still compile hosted code — the hosted smoke workflow needs it). Add a CI test on `npm pack --dry-run` that fails if hosted code, tests, internal specs, or undeclared executables enter the tarball (allowlist-based). This enforces the Phase 0 Build/Use boundary in packaging.
 2. **Credential hardening:** `0600` owner-only mode on `brandcode-auth.json`; atomic write (temp file + rename); conservative directory permissions; token redaction audit across status/telemetry/errors/history.
