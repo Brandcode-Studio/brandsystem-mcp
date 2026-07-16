@@ -66,9 +66,20 @@ function isPackageResolverRef(value: string): boolean {
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\"))
     return false;
   try {
-    return !decodeURIComponent(value)
-      .split("/")
-      .some((segment) => segment === ".." || segment === ".");
+    let decoded = value;
+    for (let pass = 0; pass < 8; pass += 1) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        return (
+          !decoded.includes("\\") &&
+          !decoded
+            .split("/")
+            .some((segment) => segment === ".." || segment === ".")
+        );
+      }
+      decoded = next;
+    }
+    return false;
   } catch {
     return false;
   }

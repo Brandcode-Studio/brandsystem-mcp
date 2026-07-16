@@ -214,6 +214,16 @@ describe("external runtime contract V1 normalization", () => {
     );
   });
 
+  it("rejects double-encoded package traversal", async () => {
+    const source = await fixture("current-producer.json");
+    const assets = source.assets as Array<Record<string, unknown>>;
+    const handle = assets[0]?.deliveryHandle as Record<string, unknown>;
+    handle.resolverRef = "/assets/%252e%252e/private/logo.svg";
+    expect(() => normalizeRuntimeContract(source)).toThrow(
+      "safe root-relative package path",
+    );
+  });
+
   it("rejects unreviewed Taste instead of inferring approved authority", async () => {
     const source = await fixture("current-producer.json");
     const guidance = source.tasteGuidance as Array<Record<string, unknown>>;
