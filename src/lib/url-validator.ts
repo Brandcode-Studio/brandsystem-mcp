@@ -103,6 +103,11 @@ export const MAX_HTML_BYTES = 5 * 1024 * 1024; // 5 MB
 /** Max bytes for fetched CSS stylesheets */
 export const MAX_CSS_BYTES = 1 * 1024 * 1024; // 1 MB
 
+export type SafeFetchOptions = RequestInit & {
+  /** Hard socket-stream limit. Defaults to MAX_HTML_BYTES. */
+  maxResponseBytes?: number;
+};
+
 /**
  * Read a response body with a byte limit. Throws if limit exceeded.
  */
@@ -144,21 +149,21 @@ export async function readResponseWithLimit(response: Response, maxBytes: number
  */
 export async function safeFetch(
   url: string,
-  options?: RequestInit,
+  options?: SafeFetchOptions,
 ): Promise<Response> {
   let currentUrl = url;
   let hops = 0;
+  const maxResponseBytes = options?.maxResponseBytes ?? MAX_HTML_BYTES;
+
+  if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes < 0) {
+    throw new Error("safeFetch maxResponseBytes must be a non-negative safe integer");
+  }
 
   while (true) {
-    const response = await pinnedRequest(currentUrl, options);
+    const response = await pinnedRequest(currentUrl, options, maxResponseBytes);
 
     if (![301, 302, 307, 308].includes(response.status)) {
       return response;
-    }
-
-    hops++;
-    if (hops > MAX_REDIRECTS) {
-      throw new Error(`SSRF blocked: too many redirects (>${MAX_REDIRECTS})`);
     }
 
     const location = response.headers.get("location");
@@ -166,12 +171,25 @@ export async function safeFetch(
       return response; // redirect with no Location — return as-is
     }
 
+    // Redirect bodies are never consumed. Cancel immediately so a hostile
+    // redirect cannot keep streaming bytes while the next hop is validated.
+    await response.body?.cancel().catch(() => undefined);
+
+    hops++;
+    if (hops > MAX_REDIRECTS) {
+      throw new Error(`SSRF blocked: too many redirects (>${MAX_REDIRECTS})`);
+    }
+
     // Resolve relative redirects
     currentUrl = new URL(location, currentUrl).href;
   }
 }
 
-async function pinnedRequest(url: string, options?: RequestInit): Promise<Response> {
+async function pinnedRequest(
+  url: string,
+  options: SafeFetchOptions | undefined,
+  maxResponseBytes: number,
+): Promise<Response> {
   const parsed = new URL(url);
   const resolved = await resolveValidatedAddress(url);
   const transport = parsed.protocol === "https:" ? https : http;
@@ -204,29 +222,66 @@ async function pinnedRequest(url: string, options?: RequestInit): Promise<Respon
     const req = transport.request(
       requestOptions,
       (res) => {
-        const chunks: Uint8Array[] = [];
+        const responseHeaders = new Headers();
 
-        res.on("data", (chunk) => {
-          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-        });
-        res.on("end", () => {
-          const body = Buffer.concat(chunks);
-          const responseHeaders = new Headers();
-
-          for (const [key, value] of Object.entries(res.headers)) {
-            if (Array.isArray(value)) {
-              for (const entry of value) responseHeaders.append(key, entry);
-            } else if (typeof value === "string") {
-              responseHeaders.set(key, value);
-            }
+        for (const [key, value] of Object.entries(res.headers)) {
+          if (Array.isArray(value)) {
+            for (const entry of value) responseHeaders.append(key, entry);
+          } else if (typeof value === "string") {
+            responseHeaders.set(key, value);
           }
+        }
 
-          resolve(new Response(body, {
-            status: res.statusCode ?? 200,
-            statusText: res.statusMessage,
-            headers: responseHeaders,
-          }));
-        });
+        const declaredLength = Number(responseHeaders.get("content-length"));
+        if (method !== "HEAD" && Number.isFinite(declaredLength) && declaredLength > maxResponseBytes) {
+          res.destroy();
+          reject(new Error(`Response exceeded ${maxResponseBytes} byte limit`));
+          return;
+        }
+
+        const status = res.statusCode ?? 200;
+        const statusForbidsBody = status === 101 || status === 204 || status === 205 || status === 304;
+        const body = method === "HEAD" || statusForbidsBody
+          ? null
+          : new ReadableStream<Uint8Array>({
+              start(controller) {
+                let totalBytes = 0;
+                let closed = false;
+
+                const fail = (error: Error) => {
+                  if (closed) return;
+                  closed = true;
+                  controller.error(error);
+                  res.destroy();
+                };
+
+                res.on("data", (chunk: Buffer | string) => {
+                  if (closed) return;
+                  const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+                  totalBytes += bytes.byteLength;
+                  if (totalBytes > maxResponseBytes) {
+                    fail(new Error(`Response exceeded ${maxResponseBytes} byte limit`));
+                    return;
+                  }
+                  controller.enqueue(bytes);
+                });
+                res.on("end", () => {
+                  if (closed) return;
+                  closed = true;
+                  controller.close();
+                });
+                res.on("error", (error) => fail(error));
+              },
+              cancel() {
+                res.destroy();
+              },
+            });
+
+        resolve(new Response(body, {
+          status,
+          statusText: res.statusMessage,
+          headers: responseHeaders,
+        }));
       },
     );
 

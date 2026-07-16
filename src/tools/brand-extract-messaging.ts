@@ -613,6 +613,7 @@ async function handler(input: Params) {
     allUrls.map(async (pageUrl) => {
       const resp = await safeFetch(pageUrl, {
         signal: AbortSignal.timeout(15000),
+        maxResponseBytes: MAX_HTML_BYTES,
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
       if (!resp.ok) return { url: pageUrl, text: "" };

@@ -181,6 +181,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
     try {
       const response = await safeFetch(url, {
         signal: AbortSignal.timeout(15000),
+        maxResponseBytes: MAX_HTML_BYTES,
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
       if (!response.ok) {
@@ -234,6 +235,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
     try {
       const resp = await safeFetch(sheetUrl, {
         signal: AbortSignal.timeout(5000),
+        maxResponseBytes: MAX_CSS_BYTES,
         headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
       });
       const cssText = await readResponseWithLimit(resp, MAX_CSS_BYTES);

@@ -362,6 +362,7 @@ async function discoverSitePages(sourceUrl: string, pageLimit = 5, discoveryLimi
   const collectFromHtml = async (url: string) => {
     const response = await safeFetch(url, {
       signal: AbortSignal.timeout(12000),
+      maxResponseBytes: MAX_HTML_BYTES,
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
     if (!response.ok) return;
@@ -385,6 +386,7 @@ async function discoverSitePages(sourceUrl: string, pageLimit = 5, discoveryLimi
     const sitemapUrl = new URL("/sitemap.xml", normalizedBase).toString();
     const response = await safeFetch(sitemapUrl, {
       signal: AbortSignal.timeout(8000),
+      maxResponseBytes: MAX_HTML_BYTES,
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
     if (response.ok) {
