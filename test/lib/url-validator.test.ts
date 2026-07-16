@@ -11,7 +11,12 @@ vi.mock("node:dns/promises", () => ({
 }));
 
 import dns from "node:dns/promises";
-import { validateUrl, safeFetch } from "../../src/lib/url-validator.js";
+import {
+  MAX_HTML_BYTES,
+  readResponseWithLimit,
+  safeFetch,
+  validateUrl,
+} from "../../src/lib/url-validator.js";
 
 const mockLookup = vi.mocked(dns.lookup);
 
@@ -173,6 +178,48 @@ describe("safeFetch", () => {
     });
   });
 
+  it("enforces the byte limit while the socket response is streaming", async () => {
+    mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as any);
+    const oversized = makeResponse("1234");
+    const destroySpy = vi.spyOn(oversized, "destroy");
+    mockTransportRequest(https, [oversized]);
+
+    const result = await safeFetch("https://example.com/large", {
+      maxResponseBytes: 3,
+    });
+
+    await expect(result.text()).rejects.toThrow("Response exceeded 3 byte limit");
+    expect(destroySpy).toHaveBeenCalled();
+  });
+
+  it("rejects an oversized declared body before consuming it", async () => {
+    mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as any);
+    const oversized = makeResponse("ignored", 200, { "content-length": "4" });
+    const destroySpy = vi.spyOn(oversized, "destroy");
+    mockTransportRequest(https, [oversized]);
+
+    await expect(
+      safeFetch("https://example.com/large", { maxResponseBytes: 3 }),
+    ).rejects.toThrow("Response exceeded 3 byte limit");
+    expect(destroySpy).toHaveBeenCalled();
+  });
+
+  it("retains the caller-level reader cap below the transport default", async () => {
+    mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as any);
+    mockTransportRequest(https, [makeResponse("1234")]);
+
+    const result = await safeFetch("https://example.com/large");
+    await expect(readResponseWithLimit(result, 3)).rejects.toThrow("Response exceeded");
+  });
+
+  it("rejects invalid response limits before opening a socket", async () => {
+    const requestSpy = vi.spyOn(https, "request");
+    await expect(
+      safeFetch("https://example.com", { maxResponseBytes: MAX_HTML_BYTES + 0.5 }),
+    ).rejects.toThrow("non-negative safe integer");
+    expect(requestSpy).not.toHaveBeenCalled();
+  });
+
   it("rejects a private IP URL without making the request", async () => {
     const requestSpy = vi.spyOn(http, "request");
 
@@ -195,6 +242,24 @@ describe("safeFetch", () => {
     expect(result.status).toBe(200);
     expect(await result.text()).toBe("done");
     expect(requestSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns a redirect body when no Location header is present", async () => {
+    mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as any);
+    mockTransportRequest(https, [makeResponse("explanation", 302, {}, "Found")]);
+
+    const result = await safeFetch("https://example.com/redir");
+    expect(result.status).toBe(302);
+    expect(await result.text()).toBe("explanation");
+  });
+
+  it("returns bodyless statuses without constructing an invalid stream body", async () => {
+    mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as any);
+    mockTransportRequest(https, [makeResponse("", 204)]);
+
+    const result = await safeFetch("https://example.com/empty");
+    expect(result.status).toBe(204);
+    expect(result.body).toBeNull();
   });
 
   it("blocks redirect to a private IP", async () => {

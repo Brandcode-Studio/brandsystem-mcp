@@ -2,6 +2,8 @@ import * as cheerio from "cheerio";
 import { getVersion } from "./version.js";
 import { safeFetch } from "./url-validator.js";
 
+const MAX_LOGO_BYTES = 500_000;
+
 export interface ExtractedLogo {
   url: string;
   type: "og-image" | "svg-favicon" | "selector-img" | "selector-svg" | "apple-touch-icon" | "favicon" | "clearbit" | "common-path";
@@ -241,6 +243,7 @@ export async function fetchClearbitLogo(domain: string): Promise<ExtractedLogo |
   try {
     const response = await safeFetch(url, {
       signal: AbortSignal.timeout(5000),
+      maxResponseBytes: MAX_LOGO_BYTES,
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
 
@@ -325,6 +328,7 @@ export async function fetchGoogleFavicon(domain: string): Promise<ExtractedLogo 
   try {
     const response = await safeFetch(url, {
       signal: AbortSignal.timeout(5000),
+      maxResponseBytes: MAX_LOGO_BYTES,
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
 
@@ -361,6 +365,7 @@ export async function fetchAndEncodeLogo(
   try {
     const response = await safeFetch(url, {
       signal: AbortSignal.timeout(10000),
+      maxResponseBytes: MAX_LOGO_BYTES,
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
 
@@ -393,6 +398,7 @@ export async function fetchLogo(
   try {
     const response = await safeFetch(url, {
       signal: AbortSignal.timeout(10000),
+      maxResponseBytes: MAX_LOGO_BYTES,
       headers: { "User-Agent": `brandsystem-mcp/${getVersion()}` },
     });
 

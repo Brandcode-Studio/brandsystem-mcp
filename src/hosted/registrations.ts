@@ -18,18 +18,13 @@ import { registerGetAsset, registerListAssets } from "./tools/assets.js";
 import { registerFeedback } from "./tools/feedback.js";
 import { registerCaptureTaste } from "./tools/capture-taste.js";
 import { registerHistory } from "./tools/history.js";
+import { HOSTED_TOOL_ORDER } from "./tool-order.mjs";
 
-export const HOSTED_TOOL_ORDER = [
-  "brand_runtime",
-  "brand_search",
-  "brand_check",
-  "brand_status",
-  "list_brand_assets",
-  "get_brand_asset",
-  "brand_feedback",
-  "capture_taste",
-  "brand_history",
-] as const;
+// Single source of truth for HOSTED_TOOL_ORDER lives in ./tool-order.mjs (a
+// plain zero-dependency ES module) so scripts/hosted-mcp-smoke.mjs can import
+// the exact same values without a build step. Re-exported here so this
+// remains the canonical import path for the rest of the codebase.
+export { HOSTED_TOOL_ORDER };
 
 export function registerHostedTools(
   server: McpServer,

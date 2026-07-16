@@ -9,6 +9,91 @@ import {
 } from "../connectors/brandcode/live-source.js";
 import { generateRecoveryGuidance } from "../lib/recovery-guidance.js";
 
+/**
+ * Session/phase taxonomy — mirrors the inline `// ── Section ──` comment
+ * groups and registration order in src/server.ts's createServer(). This is
+ * the single place that taxonomy is duplicated outside server.ts; if the
+ * grouping there changes, update this list to match.
+ *
+ * Kept here (rather than a shared lib) because brand_status is the only
+ * consumer today — the "what can I do?" resume point is the natural place
+ * for agents to discover the phase structure.
+ */
+export const TOOL_SESSIONS: ReadonlyArray<{ name: string; tools: readonly string[] }> = [
+  {
+    name: "Entry points",
+    tools: ["brand_start", "brand_status"],
+  },
+  {
+    name: "Session 1: Core Identity",
+    tools: [
+      "brand_extract_web",
+      "brand_extract_visual",
+      "brand_extract_site",
+      "brand_extract_pdf",
+      "brand_resolve_conflicts",
+      "brand_generate_designmd",
+      "brand_extract_figma",
+      "brand_set_logo",
+      "brand_compile",
+      "brand_clarify",
+      "brand_audit",
+      "brand_report",
+      "brand_init",
+    ],
+  },
+  {
+    name: "Session 2: Visual Identity",
+    tools: ["brand_deepen_identity", "brand_ingest_assets", "brand_preflight"],
+  },
+  {
+    name: "Session 3: Messaging",
+    tools: ["brand_extract_messaging", "brand_compile_messaging"],
+  },
+  {
+    name: "Session 4: Content Strategy",
+    tools: [
+      "brand_build_personas",
+      "brand_build_journey",
+      "brand_build_themes",
+      "brand_build_matrix",
+    ],
+  },
+  {
+    name: "Content scoring",
+    tools: ["brand_audit_content", "brand_check_compliance", "brand_audit_drift"],
+  },
+  {
+    name: "Runtime",
+    tools: ["brand_runtime", "brand_check", "brand_preview"],
+  },
+  {
+    name: "Brandcode Studio connector",
+    tools: [
+      "brand_brandcode_auth",
+      "brand_brandcode_connect",
+      "brand_brandcode_sync",
+      "brand_brandcode_status",
+      "brand_brandcode_live",
+    ],
+  },
+  {
+    name: "Git-connected source",
+    tools: ["brand_connect_repo", "brand_repo_status"],
+  },
+  {
+    name: "Cross-session utilities",
+    tools: [
+      "brand_write",
+      "brand_export",
+      "brand_enrich_skill",
+      "brand_feedback",
+      "brand_feedback_review",
+      "brand_feedback_triage",
+    ],
+  },
+];
+
 async function handler() {
   const cwd = process.cwd();
   const brandDir = new BrandDir(cwd);
@@ -26,6 +111,7 @@ async function handler() {
       ],
       data: {
         error: ERROR_CODES.NOT_FOUND,
+        tool_sessions: TOOL_SESSIONS,
         getting_started: {
           what_is_brandsystem: "brandsystem extracts and manages brand identity (logo, colors, fonts, voice, visual rules) so AI tools produce on-brand output. It creates a .brand/ directory with structured YAML, DTCG tokens, and a portable HTML report.",
           quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, escalates to deeper visual/site extraction for JS-rendered or weak-signal sites when Chrome is available, compiles DTCG tokens + brand runtime + interaction policy, generates design-synthesis.json + DESIGN.md, and generates a portable brand report — all in one call. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
@@ -272,6 +358,7 @@ async function handler() {
     next_steps: nextSteps.length > 0 ? nextSteps : ["Brand system is up to date"],
     data: {
       status: lines.join("\n"),
+      tool_sessions: TOOL_SESSIONS,
       recovery: recovery ? {
         readiness: recovery.currentReadiness,
         actions: recovery.actions,

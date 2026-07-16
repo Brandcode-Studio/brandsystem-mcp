@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "brandcode-runtime-contract/v1",
+  "manifest": {
+    "objectType": "full_brand_runtime",
+    "runtimeId": "broken@1",
+    "brandSlug": "broken",
+    "brandName": "Broken",
+    "runtimeVersion": "1",
+    "generatedAt": "2026-07-16T00:00:00.000Z",
+    "authority": "compiled_runtime",
+    "provenanceClass": "compiled_source"
+  },
+  "voice": { "verbalIdentity": "Missing Official Brand.", "phrases": [] },
+  "strategy": { "perspective": "Incomplete.", "moves": [] },
+  "knowledge": { "corpusId": null, "documentCount": 0, "descriptors": [] },
+  "interactionPolicy": {
+    "mutability": "read_only",
+    "defaultSurface": "kitchen",
+    "supportedSurfaces": ["kitchen"],
+    "rules": []
+  },
+  "assets": [],
+  "kits": { "selected": null, "campaigns": [] },
+  "tasteGuidance": [],
+  "capabilityWarnings": []
+}

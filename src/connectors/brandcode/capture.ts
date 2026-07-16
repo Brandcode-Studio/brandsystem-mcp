@@ -17,7 +17,11 @@ import { BrandcodeClientError } from "./client.js";
 const USER_AGENT = "brandsystem-mcp";
 const TIMEOUT_MS = 15_000;
 
-async function postJson<T>(url: string, authToken: string, body: unknown): Promise<T> {
+async function postJson<T>(
+  url: string,
+  authToken: string,
+  body: unknown,
+): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -49,13 +53,23 @@ export type TasteCapturePayload = {
   verdict: "distinctive" | "generic" | "flag";
   attributeReason: string;
   surface: "chat" | "code" | "studio";
+  artifactKind?: string;
+  proposedScope?: string[];
+  runtimeVersion?: string;
   actor?: string;
   turnId?: string;
   sessionId?: string;
 };
 
 export type TasteCaptureResponse =
-  | { ok: true; routed: "queued"; ref: string; quarantined: boolean; canonicalMutation: false }
+  | {
+      ok: true;
+      routed: "queued";
+      ref: string;
+      quarantined: boolean;
+      canonicalMutation: false;
+      reviewUrl?: string;
+    }
   | { ok: false; code?: string; error?: string; message?: string };
 
 export async function postTasteCapture(
@@ -93,11 +107,20 @@ export type ResearchRecipePayload = {
 
 export type IntelligenceCaptureOutcome =
   | { status: "queued"; statement: string; ref: string; quarantined: boolean }
-  | { status: "escalated-to-decision"; statement: string; decisionPrompt: string }
+  | {
+      status: "escalated-to-decision";
+      statement: string;
+      decisionPrompt: string;
+    }
   | { status: "refused"; code: string; message: string };
 
 export type IntelligenceCaptureResponse =
-  | { ok: true; mode: "findings" | "candidate"; count: number; outcomes: IntelligenceCaptureOutcome[] }
+  | {
+      ok: true;
+      mode: "findings" | "candidate";
+      count: number;
+      outcomes: IntelligenceCaptureOutcome[];
+    }
   | { ok: false; code?: string; error?: string; message?: string };
 
 export async function postIntelligenceFindings(

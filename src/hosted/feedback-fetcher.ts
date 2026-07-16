@@ -4,8 +4,7 @@
  * This writes only the explicit brand_feedback entry to UCS AgentRun history.
  * It is not general telemetry and does not mutate canonical governance.
  */
-const USER_AGENT = "brandcode-mcp";
-const DEFAULT_TIMEOUT_MS = 15_000;
+import { postUcsHistoryEntry } from "./ucs-history-post.js";
 
 export class FeedbackUpstreamError extends Error {
   constructor(
@@ -30,24 +29,9 @@ export interface AppendHostedFeedbackOptions {
 export async function appendHostedFeedback(
   opts: AppendHostedFeedbackOptions,
 ): Promise<unknown> {
-  const url = new URL(
-    `/api/brand/hosted/${encodeURIComponent(opts.slug)}/agent/history`,
-    opts.ucsBaseUrl,
-  );
-
   let response: Response;
   try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        "user-agent": USER_AGENT,
-        authorization: `Bearer ${opts.ucsServiceToken}`,
-      },
-      body: JSON.stringify({ entry: opts.entry }),
-      signal: opts.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    });
+    response = await postUcsHistoryEntry(opts);
   } catch (err) {
     throw new FeedbackUpstreamError(
       502,

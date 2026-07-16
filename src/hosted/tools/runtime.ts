@@ -12,6 +12,12 @@ import { buildResponse, safeParseParams } from "../../lib/response.js";
 import { ERROR_CODES } from "../../types/index.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
 import type { BrandInstancePayload } from "../../connectors/brandcode/knowledge-types.js";
+import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
+import {
+  normalizeRuntimeContractFromPackage,
+  RuntimeContractValidationError,
+  sliceRuntimeContract,
+} from "../../connectors/brandcode/runtime-contract/index.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
@@ -106,8 +112,7 @@ function normalizeBrandInstance(
   const assets = instance.assets as unknown[] | undefined;
   const manifest = instance.manifest as Record<string, unknown> | undefined;
 
-  const colors =
-    (tokens?.colors as Record<string, string> | undefined) ?? {};
+  const colors = (tokens?.colors as Record<string, string> | undefined) ?? {};
   const typography = pickTypography(fonts, tokens);
   const logo = pickLogo(assets);
 
@@ -144,7 +149,9 @@ function trimProse(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const text = value.trim();
   if (!text) return null;
-  return text.length > PROSE_LIMIT ? `${text.slice(0, PROSE_LIMIT).trimEnd()}...` : text;
+  return text.length > PROSE_LIMIT
+    ? `${text.slice(0, PROSE_LIMIT).trimEnd()}...`
+    : text;
 }
 
 /** Voice slice from the hosted governance model: prose verbal identity +
@@ -154,7 +161,9 @@ function pickVoice(inst: BrandInstancePayload): Record<string, unknown> | null {
   const perspective = trimProse(inst.perspective);
   const phrasesRaw = Array.isArray(inst.brandPhrases) ? inst.brandPhrases : [];
   const brandPhrases = phrasesRaw
-    .filter((p) => p && typeof p.phrase === "string" && p.phrase.trim().length > 0)
+    .filter(
+      (p) => p && typeof p.phrase === "string" && p.phrase.trim().length > 0,
+    )
     .slice(0, ARRAY_LIMIT)
     .map((p) => ({
       phrase: p.phrase,
@@ -173,9 +182,13 @@ function pickVoice(inst: BrandInstancePayload): Record<string, unknown> | null {
 
 /** Strategy slice from the hosted governance model: narratives, application
  *  rules, proof points, and strategy moves — summarized for context injection. */
-function pickStrategy(inst: BrandInstancePayload): Record<string, unknown> | null {
+function pickStrategy(
+  inst: BrandInstancePayload,
+): Record<string, unknown> | null {
   const narrativesRaw = Array.isArray(inst.narratives) ? inst.narratives : [];
-  const rulesRaw = Array.isArray(inst.applicationRules) ? inst.applicationRules : [];
+  const rulesRaw = Array.isArray(inst.applicationRules)
+    ? inst.applicationRules
+    : [];
   const proofRaw = Array.isArray(inst.proofPoints) ? inst.proofPoints : [];
   const movesRaw = Array.isArray(inst.strategyMoves) ? inst.strategyMoves : [];
 
@@ -229,8 +242,7 @@ function pickTypography(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   const roles = fonts?.roles as
-    | Record<string, Record<string, unknown>>
-    | undefined;
+    Record<string, Record<string, unknown>> | undefined;
   if (roles) {
     // Canonical order — display first so minimal slice picks it as "heading".
     const order = ["display", "heading", "body", "mono"];
@@ -297,9 +309,9 @@ function sliceRuntime(
         ? {
             colors: identity.colors
               ? Object.fromEntries(
-                  Object.entries(identity.colors as Record<string, string>).filter(
-                    ([k]) => k === "primary",
-                  ),
+                  Object.entries(
+                    identity.colors as Record<string, string>,
+                  ).filter(([k]) => k === "primary"),
                 )
               : {},
             typography: identity.typography
@@ -321,6 +333,57 @@ function sliceRuntime(
     return { ...base, voice: runtime.voice, strategy: runtime.strategy };
   }
   return runtime;
+}
+
+function compactTasteGuidance(projection: TasteGuidanceProjection | null) {
+  if (!projection) return null;
+  return {
+    schema_version: projection.schemaVersion,
+    taste_revision: projection.tasteRevision,
+    updated_at: projection.updatedAt,
+    approved_count: projection.counts.approved,
+    guidance: projection.guidance.slice(0, 12).map((item) => ({
+      id: item.id,
+      directive: item.directive,
+      polarity: item.polarity,
+      reason: item.reason,
+      scope: {
+        artifact_kind: item.scope.artifactKind,
+        pattern_ref: item.scope.patternRef,
+        surfaces: item.scope.surfaces,
+      },
+      provenance: item.provenance,
+      reviewed_at: item.reviewedAt,
+      canonical_mutation: false,
+    })),
+    boundary: projection.boundary,
+  };
+}
+
+function tasteWorkflow(captureAvailable: boolean) {
+  return {
+    schema_version: "brandcode-taste-workflow/v0.1",
+    apply_reviewed_guidance:
+      "Apply only approved guidance that matches the current artifact kind or surface. Honor an explicit fresh-direction request by not applying saved taste guidance.",
+    capture: captureAvailable
+      ? {
+          available: true,
+          tool: "capture_taste",
+          when_to_offer:
+            "After the person expresses a concrete judgment about an artifact, ask whether they want that judgment queued in Brandcode for review.",
+          required_detail:
+            "Record the candidate reference, verdict, and a specific attribute-level reason; include artifact, surface, runtime, turn, and session context when available.",
+          result:
+            "The capture remains review-only. Return the successful tool response's review_url so the person can review the exact queued item in Brandcode.",
+        }
+      : {
+          available: false,
+          reason:
+            "This MCP connection has read access but not capture access. Do not claim that a taste judgment was recorded.",
+        },
+    never:
+      "Never passively capture a conversation, infer silence as approval, or claim a queued judgment changed Official Brand or approved guidance.",
+  };
 }
 
 export function registerRuntime(
@@ -351,7 +414,29 @@ export function registerRuntime(
         });
       }
 
-      const runtime = extractRuntime(pkg);
+      let contractIngress;
+      try {
+        contractIngress = normalizeRuntimeContractFromPackage(pkg);
+      } catch (err) {
+        if (err instanceof RuntimeContractValidationError) {
+          return buildResponse({
+            what_happened: `Hosted runtime contract for "${context.slug}" is incompatible with this MCP consumer`,
+            next_steps: [
+              "Recompile or re-export the brand runtime from the current Brandcode contract producer",
+              "Inspect the returned issues before retrying; incompatible contracts never fall back to a legacy shape",
+            ],
+            data: {
+              error: "runtime_contract_invalid",
+              contract: "brandcode-runtime-contract/v1",
+              issues: err.issues,
+              slug: context.slug,
+            },
+          });
+        }
+        throw err;
+      }
+
+      const runtime = contractIngress?.runtime ?? extractRuntime(pkg);
       if (!runtime) {
         return buildResponse({
           what_happened: `No compiled runtime available for "${context.slug}" yet`,
@@ -366,7 +451,34 @@ export function registerRuntime(
         });
       }
 
-      const sliced = sliceRuntime(runtime, parsed.data.slice);
+      let tasteGuidance: TasteGuidanceProjection | null = null;
+      let tasteGuidanceStatus:
+        "available" | "empty" | "unavailable" | "not_requested" =
+        "not_requested";
+      if (parsed.data.slice === "full" || parsed.data.slice === "voice") {
+        try {
+          tasteGuidance = await context.loadTasteGuidance();
+          tasteGuidanceStatus = tasteGuidance?.guidance.length
+            ? "available"
+            : "empty";
+        } catch {
+          tasteGuidanceStatus = "unavailable";
+        }
+      }
+
+      const sliced = {
+        ...(contractIngress
+          ? sliceRuntimeContract(contractIngress.runtime, parsed.data.slice)
+          : sliceRuntime(runtime, parsed.data.slice)),
+        ...(parsed.data.slice === "full" || parsed.data.slice === "voice"
+          ? {
+              taste_guidance: compactTasteGuidance(tasteGuidance),
+              taste_workflow: tasteWorkflow(
+                context.auth.scopes.includes("capture"),
+              ),
+            }
+          : {}),
+      };
       const estimatedTokens =
         parsed.data.slice === "full"
           ? "~1200"
@@ -380,6 +492,13 @@ export function registerRuntime(
         what_happened: `Loaded live runtime for "${context.slug}" — ${parsed.data.slice} slice (${estimatedTokens} tokens)`,
         next_steps: [
           "Inject this into your sub-agent's prompt as brand context",
+          ...(parsed.data.slice === "full" || parsed.data.slice === "voice"
+            ? [
+                context.auth.scopes.includes("capture")
+                  ? "Apply relevant approved Taste Guidance; after a concrete user judgment, offer to queue it with capture_taste for Brandcode review"
+                  : "Apply relevant approved Taste Guidance; this connection is read-only for taste capture",
+              ]
+            : []),
           parsed.data.slice === "full"
             ? "Use slice='visual' or 'voice' for smaller hand-offs"
             : "Use slice='full' for complete context",
@@ -389,6 +508,8 @@ export function registerRuntime(
           runtime_origin: "hosted",
           slug: context.slug,
           environment: context.auth.environment,
+          taste_guidance_status: tasteGuidanceStatus,
+          runtime_contract_negotiation: contractIngress?.negotiation ?? null,
         },
       });
     },

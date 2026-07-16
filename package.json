@@ -1,6 +1,6 @@
 {
   "name": "@brandsystem/mcp",
-  "version": "0.9.3",
+  "version": "0.9.5",
   "mcpName": "io.github.Brandcode-Studio/brandsystem-mcp",
   "description": "Author a portable .brand runtime — the governance layer that travels with your brand. Extract identity from websites, Figma, and PDFs; compile tokens, anti-patterns, and voice rules into a single .brand/ directory; deploy to Claude Design, Claude Code, Cursor, ChatGPT, and any MCP-compatible tool. One artifact, every surface on brand.",
   "type": "module",
@@ -28,6 +28,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
     "@upstash/redis": "^1.38.0",
+    "@vercel/functions": "^3.7.5",
     "cheerio": "^1.0.0",
     "css-tree": "^3.1.0",
     "pdfjs-dist": "^5.6.205",

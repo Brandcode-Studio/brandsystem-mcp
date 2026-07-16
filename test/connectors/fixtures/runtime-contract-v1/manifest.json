@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "brandcode-runtime-contract-fixture-bundle/v1",
+  "contractVersion": "brandcode-runtime-contract/v1",
+  "compatiblePreviousVersion": "brandcode-runtime-contract/v0.9",
+  "fixtures": {
+    "currentProducerCurrentConsumer": "current-producer.json",
+    "previousProducerCurrentConsumer": "previous-producer.json",
+    "missingRequiredSemantic": "missing-required-semantic.json",
+    "unsupportedMajor": "unsupported-major.json",
+    "invalidDeliveryHandle": "invalid-delivery-handle.json"
+  },
+  "nonClaim": "These fixtures prove local contract compatibility, not external MCP adoption."
+}

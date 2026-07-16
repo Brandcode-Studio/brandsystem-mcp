@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createHostedServer } from "../../src/hosted/server.js";
 import { HOSTED_TOOL_ORDER } from "../../src/hosted/registrations.js";
+import {
+  connectHostedClient as connectClient,
+  callHostedTool as call,
+} from "./helpers.js";
 import type {
   HostedBrandContext,
   BrandcodeMcpAuthInfo,
@@ -21,8 +22,7 @@ const TEST_RATE_LIMIT: HostedRateLimitSnapshot = {
   reset_at: "2026-05-11T12:01:00.000Z",
   retry_after_seconds: null,
   release_gate: "blocked",
-  blocker_owner:
-    "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
+  blocker_owner: "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
   required_before_public_release:
     "Replace in-process pre-release enforcement with durable shared hosted rate-limit enforcement before broad public release",
   source: "hosted tool test",
@@ -39,8 +39,7 @@ const TEST_DURABLE_RATE_LIMIT: HostedRateLimitSnapshot = {
   reset_at: "2026-05-11T12:01:00.000Z",
   retry_after_seconds: null,
   release_gate: "blocked",
-  blocker_owner:
-    "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
+  blocker_owner: "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
   required_before_public_release:
     "Capture command-backed hosted durable/shared rate-limit proof and Jason explicit release approval before broad public release",
   source: "hosted durable tool test",
@@ -68,30 +67,12 @@ function buildContext(
     slug: "acme",
     auth,
     loadBrandPackage: async () => pkg,
+    loadTasteGuidance: async () => null,
     ucsBaseUrl: "https://www.brandcode.studio",
     ucsServiceToken: "test-token",
     rateLimit: TEST_RATE_LIMIT,
     ...overrides,
   };
-}
-
-async function connectClient(context: HostedBrandContext) {
-  const server = createHostedServer(context);
-  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "hosted-tool-test", version: "1.0.0" });
-  await server.connect(serverT);
-  await client.connect(clientT);
-  return { server, client };
-}
-
-async function call(
-  client: Client,
-  name: string,
-  args: Record<string, unknown> = {},
-) {
-  const result = await client.callTool({ name, arguments: args });
-  const content = result.content as Array<{ type: string; text: string }>;
-  return JSON.parse(content[0].text) as Record<string, unknown>;
 }
 
 beforeEach(() => {
@@ -190,11 +171,12 @@ describe("hosted tool scope enforcement", () => {
     const auth = buildAuth({ scopes: ["feedback"] });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, entry: {} }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ok: true, entry: {} }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
       ),
     );
     const allowed = await connectClient(buildContext(null, { auth }));
@@ -219,20 +201,21 @@ describe("hosted tool scope enforcement", () => {
     const auth = buildAuth({ scopes: ["capture"] });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            routed: "queued",
-            ref: "taste-ledger:edge-capture",
-            quarantined: false,
-            canonicalMutation: false,
-          }),
-          {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          },
-        ),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              ok: true,
+              routed: "queued",
+              ref: "taste-ledger:edge-capture",
+              quarantined: false,
+              canonicalMutation: false,
+            }),
+            {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            },
+          ),
       ),
     );
     const allowed = await connectClient(buildContext(null, { auth }));
@@ -254,11 +237,12 @@ describe("capture_taste (hosted)", () => {
   const captureAuth = buildAuth({ scopes: ["capture"] });
 
   function stubCaptureResponse(body: unknown, init: ResponseInit = {}) {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify(body), {
-        status: init.status ?? 200,
-        headers: { "content-type": "application/json" },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status: init.status ?? 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
@@ -271,6 +255,8 @@ describe("capture_taste (hosted)", () => {
       ref: "taste-ledger:edge-capture",
       quarantined: false,
       canonicalMutation: false,
+      reviewUrl:
+        "https://www.brandcode.studio/tools/studio/acme/brand/intelligence",
     });
     const { client } = await connectClient(
       buildContext(null, { auth: captureAuth }),
@@ -279,9 +265,15 @@ describe("capture_taste (hosted)", () => {
     const json = await call(client, "capture_taste", {
       candidate_ref: "variant-851",
       verdict: "distinctive",
-      attribute_reason: "The asymmetric crop and editorial caption read as ours.",
+      attribute_reason:
+        "The asymmetric crop and editorial caption read as ours.",
       candidate_text: "Hero candidate with caption",
       surface: "studio",
+      artifact_kind: "social-layout",
+      proposed_scope: ["chef", "social"],
+      runtime_version: "runtime-42",
+      turn_id: "turn-42",
+      session_id: "session-42",
     });
 
     expect(json).toMatchObject({
@@ -292,9 +284,14 @@ describe("capture_taste (hosted)", () => {
       verdict: "distinctive",
       canonical_mutation: false,
       ref: "taste-ledger:edge-capture",
+      review_url:
+        "https://www.brandcode.studio/tools/studio/acme/brand/intelligence",
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 2 calls: the tool's own UCS taste-capture POST (calls[0]), then the
+    // hosted AgentRun telemetry POST fired by the server.tool wrapper after
+    // the tool handler resolves (calls[1]).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe(
       "https://www.brandcode.studio/api/brand/acme/runtime/taste-capture",
@@ -313,8 +310,14 @@ describe("capture_taste (hosted)", () => {
       candidateRef: "variant-851",
       candidateText: "Hero candidate with caption",
       verdict: "distinctive",
-      attributeReason: "The asymmetric crop and editorial caption read as ours.",
+      attributeReason:
+        "The asymmetric crop and editorial caption read as ours.",
       surface: "studio",
+      artifactKind: "social-layout",
+      proposedScope: ["chef", "social"],
+      runtimeVersion: "runtime-42",
+      turnId: "turn-42",
+      sessionId: "session-42",
       actor: "brandcode-mcp:bck_test_acme",
     });
     expect(body).not.toHaveProperty("brand");
@@ -362,7 +365,11 @@ describe("capture_taste (hosted)", () => {
 
   it("returns route refusals without claiming a capture", async () => {
     stubCaptureResponse(
-      { ok: false, code: "missing_reason", message: "attributeReason required" },
+      {
+        ok: false,
+        code: "missing_reason",
+        message: "attributeReason required",
+      },
       { status: 200 },
     );
     const { client } = await connectClient(
@@ -388,11 +395,12 @@ describe("brand_feedback (hosted)", () => {
   const feedbackAuth = buildAuth({ scopes: ["feedback"] });
 
   function stubFeedbackResponse(body: unknown, init: ResponseInit = {}) {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify(body), {
-        status: init.status ?? 200,
-        headers: { "content-type": "application/json" },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status: init.status ?? 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
@@ -409,10 +417,16 @@ describe("brand_feedback (hosted)", () => {
       detail: "Observed while checking a hosted package.",
       source_tool: "brand_search",
       related_run_id: "run-123",
-      evidence_refs: ["package://runtime/search", "https://private-provider.example/raw"],
+      evidence_refs: [
+        "package://runtime/search",
+        "https://private-provider.example/raw",
+      ],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 2 calls: the tool's own explicit feedback-append POST (calls[0]), then
+    // the hosted AgentRun telemetry POST fired by the server.tool wrapper
+    // after the tool handler resolves (calls[1]).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe(
       "https://www.brandcode.studio/api/brand/hosted/acme/agent/history",
@@ -509,9 +523,12 @@ describe("brand_feedback (hosted)", () => {
     ] as const;
 
     for (const [upstreamStatus, code, status] of cases) {
-      stubFeedbackResponse({ error: `upstream ${upstreamStatus}` }, {
-        status: upstreamStatus,
-      });
+      stubFeedbackResponse(
+        { error: `upstream ${upstreamStatus}` },
+        {
+          status: upstreamStatus,
+        },
+      );
       const { client } = await connectClient(
         buildContext(null, { auth: feedbackAuth }),
       );
@@ -628,9 +645,9 @@ describe("brand_check (hosted)", () => {
     );
     const known = await call(client, "brand_check", { color: "#2563EB" });
     expect(known.verdict).toBe("pass");
-    expect((known.checks as Record<string, Record<string, unknown>>).color.status).toBe(
-      "pass",
-    );
+    expect(
+      (known.checks as Record<string, Record<string, unknown>>).color.status,
+    ).toBe("pass");
 
     const unknown = await call(client, "brand_check", { color: "#abcdef" });
     expect(unknown.verdict).toBe("review");
@@ -649,9 +666,9 @@ describe("brand_check (hosted)", () => {
       font: "Merriweather, Georgia, serif",
     });
     expect(known.verdict).toBe("pass");
-    expect((known.checks as Record<string, Record<string, unknown>>).font.status).toBe(
-      "pass",
-    );
+    expect(
+      (known.checks as Record<string, Record<string, unknown>>).font.status,
+    ).toBe("pass");
 
     const unknown = await call(client, "brand_check", {
       font: "Comic Sans MS",
@@ -704,6 +721,120 @@ describe("brand_check (hosted)", () => {
       text: { status: "review" },
       color: { status: "review" },
       font: { status: "review" },
+    });
+  });
+
+  it("returns only matching approved Taste Guidance as a revision counterprompt", async () => {
+    const tasteGuidance = {
+      schemaVersion: "s078-tmcp1-taste-memory-guidance/v0.1" as const,
+      brandSlug: "acme",
+      tasteRevision: `sha256:${"b".repeat(64)}`,
+      updatedAt: "2026-07-15T08:00:00.000Z",
+      guidance: [
+        {
+          id: "taste-social",
+          directive: "Use asymmetric crops when the subject stays legible.",
+          polarity: "use" as const,
+          reason: "Creates intentional tension.",
+          scope: {
+            artifactKind: "social-layout",
+            patternRef: "asymmetric-crop",
+            surfaces: ["social", "chef"],
+          },
+          provenance: "Reviewed external capture",
+          reviewedBy: "brand-admin" as const,
+          reviewedAt: "2026-07-15T08:00:00.000Z",
+          canonicalMutation: false as const,
+        },
+        {
+          id: "taste-deck",
+          directive: "Avoid centered title stacks in presentations.",
+          polarity: "avoid" as const,
+          reason: "The deck system uses editorial edge alignment.",
+          scope: {
+            artifactKind: "presentation",
+            patternRef: "centered-title-stack",
+            surfaces: ["slides"],
+          },
+          provenance: "Reviewed deck capture",
+          reviewedBy: "brand-admin" as const,
+          reviewedAt: "2026-07-15T08:00:00.000Z",
+          canonicalMutation: false as const,
+        },
+      ],
+      counts: { approved: 2 },
+      boundary:
+        "Reviewed Taste Memory guides creation without mutating Official Brand.",
+    };
+    const { client } = await connectClient(
+      buildContext(CHECK_PACKAGE, {
+        auth: checkAuth,
+        loadTasteGuidance: async () => tasteGuidance,
+      }),
+    );
+    const json = await call(client, "brand_check", {
+      text: "Governed AI, ready to ship",
+      artifact_kind: "social-layout",
+      surface: "social",
+    });
+    const counterprompt = json.taste_counterprompt as Record<string, unknown>;
+    const guidance = counterprompt.guidance as Array<Record<string, unknown>>;
+
+    expect(json.verdict).toBe("pass");
+    expect(counterprompt).toMatchObject({
+      status: "available",
+      semantic_verdict: "not_evaluated",
+      artifact_kind: "social-layout",
+      surface: "social",
+    });
+    expect(guidance.map((item) => item.id)).toEqual(["taste-social"]);
+    expect(counterprompt.boundary).toContain("not an automated semantic");
+    expect(json.recommendations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("revision counterprompt"),
+      ]),
+    );
+  });
+
+  it("keeps unavailable and unrequested Taste Guidance out of the verdict", async () => {
+    let tasteReads = 0;
+    const unrequested = await connectClient(
+      buildContext(CHECK_PACKAGE, {
+        auth: checkAuth,
+        loadTasteGuidance: async () => {
+          tasteReads += 1;
+          return null;
+        },
+      }),
+    );
+    const ordinary = await call(unrequested.client, "brand_check", {
+      color: "#2563eb",
+    });
+    expect(ordinary.verdict).toBe("pass");
+    expect(tasteReads).toBe(0);
+    expect(ordinary.taste_counterprompt).toMatchObject({
+      status: "not_requested",
+      semantic_verdict: "not_evaluated",
+      guidance: [],
+    });
+
+    const unavailableClient = await connectClient(
+      buildContext(CHECK_PACKAGE, {
+        auth: checkAuth,
+        loadTasteGuidance: async () => {
+          throw new Error("temporary outage");
+        },
+      }),
+    );
+    const unavailable = await call(unavailableClient.client, "brand_check", {
+      color: "#2563eb",
+      artifact_kind: "social-layout",
+    });
+    expect(unavailable.verdict).toBe("pass");
+    expect(unavailable.taste_counterprompt).toMatchObject({
+      status: "unavailable",
+      semantic_verdict: "not_evaluated",
+      guidance: [],
     });
   });
 });
@@ -860,6 +991,69 @@ describe("brand_search (hosted)", () => {
     const json = await call(client, "brand_search", { query: "governed AI" });
     expect(json.retrieval_engine).toBe("keyword_fallback");
   });
+
+  it("returns approved Taste Memory as searchable review evidence", async () => {
+    const { client } = await connectClient(
+      buildContext(SEARCH_PACKAGE, {
+        loadTasteGuidance: async () => ({
+          schemaVersion: "s078-tmcp1-taste-memory-guidance/v0.1",
+          brandSlug: "acme",
+          tasteRevision: `sha256:${"b".repeat(64)}`,
+          updatedAt: "2026-07-14T03:00:00.000Z",
+          guidance: [
+            {
+              id: "taste-1",
+              directive: "Use asymmetric crops when the subject stays legible.",
+              polarity: "use",
+              reason: "Creates intentional tension.",
+              scope: {
+                artifactKind: "social-layout",
+                patternRef: "asymmetric-crop",
+                surfaces: ["chef", "social"],
+              },
+              provenance: "Reviewed edge capture",
+              reviewedBy: "brand-admin",
+              reviewedAt: "2026-07-14T03:00:00.000Z",
+              canonicalMutation: false,
+            },
+          ],
+          counts: { approved: 1 },
+          boundary:
+            "Reviewed Taste Memory guides creation without mutating canonical brand objects.",
+        }),
+      }),
+    );
+    const json = await call(client, "brand_search", {
+      query: "asymmetric crop tension",
+    });
+    expect(json.taste_guidance_status).toBe("available");
+    expect(json.hits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "taste:taste-1",
+          source_kind: "taste_memory",
+          source_class: "review_evidence",
+          approval_state: "approved",
+          canonical_mutation: false,
+        }),
+      ]),
+    );
+  });
+
+  it("keeps ordinary search available when Taste Guidance cannot load", async () => {
+    const { client } = await connectClient(
+      buildContext(SEARCH_PACKAGE, {
+        loadTasteGuidance: async () => {
+          throw new Error("guidance unavailable");
+        },
+      }),
+    );
+    const json = await call(client, "brand_search", {
+      query: "governed AI proof",
+    });
+    expect(json.taste_guidance_status).toBe("unavailable");
+    expect(json.total_hits).toBeGreaterThan(0);
+  });
 });
 
 describe("brand_search corpus retrieval (hosted)", () => {
@@ -908,7 +1102,11 @@ describe("brand_search corpus retrieval (hosted)", () => {
           text: "hero illustration governed",
           tags: ["illustration"],
           facets: { sourceClass: "asset_metadata", approvalState: "approved" },
-          lineage: { sourceId: "hero-1", sourceType: "asset", confidence: "medium" },
+          lineage: {
+            sourceId: "hero-1",
+            sourceType: "asset",
+            confidence: "medium",
+          },
           freshness: { generatedAt: "2026-06-20T00:00:00.000Z" },
         },
       ],
@@ -971,8 +1169,13 @@ describe("brand_search corpus retrieval (hosted)", () => {
   });
 
   it("redacts URL-like citations and stays custody-safe", async () => {
-    const pkg = JSON.parse(JSON.stringify(CORPUS_PACKAGE)) as BrandPackagePayload;
-    const doc = (pkg.brandKnowledgeCorpus!.documents[0].lineage as Record<string, unknown>);
+    const pkg = JSON.parse(
+      JSON.stringify(CORPUS_PACKAGE),
+    ) as BrandPackagePayload;
+    const doc = pkg.brandKnowledgeCorpus!.documents[0].lineage as Record<
+      string,
+      unknown
+    >;
     doc.sourcePath = "https://private-provider.example/raw";
     const { client } = await connectClient(buildContext(pkg));
     const json = await call(client, "brand_search", {
@@ -1002,9 +1205,20 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
         "Acme sounds confident, plain-spoken, and specific. We never hype.",
       perspective: "Governed AI is the only durable way to scale brand work.",
       brandPhrases: [
-        { phrase: "Governed AI, ready to ship", usage: "product CTAs", deploy_verbatim: true },
+        {
+          phrase: "Governed AI, ready to ship",
+          usage: "product CTAs",
+          deploy_verbatim: true,
+        },
       ],
-      narratives: [{ id: "nl-001", name: "Flagship", status: "Active", type: "Key Message" }],
+      narratives: [
+        {
+          id: "nl-001",
+          name: "Flagship",
+          status: "Active",
+          type: "Key Message",
+        },
+      ],
       applicationRules: [
         {
           id: "ar-001",
@@ -1015,10 +1229,20 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
         },
       ],
       proofPoints: [
-        { id: "claim-001", claim: "91% need governed AI", tier: "Primary", status: "Active" },
+        {
+          id: "claim-001",
+          claim: "91% need governed AI",
+          tier: "Primary",
+          status: "Active",
+        },
       ],
       strategyMoves: [
-        { move: 1, name: "Lead with governance", status: "Active", timeline: "Q3" },
+        {
+          move: 1,
+          name: "Lead with governance",
+          status: "Active",
+          timeline: "Q3",
+        },
       ],
     },
   };
@@ -1042,19 +1266,27 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
     const json = await call(client, "brand_runtime", { slice: "full" });
     const runtime = json.runtime as Record<string, unknown>;
     const strategy = runtime.strategy as Record<string, unknown>;
-    expect((strategy.narratives as Array<Record<string, unknown>>)[0]).toMatchObject({
+    expect(
+      (strategy.narratives as Array<Record<string, unknown>>)[0],
+    ).toMatchObject({
       id: "nl-001",
       name: "Flagship",
     });
-    expect((strategy.application_rules as Array<Record<string, unknown>>)[0]).toMatchObject({
+    expect(
+      (strategy.application_rules as Array<Record<string, unknown>>)[0],
+    ).toMatchObject({
       id: "ar-001",
       framework: "Problem Guide Proof",
     });
-    expect((strategy.proof_points as Array<Record<string, unknown>>)[0]).toMatchObject({
+    expect(
+      (strategy.proof_points as Array<Record<string, unknown>>)[0],
+    ).toMatchObject({
       id: "claim-001",
       tier: "Primary",
     });
-    expect((strategy.strategy_moves as Array<Record<string, unknown>>)[0]).toMatchObject({
+    expect(
+      (strategy.strategy_moves as Array<Record<string, unknown>>)[0],
+    ).toMatchObject({
       move: 1,
       name: "Lead with governance",
     });
@@ -1075,10 +1307,124 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
     expect(runtime.strategy).toBeTruthy();
   });
 
+  it("full and voice runtime slices carry approved Taste Guidance", async () => {
+    const tasteGuidance = {
+      schemaVersion: "s078-tmcp1-taste-memory-guidance/v0.1" as const,
+      brandSlug: "acme",
+      tasteRevision: `sha256:${"a".repeat(64)}`,
+      updatedAt: "2026-07-14T03:00:00.000Z",
+      guidance: [
+        {
+          id: "taste-1",
+          directive: "Use asymmetric crops when the subject stays legible.",
+          polarity: "use" as const,
+          reason: "Creates intentional tension.",
+          scope: {
+            artifactKind: "social-layout",
+            patternRef: "asymmetric-crop",
+            surfaces: ["chef", "social"],
+          },
+          provenance: "Reviewed edge capture",
+          reviewedBy: "brand-admin" as const,
+          reviewedAt: "2026-07-14T03:00:00.000Z",
+          canonicalMutation: false as const,
+        },
+      ],
+      counts: { approved: 1 },
+      boundary:
+        "Reviewed Taste Memory guides creation. It does not mutate Official Brand, Production-approved Assets, selected kits, or Full Runtime.",
+    };
+    const context = buildContext(GOV_PACKAGE, {
+      loadTasteGuidance: async () => tasteGuidance,
+    });
+    const { client } = await connectClient(context);
+    const full = await call(client, "brand_runtime", { slice: "full" });
+    const fullRuntime = full.runtime as Record<string, unknown>;
+    expect(full.taste_guidance_status).toBe("available");
+    expect(fullRuntime.taste_guidance).toMatchObject({
+      taste_revision: tasteGuidance.tasteRevision,
+      approved_count: 1,
+      guidance: [
+        {
+          directive: "Use asymmetric crops when the subject stays legible.",
+          polarity: "use",
+          canonical_mutation: false,
+        },
+      ],
+    });
+
+    const voice = await call(client, "brand_runtime", { slice: "voice" });
+    expect(
+      (voice.runtime as Record<string, unknown>).taste_guidance,
+    ).toBeTruthy();
+  });
+
+  it("teaches capture-scoped agents the explicit review-only taste workflow", async () => {
+    const auth = buildAuth({ scopes: ["read", "capture"] });
+    const { client } = await connectClient(buildContext(GOV_PACKAGE, { auth }));
+    const json = await call(client, "brand_runtime", { slice: "full" });
+    const runtime = json.runtime as Record<string, unknown>;
+    const workflow = runtime.taste_workflow as Record<string, unknown>;
+    const capture = workflow.capture as Record<string, unknown>;
+
+    expect(workflow.schema_version).toBe("brandcode-taste-workflow/v0.1");
+    expect(workflow.apply_reviewed_guidance).toContain("approved guidance");
+    expect(workflow.apply_reviewed_guidance).toContain("fresh-direction");
+    expect(capture).toMatchObject({
+      available: true,
+      tool: "capture_taste",
+    });
+    expect(capture.when_to_offer).toContain("concrete judgment");
+    expect(capture.result).toContain("review_url");
+    expect(workflow.never).toContain("Never passively capture");
+    expect((json._metadata as Record<string, unknown>).next_steps).toEqual(
+      expect.arrayContaining([expect.stringContaining("offer to queue")]),
+    );
+  });
+
+  it("keeps read-only agents truthful about unavailable taste capture", async () => {
+    const { client } = await connectClient(buildContext(GOV_PACKAGE));
+    const json = await call(client, "brand_runtime", { slice: "voice" });
+    const runtime = json.runtime as Record<string, unknown>;
+    const workflow = runtime.taste_workflow as Record<string, unknown>;
+    const capture = workflow.capture as Record<string, unknown>;
+
+    expect(capture).toMatchObject({ available: false });
+    expect(capture.reason).toContain("read access but not capture access");
+    expect((json._metadata as Record<string, unknown>).next_steps).toEqual(
+      expect.arrayContaining([expect.stringContaining("read-only")]),
+    );
+  });
+
+  it("minimal runtime stays small and does not fetch Taste Guidance", async () => {
+    let tasteReads = 0;
+    const { client } = await connectClient(
+      buildContext(GOV_PACKAGE, {
+        loadTasteGuidance: async () => {
+          tasteReads += 1;
+          return null;
+        },
+      }),
+    );
+    const json = await call(client, "brand_runtime", { slice: "minimal" });
+    expect(tasteReads).toBe(0);
+    expect(json.taste_guidance_status).toBe("not_requested");
+    expect(json.runtime as Record<string, unknown>).not.toHaveProperty(
+      "taste_guidance",
+    );
+    expect(json.runtime as Record<string, unknown>).not.toHaveProperty(
+      "taste_workflow",
+    );
+  });
+
   it("leaves voice/strategy null when the brand instance carries no governance", async () => {
     const pkg: BrandPackagePayload = {
       slug: "acme",
-      brandInstance: { tokens: { colors: { primary: "#000000" } }, fonts: {}, assets: [] },
+      brandInstance: {
+        tokens: { colors: { primary: "#000000" } },
+        fonts: {},
+        assets: [],
+      },
     };
     const { client } = await connectClient(buildContext(pkg));
     const json = await call(client, "brand_runtime", { slice: "full" });
@@ -1136,6 +1482,21 @@ describe("hosted asset tools", () => {
           lifecycle: "runtime",
           packageUrl: "https://private-provider.example/runtime-logo.svg",
         },
+        {
+          id: "package-url-public",
+          title: "Public package asset",
+          category: "logo",
+          lifecycle: "production-approved",
+          productionApproved: true,
+          packageUrl: "https://www.brandcode.studio/api/brand/hosted/acme/assets/logo.svg",
+        },
+        {
+          id: "package-url-untrusted",
+          title: "Untrusted package asset",
+          category: "logo",
+          lifecycle: "runtime",
+          packageUrl: "https://cdn.example.com/acme/logo.svg",
+        },
       ],
     },
     brandData: {
@@ -1155,7 +1516,7 @@ describe("hosted asset tools", () => {
   it("list_brand_assets returns package-safe asset summaries with posture", async () => {
     const { client } = await connectClient(buildContext(ASSET_PACKAGE));
     const json = await call(client, "list_brand_assets", { limit: 10 });
-    expect(json.total_assets).toBe(5);
+    expect(json.total_assets).toBe(7);
     expect(json.next_cursor).toBeNull();
     expect(json.custody_safe).toBe(true);
     expect(json.selected_kit_artifact_support).toBe("not_implemented_in_v1");
@@ -1166,6 +1527,8 @@ describe("hosted asset tools", () => {
       "hero-runtime",
       "campaign-private",
       "package-url-private",
+      "package-url-public",
+      "package-url-untrusted",
       "approved-badge",
     ]);
     expect(assets[0]).toMatchObject({
@@ -1184,7 +1547,7 @@ describe("hosted asset tools", () => {
   it("list_brand_assets filters and paginates deterministically", async () => {
     const { client } = await connectClient(buildContext(ASSET_PACKAGE));
     const first = await call(client, "list_brand_assets", { limit: 2 });
-    expect((first.assets as unknown[])).toHaveLength(2);
+    expect(first.assets as unknown[]).toHaveLength(2);
     expect(first.next_cursor).toBe("2");
 
     const second = await call(client, "list_brand_assets", {
@@ -1192,15 +1555,19 @@ describe("hosted asset tools", () => {
       cursor: String(first.next_cursor),
     });
     expect(
-      (second.assets as Array<Record<string, unknown>>).map((asset) => asset.id),
+      (second.assets as Array<Record<string, unknown>>).map(
+        (asset) => asset.id,
+      ),
     ).toEqual(["campaign-private", "package-url-private"]);
 
     const filtered = await call(client, "list_brand_assets", {
       lifecycle: "production",
     });
     expect(
-      (filtered.assets as Array<Record<string, unknown>>).map((asset) => asset.id),
-    ).toEqual(["approved-badge"]);
+      (filtered.assets as Array<Record<string, unknown>>).map(
+        (asset) => asset.id,
+      ),
+    ).toEqual(["package-url-public", "approved-badge"]);
   });
 
   it("get_brand_asset returns full safe metadata for a package asset", async () => {
@@ -1258,6 +1625,39 @@ describe("hosted asset tools", () => {
     expect(JSON.stringify(json)).not.toContain("private-provider.example");
   });
 
+  it("get_brand_asset returns usable package URLs only from trusted Brandcode origins", async () => {
+    const { client } = await connectClient(buildContext(ASSET_PACKAGE));
+    const json = await call(client, "get_brand_asset", {
+      asset_id: "package-url-public",
+    });
+    const asset = json.asset as Record<string, unknown>;
+    expect(asset.delivery_ref).toEqual({
+      posture: "package_safe",
+      package_url: "https://www.brandcode.studio/api/brand/hosted/acme/assets/logo.svg",
+    });
+    expect(asset.custody).toMatchObject({
+      safe_for_mcp: true,
+      blocked_private_provider_url: false,
+    });
+  });
+
+  it("get_brand_asset blocks package URLs on untrusted third-party origins", async () => {
+    const { client } = await connectClient(buildContext(ASSET_PACKAGE));
+    const json = await call(client, "get_brand_asset", {
+      asset_id: "package-url-untrusted",
+    });
+    const asset = json.asset as Record<string, unknown>;
+    expect(asset.delivery_ref).toEqual({
+      posture: "blocked_untrusted_package_url",
+      reason: "Package delivery URL is not hosted on a trusted Brandcode origin",
+    });
+    expect(asset.custody).toMatchObject({
+      safe_for_mcp: false,
+      blocked_private_provider_url: true,
+    });
+    expect(JSON.stringify(json)).not.toContain("cdn.example.com");
+  });
+
   it("get_brand_asset returns asset_not_found for unknown ids", async () => {
     const { client } = await connectClient(buildContext(ASSET_PACKAGE));
     const json = await call(client, "get_brand_asset", { asset_id: "missing" });
@@ -1275,11 +1675,12 @@ describe("hosted asset tools", () => {
 
 describe("brand_history (hosted)", () => {
   function stubHistoryResponse(body: unknown, init: ResponseInit = {}) {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify(body), {
-        status: init.status ?? 200,
-        headers: { "content-type": "application/json" },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status: init.status ?? 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
@@ -1371,7 +1772,9 @@ describe("brand_history (hosted)", () => {
             createdAt: "2026-05-06T10:00:02.000Z",
             parentReceiptId: "portable-verification-run-001",
             support: {
-              diagnosisSteps: ["large support blob that should not be returned"],
+              diagnosisSteps: [
+                "large support blob that should not be returned",
+              ],
             },
           },
         ],
@@ -1387,7 +1790,10 @@ describe("brand_history (hosted)", () => {
       cursor: "ignored-cursor",
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 2 calls: the tool's own UCS history GET (calls[0]), then the hosted
+    // AgentRun telemetry POST fired by the server.tool wrapper after the
+    // tool handler resolves (calls[1]).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     const requestedUrl = new URL(String(url));
     expect(requestedUrl.pathname).toBe("/api/brand/hosted/acme/agent/history");
@@ -1406,8 +1812,8 @@ describe("brand_history (hosted)", () => {
     expect(json.cursor_support).toBe("not_reported_by_ucs");
     expect(json.cursor_requested).toBe("ignored-cursor");
     expect(json.telemetry).toMatchObject({
-      write_active: false,
-      status: "deferred",
+      write_active: true,
+      status: "active",
     });
 
     const history = json.history as Array<Record<string, unknown>>;
@@ -1459,6 +1865,10 @@ describe("brand_history (hosted)", () => {
     expect(json.history).toEqual([]);
     expect(json.malformed_history).toBe(true);
     expect(json.next_cursor).toBeNull();
+    // Surfaced so AgentRun telemetry classifies this as upstream_error
+    // instead of ok -- see test/hosted/server.test.ts for the telemetry
+    // classification assertion.
+    expect(json.error).toBe("ucs_history_contract_error");
   });
 
   it("returns structured errors for UCS not found and service-token failures", async () => {
@@ -1472,7 +1882,10 @@ describe("brand_history (hosted)", () => {
       history_origin: "ucs",
     });
 
-    stubHistoryResponse({ error: "Service-token auth required." }, { status: 401 });
+    stubHistoryResponse(
+      { error: "Service-token auth required." },
+      { status: 401 },
+    );
     const authClient = await connectClient(buildContext(null));
     const authError = await call(authClient.client, "brand_history", {});
     expect(authError).toMatchObject({
@@ -1700,7 +2113,9 @@ describe("brand_status (hosted)", () => {
     const implementedTools = json.implemented_tools as Array<
       Record<string, unknown>
     >;
-    expect(implementedTools.map((tool) => [tool.tool, tool.implementation])).toEqual([
+    expect(
+      implementedTools.map((tool) => [tool.tool, tool.implementation]),
+    ).toEqual([
       ["brand_runtime", "real"],
       ["brand_search", "real"],
       ["brand_check", "real"],
@@ -1753,8 +2168,8 @@ describe("brand_status (hosted)", () => {
       version_hash: "abc123",
     });
     expect(json.telemetry).toMatchObject({
-      active: false,
-      status: "deferred",
+      active: true,
+      status: "active",
     });
     expect(json.rate_limits).toEqual(TEST_RATE_LIMIT);
 
@@ -1768,7 +2183,7 @@ describe("brand_status (hosted)", () => {
     });
     expect(json.status).toContain("Real tools:");
     expect(json.status).toContain("Stubs:        ");
-    expect(json.status).toContain("Telemetry:    deferred");
+    expect(json.status).toContain("Telemetry:    active");
     expect(json.status).toContain(
       "Rate limits:  active_pre_release_in_process",
     );

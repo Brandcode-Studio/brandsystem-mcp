@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "brandcode-runtime-contract/v1",
+  "manifest": {
+    "objectType": "full_brand_runtime",
+    "runtimeId": "acme@2026-07-16",
+    "brandSlug": "acme",
+    "brandName": "Acme",
+    "runtimeVersion": "2026-07-16",
+    "generatedAt": "2026-07-16T00:00:00.000Z",
+    "authority": "compiled_runtime",
+    "provenanceClass": "compiled_source"
+  },
+  "officialBrand": {
+    "objectType": "official_brand",
+    "slug": "acme",
+    "name": "Acme",
+    "version": "1.4.0",
+    "authority": "official",
+    "provenanceClass": "official_source"
+  },
+  "voice": {
+    "verbalIdentity": "Direct, useful, and human.",
+    "phrases": [
+      { "phrase": "Make it useful", "usage": "Primary sign-off" },
+      { "phrase": "Built for action", "usage": "Campaign headline" }
+    ]
+  },
+  "strategy": {
+    "perspective": "Useful systems beat ornamental guidelines.",
+    "moves": [
+      { "id": "2", "name": "Scale", "status": "planned" },
+      { "id": "1", "name": "Operationalize", "status": "active" }
+    ]
+  },
+  "knowledge": {
+    "corpusId": "acme-corpus-v1",
+    "documentCount": 12,
+    "descriptors": [
+      { "id": "voice", "sourceClass": "runtime_graph", "status": "indexed" },
+      { "id": "proof", "sourceClass": "governance", "status": "indexed" }
+    ]
+  },
+  "interactionPolicy": {
+    "mutability": "read_only",
+    "defaultSurface": "kitchen",
+    "supportedSurfaces": ["messaging", "chef", "kitchen"],
+    "rules": [
+      { "id": "rule-2", "touchpoint": "social", "guidance": "Lead with the outcome." },
+      { "id": "rule-1", "touchpoint": "deck", "guidance": "Use one claim per slide." }
+    ]
+  },
+  "assets": [
+    {
+      "objectType": "production_approved_asset",
+      "id": "logo-primary",
+      "name": "Primary logo",
+      "category": "logo",
+      "authority": "production_approved",
+      "approvalState": "approved",
+      "provenanceClass": "official_source",
+      "deliveryRef": "/assets/logo.svg",
+      "deliveryHandle": {
+        "assetId": "logo-primary",
+        "brandSlug": "acme",
+        "resolverRef": "/assets/logo.svg",
+        "transport": "package_path",
+        "posture": "package_non_expiring",
+        "integritySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expiresAt": null
+      },
+      "runtimeRoles": ["header", "identity"]
+    }
+  ],
+  "kits": {
+    "selected": {
+      "objectType": "selected_brand_kit",
+      "id": "kit-social",
+      "name": "Social launch kit",
+      "authority": "selected_context",
+      "provenanceClass": "compiled_source",
+      "memberAssetIds": ["exploratory-concept", "logo-primary", "logo-primary"]
+    },
+    "campaigns": [
+      {
+        "objectType": "campaign_exploratory_kit",
+        "id": "campaign-summer",
+        "name": "Summer exploration",
+        "authority": "exploratory_context",
+        "provenanceClass": "compiled_source"
+      }
+    ]
+  },
+  "tasteGuidance": [
+    {
+      "objectType": "reviewed_taste_guidance",
+      "id": "taste-1",
+      "guidance": "Prefer decisive asymmetry over centered card grids.",
+      "reviewStatus": "approved",
+      "authority": "reviewed_memory",
+      "provenanceClass": "reviewed_memory"
+    }
+  ],
+  "capabilityWarnings": [
+    { "code": "asset:hero", "message": "No approved hero image is available." }
+  ],
+  "futureConsumerHint": { "safeToIgnore": true }
+}

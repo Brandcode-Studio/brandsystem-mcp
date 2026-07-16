@@ -5,7 +5,8 @@
  * returns BrandcodeMcpAuthInfo or null. Resolution order (see authorizeRequest):
  *   1. options.validateToken — explicit injection (tests).
  *   2. buildDefaultValidator — local env-seeded keys, only when
- *      BRANDCODE_MCP_TEST_KEYS is set (local dev + staging smoke).
+ *      BRANDCODE_MCP_TEST_KEYS is set for staging smoke, or when production
+ *      smoke opts in with allowEnvTestKeys.
  *   3. buildUcsValidator — the production path: POST the key to the UCS
  *      `/api/brandcode-mcp/keys/validate` endpoint with the hosted service
  *      token and map the response onto BrandcodeMcpAuthInfo.
@@ -150,6 +151,15 @@ function isScope(value: unknown): value is BrandcodeMcpScope {
   );
 }
 
+function shouldUseEnvSeededKeys(
+  options: HostedRuntimeOptions,
+  environment: "staging" | "production",
+): boolean {
+  if (!process.env.BRANDCODE_MCP_TEST_KEYS) return false;
+  if (environment !== "production") return true;
+  return options.allowEnvTestKeys === true;
+}
+
 interface UcsKeyValidationOk {
   valid: true;
   keyId: string;
@@ -277,7 +287,7 @@ export async function authorizeRequest(
   const environment = options.environment ?? "staging";
   const validator =
     options.validateToken ??
-    (process.env.BRANDCODE_MCP_TEST_KEYS
+    (shouldUseEnvSeededKeys(options, environment)
       ? buildDefaultValidator(environment)
       : buildUcsValidator({
           ucsBaseUrl: options.ucsBaseUrl,

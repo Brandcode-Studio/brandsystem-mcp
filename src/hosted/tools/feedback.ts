@@ -14,6 +14,7 @@ import {
   FeedbackUpstreamError,
 } from "../feedback-fetcher.js";
 import { enforceToolScope } from "../scope.js";
+import { HOSTED_AGENT_RUN_TELEMETRY_STATUS } from "../telemetry.js";
 import type { HostedBrandContext } from "../types.js";
 
 const paramsShape = {
@@ -237,10 +238,10 @@ export function registerFeedback(server: McpServer, context: HostedBrandContext)
             "Feedback entries use the UCS AgentRun runtime surface because mcp-hosted is not an allowed AgentSupportSurface value",
           stored: body && typeof body === "object",
           telemetry: {
-            general_post_active: false,
-            status: "deferred",
+            general_post_active: HOSTED_AGENT_RUN_TELEMETRY_STATUS === "active",
+            status: HOSTED_AGENT_RUN_TELEMETRY_STATUS,
             detail:
-              "brand_feedback appends this explicit feedback entry only; general hosted AgentRun telemetry POST remains deferred",
+              "brand_feedback appends this explicit feedback entry, and general hosted AgentRun telemetry now also POSTs a record for every hosted tool call",
           },
           slug: context.slug,
           environment: context.auth.environment,

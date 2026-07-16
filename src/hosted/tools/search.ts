@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../../lib/response.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
+import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
 import { queryBrandKnowledgeCorpus } from "../brand-retrieval.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
@@ -47,7 +48,8 @@ type SourceType =
   | "application_rule"
   | "brand_phrase"
   | "readiness"
-  | "capability";
+  | "capability"
+  | "taste_memory";
 
 interface SearchDoc {
   id: string;
@@ -146,12 +148,7 @@ function provenanceFrom(
     if (typeof value === "string" && value.trim().length > 0) {
       out[toSnake(key)] = stripUrls(value.trim());
     } else if (isRecord(value)) {
-      const label = pickString(
-        value.label,
-        value.name,
-        value.title,
-        value.id,
-      );
+      const label = pickString(value.label, value.name, value.title, value.id);
       if (label) out[toSnake(key)] = stripUrls(label);
     }
   }
@@ -189,9 +186,7 @@ function addDoc(
 function collectDocs(pkg: BrandPackagePayload | null): SearchDoc[] {
   if (!pkg || typeof pkg !== "object") return [];
   const record = pkg as Record<string, unknown>;
-  const instance = isRecord(record.brandInstance)
-    ? record.brandInstance
-    : {};
+  const instance = isRecord(record.brandInstance) ? record.brandInstance : {};
   const docs: SearchDoc[] = [];
 
   for (const item of asArray(instance.narratives, "entries")) {
@@ -248,7 +243,13 @@ function collectDocs(pkg: BrandPackagePayload | null): SearchDoc[] {
   for (const item of asArray(instance.applicationRules, "rules")) {
     if (!isRecord(item)) continue;
     const id = pickString(item.id, item.key) || `rule-${docs.length + 1}`;
-    const title = pickString(item.name, item.title, item.rule, item.framework, id);
+    const title = pickString(
+      item.name,
+      item.title,
+      item.rule,
+      item.framework,
+      id,
+    );
     const excerpt = joinText(
       item.rule,
       item.description,
@@ -297,7 +298,10 @@ function collectDocs(pkg: BrandPackagePayload | null): SearchDoc[] {
   if (readiness) {
     const stage = pickString(readiness.stage, readiness.status);
     const nextUnlock = pickString(readiness.nextUnlock, readiness.next_unlock);
-    const concern = pickString(readiness.primaryConcern, readiness.primary_concern);
+    const concern = pickString(
+      readiness.primaryConcern,
+      readiness.primary_concern,
+    );
     addDoc(docs, {
       id: "readiness",
       title: stage ? `Readiness: ${stage}` : "Readiness",
@@ -389,6 +393,70 @@ function rankDocs(
     }));
 }
 
+function rankTasteGuidance(
+  projection: TasteGuidanceProjection | null,
+  query: string,
+  limit: number,
+) {
+  const tokens = tokenize(query);
+  if (!projection || tokens.length === 0) return [];
+
+  return projection.guidance
+    .map((item, index) => {
+      const searchText = [
+        item.directive,
+        item.reason,
+        item.polarity,
+        item.provenance,
+        item.scope.artifactKind,
+        item.scope.patternRef,
+        ...item.scope.surfaces,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const score = tokens.reduce(
+        (total, token) => total + (searchText.includes(token) ? 12 : 0),
+        0,
+      );
+      return { item, index, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, limit)
+    .map(({ item, score }) => ({
+      id: `taste:${item.id}`,
+      title: excerptFrom(item.directive),
+      source_type: "taste_memory" as const,
+      source_kind: "taste_memory",
+      source_class: "review_evidence",
+      excerpt: excerptFrom(
+        [item.polarity === "avoid" ? "Avoid." : "Use.", item.reason]
+          .filter(Boolean)
+          .join(" "),
+      ),
+      score,
+      confidence: "high",
+      approval_state: "approved",
+      citation: null,
+      reasons: ["Matched approved Taste Memory"],
+      status: "approved",
+      provenance: {
+        source: stripUrls(item.provenance),
+        reviewed_by: item.reviewedBy,
+        reviewed_at: item.reviewedAt,
+        taste_revision: projection.tasteRevision,
+      },
+      scope: {
+        artifact_kind: item.scope.artifactKind,
+        pattern_ref: item.scope.patternRef,
+        surfaces: item.scope.surfaces,
+      },
+      polarity: item.polarity,
+      canonical_mutation: false,
+    }));
+}
+
 export function registerSearch(server: McpServer, context: HostedBrandContext) {
   server.tool(
     "brand_search",
@@ -419,10 +487,29 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
 
       const trimmedQuery = parsed.data.query.trim();
       const corpus = pkg?.brandKnowledgeCorpus;
+      let tasteGuidance: TasteGuidanceProjection | null = null;
+      let tasteGuidanceStatus: "available" | "empty" | "unavailable" = "empty";
+      try {
+        tasteGuidance = await context.loadTasteGuidance();
+        tasteGuidanceStatus = tasteGuidance?.guidance.length
+          ? "available"
+          : "empty";
+      } catch {
+        tasteGuidanceStatus = "unavailable";
+      }
+      const tasteHits = rankTasteGuidance(
+        tasteGuidance,
+        trimmedQuery,
+        parsed.data.limit,
+      );
 
       // Primary path: rank UCS's prebuilt knowledge corpus with the same engine
       // Brand Console uses — real provenance, confidence, coverage, blind spots.
-      if (corpus && Array.isArray(corpus.documents) && corpus.documents.length > 0) {
+      if (
+        corpus &&
+        Array.isArray(corpus.documents) &&
+        corpus.documents.length > 0
+      ) {
         const result = queryBrandKnowledgeCorpus({
           corpus,
           manifest: pkg?.retrievalManifest ?? null,
@@ -432,18 +519,21 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
             topK: parsed.data.limit,
           },
         });
-        const hits = result.hits.map((hit) => ({
-          id: hit.id,
-          title: excerptFrom(hit.title),
-          source_kind: hit.sourceKind,
-          source_class: hit.sourceClass,
-          excerpt: excerptFrom(hit.excerpt),
-          score: hit.score,
-          confidence: hit.confidence,
-          approval_state: hit.approvalState,
-          citation: hit.citation ? stripUrls(hit.citation) : null,
-          reasons: hit.reasons,
-        }));
+        const hits = [
+          ...tasteHits,
+          ...result.hits.map((hit) => ({
+            id: hit.id,
+            title: excerptFrom(hit.title),
+            source_kind: hit.sourceKind,
+            source_class: hit.sourceClass,
+            excerpt: excerptFrom(hit.excerpt),
+            score: hit.score,
+            confidence: hit.confidence,
+            approval_state: hit.approvalState,
+            citation: hit.citation ? stripUrls(hit.citation) : null,
+            reasons: hit.reasons,
+          })),
+        ].slice(0, parsed.data.limit);
 
         return buildResponse({
           what_happened:
@@ -474,6 +564,8 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
             blind_spots: result.blindSpots,
             warnings: result.warnings,
             searched_documents: corpus.documents.length,
+            taste_guidance_status: tasteGuidanceStatus,
+            taste_revision: tasteGuidance?.tasteRevision ?? null,
             custody_safe: true,
             slug: context.slug,
             environment: context.auth.environment,
@@ -484,7 +576,10 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
       // Fallback path: older/sparser packages with no prebuilt corpus. Keyword
       // scan over whatever structured arrays the brandInstance carries.
       const docs = collectDocs(pkg);
-      const hits = rankDocs(docs, trimmedQuery, parsed.data.limit);
+      const hits = [
+        ...tasteHits,
+        ...rankDocs(docs, trimmedQuery, parsed.data.limit),
+      ].slice(0, parsed.data.limit);
 
       return buildResponse({
         what_happened:
@@ -508,6 +603,8 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
           hits,
           total_hits: hits.length,
           searched_documents: docs.length,
+          taste_guidance_status: tasteGuidanceStatus,
+          taste_revision: tasteGuidance?.tasteRevision ?? null,
           searched_sources: [
             "brandInstance.narratives",
             "brandInstance.proofPoints",

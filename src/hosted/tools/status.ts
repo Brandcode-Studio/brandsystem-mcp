@@ -12,6 +12,7 @@ import {
   toolHasScope,
 } from "../auth.js";
 import { enforceToolScope } from "../scope.js";
+import { HOSTED_AGENT_RUN_TELEMETRY_STATUS } from "../telemetry.js";
 import type {
   BrandcodeMcpScope,
   HostedBrandContext,
@@ -328,7 +329,7 @@ export function registerStatus(server: McpServer, context: HostedBrandContext) {
         `Search:       ${search.available ? `${search.document_count} docs` : "no hosted knowledge docs"}`,
         `Assets:       ${assets.available ? `${assets.total_count} assets` : "no hosted assets"}`,
         `Full runtime: ${artifact.present ? "reported by package" : "not reported by package"}`,
-        "Telemetry:    deferred",
+        `Telemetry:    ${HOSTED_AGENT_RUN_TELEMETRY_STATUS}`,
         `Rate limits:  ${rateLimits.status}`,
         summary.readiness_stage
           ? `Readiness:    ${summary.readiness_stage}`
@@ -365,10 +366,10 @@ export function registerStatus(server: McpServer, context: HostedBrandContext) {
           full_brand_runtime_artifact: artifact,
           remaining_stubs: stubTools.map((tool) => tool.tool),
           telemetry: {
-            active: false,
-            status: "deferred",
+            active: HOSTED_AGENT_RUN_TELEMETRY_STATUS === "active",
+            status: HOSTED_AGENT_RUN_TELEMETRY_STATUS,
             detail:
-              "General hosted AgentRun telemetry is not active; brand_feedback uses UCS history POST only for explicit append-only feedback",
+              "Hosted AgentRun telemetry POSTs a record to UCS for every hosted tool call, in addition to brand_feedback's explicit append-only feedback entries",
           },
           rate_limits: rateLimits,
           brand_summary: {
