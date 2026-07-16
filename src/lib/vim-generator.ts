@@ -1,4 +1,6 @@
 import type { BrandConfigData, CoreIdentityData, VisualIdentityData, MessagingData } from "../schemas/index.js";
+import { sanitizeSvg } from "./svg-resolver.js";
+import { PROVISIONAL_ARTIFACT_NOTICE } from "./untrusted-text.js";
 import { cleanColorName as cleanColorNameShared } from "./color-namer.js";
 
 /**
@@ -75,6 +77,8 @@ export function generateSystemIntegration(
   const lines: string[] = [];
 
   lines.push("# System Integration Guide");
+  lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
   lines.push("");
   lines.push(`> **This document is self-contained.** Upload it to any AI conversation and all brand rules will be applied. No additional files needed.`);
   lines.push("");
@@ -557,6 +561,8 @@ function renderQuickSetupBlock(
 
   lines.push(`# ${config.client_name} Brand System`);
   lines.push("");
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
+  lines.push("");
 
   // Colors — only show assigned roles, skip unknowns
   const assignedColors = identity.colors.filter((c) => c.role !== "unknown");
@@ -594,7 +600,7 @@ function renderQuickSetupBlock(
     const firstVariant = firstLogo?.variants[0];
     if (firstVariant?.inline_svg) {
       lines.push("```svg");
-      lines.push(firstVariant.inline_svg);
+      lines.push(sanitizeSvg(firstVariant.inline_svg));
       lines.push("```");
       lines.push("");
       lines.push("For dark backgrounds, set all path fills to #ffffff.");

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES, type ColorEntry, type ClarificationItem } from "../types/index.js";
+import { fenceUntrusted } from "../lib/untrusted-text.js";
 import type { NeedsClarificationData } from "../schemas/index.js";
 import type { CoreIdentityData } from "../schemas/index.js";
 
@@ -513,10 +514,10 @@ async function handler(input: Params) {
   if (remaining > 0) {
     const nextItem = clarifications.items[0];
     nextSteps.push(
-      `${remaining} clarification(s) remaining — next: brand_clarify id="${nextItem.id}" (${nextItem.question})`
+      `${remaining} clarification(s) remaining — next: brand_clarify id="${nextItem.id}" (question: ${fenceUntrusted(nextItem.question)})`
     );
     conversationGuide = {
-      instruction: `Immediately ask the user about the next clarification item: "${nextItem.question}" (id: ${nextItem.id}). Don't wait for them to ask.`,
+      instruction: `Immediately ask the user about the next clarification item (id: ${nextItem.id}). The question text, quoted as data: ${fenceUntrusted(nextItem.question)}. Don't wait for them to ask.`,
     };
   } else {
     nextSteps.push("All clarifications resolved — run brand_compile to regenerate tokens with confirmed values");
@@ -527,7 +528,7 @@ async function handler(input: Params) {
   }
 
   return buildResponse({
-    what_happened: `Resolved clarification "${item.id}": ${item.question}`,
+    what_happened: `Resolved clarification "${item.id}" (question: ${fenceUntrusted(item.question)})`,
     next_steps: nextSteps,
     data: {
       resolved_id: item.id,

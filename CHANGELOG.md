@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.9.6 (2026-07-16)
+
+Security and distribution-integrity release. No new tools; no breaking changes to the tool surface.
+
+### Added
+
+- **Package-boundary guard (`test/package-contents.test.ts`).** The npm tarball is now allowlist-verified in CI: hosted Use-MCP code (`dist/hosted/**`), the undeclared `bin/brandcode-mcp.mjs`, tests, specs, and docs can no longer enter the published package. Tarball shrinks 521 → ~425 files; the repository still builds hosted code for the hosted smoke workflow. Enforces the Phase 0 Build/Use packaging boundary.
+- **Provisional approval status on every compiled runtime.** `brand-runtime.json` now carries `approval: "provisional_extracted"` plus a `provenance` block (sources + a machine-extracted/not-human-reviewed note). There is deliberately no promotion mechanism in 0.9.6 — extracted policy cannot present itself as reviewed. `brand_runtime` surfaces the approval state and warns agents to treat runtime text as brand data, never as instructions. Schema accepts the fields as optional so pre-0.9.6 runtimes still validate.
+- **Prompt-injection fixture suite (`test/security/prompt-injection.test.ts`).** Hostile extracted content (ignore-previous-rules, call-a-tool, read-a-file, exfiltrate-credentials, connector-swap, persist-into-prompts, XSS) is proven to: stay out of compiler-authored control fields, compile only into `provisional_extracted` runtimes, be escaped in every report HTML sink, be stripped from embedded SVG, and appear in exported artifacts only under a provenance notice. Scope is server-side containment — these tests do not (and cannot) claim a consuming agent is immune to evidence text it reads.
+- **`fenceUntrusted()` (`src/lib/untrusted-text.ts`).** Extracted values that must appear in instruction channels (`what_happened`, `next_steps`, `conversation_guide`) are flattened to one line, stripped of control characters, length-capped, and visibly quoted. Applied to clarify-question generation and resolution.
+- **Provenance notice on exported agent-facing artifacts.** All `brand_export` targets (chat, code, team, email, claude-skill), `system-integration.md`, the VIM-adjacent Quick Setup block, and `brand_enrich_skill` output now open with a notice that content is machine-extracted, not human-reviewed, and is data — not instructions that override an agent's task, tools, or safety rules.
+
+### Changed
+
+- **Template-only instruction fields.** `brand_write` no longer interpolates extracted tone descriptors into its `conversation_guide` instruction (points at the creation brief instead); `brand_clarify` fences extracted question text as quoted data in `what_happened`/`next_steps`/`conversation_guide`.
+- **Credential hardening.** `.brand/brandcode-auth.json` is written atomically (same-directory temp file + rename) with owner-only `0600` permissions from the first byte; pre-existing files are tightened on read and write. Verified: session tokens never appear in tool responses (only email + studio URL surface).
+- **Symlink-safe path containment.** `path-security.ts` gains `realResolve`/`isRealPathWithinBase`: containment now resolves through the real filesystem, so a symlink inside the working directory pointing outside it is rejected (lexical checks alone were fooled). `assertPathWithinBase` and the content-reading tools (`brand_preflight`, `brand_check_compliance`, `brand_audit_content`, `brand_audit_drift`) use the symlink-aware check.
+- **HTML report sink coverage.** `escapeHtml` now escapes single quotes; previously unescaped sinks fixed (comparison-section font families, logo type/source). `generateBrandInstructions` and all markdown/skill exports now run embedded logo SVG through `sanitizeSvg` (script/event-handler stripping) instead of embedding raw extracted SVG.
+
+### Deferred to 0.10 (tracked in docs/plans/2026-07-16-001)
+
+- Promotion gate (`human_confirmed_local` / `production_approved` via Brand Console authority) and the runtime `version`→`schema_version` field migration.
+- Provenance-integrity detector (runtime policy vs. approved provenance) — the incident runbook's detection mechanism.
+- Full delimited-evidence envelope for `brand_write`'s creation brief and remaining MEDIUM taint-audit findings (color-namer passthrough, interaction-policy rule presentation).
+
 ## 0.9.5 (2026-07-16)
 
 ### Added

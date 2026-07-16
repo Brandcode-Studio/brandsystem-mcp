@@ -8,8 +8,9 @@
  * brand_init auto-adds it to .gitignore.
  */
 
-import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
+import { readFile, writeFile, unlink, mkdir, rename, chmod } from "node:fs/promises";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 import type { AuthCredentials } from "../connectors/brandcode/types.js";
 
 const AUTH_FILE = "brandcode-auth.json";
@@ -26,6 +27,8 @@ export async function readAuthCredentials(
 ): Promise<AuthCredentials | null> {
   try {
     const raw = await readFile(authPath(cwd), "utf-8");
+    // Tighten files written by versions that predate owner-only mode.
+    await chmod(authPath(cwd), 0o600).catch(() => {});
     const creds = JSON.parse(raw) as AuthCredentials;
 
     // Check expiry
@@ -50,7 +53,23 @@ export async function writeAuthCredentials(
 ): Promise<void> {
   const dir = join(cwd, ".brand");
   await mkdir(dir, { recursive: true });
-  await writeFile(authPath(cwd), JSON.stringify(creds, null, 2) + "\n", "utf-8");
+  const target = authPath(cwd);
+  // Owner-only from the first byte: create a 0600 temp file in the same
+  // directory, then atomically rename over the target. A plain writeFile
+  // would leave a window where the file exists world-readable or truncated.
+  const tmp = join(dir, `.${AUTH_FILE}.${randomBytes(6).toString("hex")}.tmp`);
+  try {
+    await writeFile(tmp, JSON.stringify(creds, null, 2) + "\n", {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
+    await rename(tmp, target);
+  } catch (err) {
+    await unlink(tmp).catch(() => {});
+    throw err;
+  }
+  // Tighten a pre-existing file created by older versions with default mode.
+  await chmod(target, 0o600).catch(() => {});
 }
 
 /**
