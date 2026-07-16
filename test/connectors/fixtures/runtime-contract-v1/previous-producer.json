@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "brandcode-runtime-contract/v0.9",
+  "manifest": {
+    "objectType": "full_brand_runtime",
+    "runtimeId": "acme@2026-06-01",
+    "brandSlug": "acme",
+    "brandName": "Acme",
+    "runtimeVersion": "2026-06-01",
+    "generatedAt": "2026-06-01T00:00:00.000Z",
+    "authority": "compiled_runtime",
+    "provenanceClass": "compiled_source"
+  },
+  "brand": {
+    "slug": "acme",
+    "name": "Acme",
+    "version": "1.3.0",
+    "provenanceClass": "official_source"
+  },
+  "voice": {
+    "verbalIdentity": "Direct, useful, and human.",
+    "phrases": [{ "phrase": "Make it useful", "usage": "Primary sign-off" }]
+  },
+  "strategy": {
+    "perspective": "Useful systems beat ornamental guidelines.",
+    "moves": [{ "id": "1", "name": "Operationalize", "status": "active" }]
+  },
+  "knowledge": { "corpusId": null, "documentCount": 0, "descriptors": [] },
+  "interactionPolicy": {
+    "mutability": "read_only",
+    "defaultSurface": "kitchen",
+    "supportedSurfaces": ["kitchen"],
+    "rules": []
+  },
+  "assets": [],
+  "kits": { "selected": null, "campaigns": [] },
+  "tasteGuidance": [],
+  "capabilityWarnings": []
+}

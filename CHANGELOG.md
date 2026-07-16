@@ -19,6 +19,7 @@
 
 ### Changed
 
+- **Hosted runtime ingress now consumes the UCS-owned `brandcode-runtime-contract/v1`.** The external adapter is pinned to the MCPX-5A fixture bundle, preserves explicit Full Brand Runtime, Official Brand, Production-Approved Asset, selected-kit, exploratory-kit, and reviewed-Taste authority objects, negotiates compatible `v0.9` producers with a warning, tolerates unknown fields, and fails incompatible or semantically incomplete contracts without legacy fallback.
 - **Hosted asset delivery now returns usable package URLs only from trusted Brandcode HTTPS origins.** Public Brandcode package endpoints remain intact for agents to consume; private-looking and untrusted third-party URLs stay blocked and redacted.
 - **Visual extraction now keeps Chromium sandboxed and validates every network request.** Single-page and representative-site extraction reject loopback, private-network, cloud-metadata, and unsupported-protocol navigations for both main documents and subresources. Constrained containers must explicitly set `BRANDSYSTEM_UNSAFE_DISABLE_CHROME_SANDBOX=1` to accept the sandbox downgrade.
 

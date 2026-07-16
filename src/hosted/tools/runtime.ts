@@ -13,6 +13,11 @@ import { ERROR_CODES } from "../../types/index.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
 import type { BrandInstancePayload } from "../../connectors/brandcode/knowledge-types.js";
 import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
+import {
+  normalizeRuntimeContractFromPackage,
+  RuntimeContractValidationError,
+  sliceRuntimeContract,
+} from "../../connectors/brandcode/runtime-contract/index.js";
 import { enforceToolScope } from "../scope.js";
 import type { HostedBrandContext } from "../types.js";
 
@@ -409,7 +414,29 @@ export function registerRuntime(
         });
       }
 
-      const runtime = extractRuntime(pkg);
+      let contractIngress;
+      try {
+        contractIngress = normalizeRuntimeContractFromPackage(pkg);
+      } catch (err) {
+        if (err instanceof RuntimeContractValidationError) {
+          return buildResponse({
+            what_happened: `Hosted runtime contract for "${context.slug}" is incompatible with this MCP consumer`,
+            next_steps: [
+              "Recompile or re-export the brand runtime from the current Brandcode contract producer",
+              "Inspect the returned issues before retrying; incompatible contracts never fall back to a legacy shape",
+            ],
+            data: {
+              error: "runtime_contract_invalid",
+              contract: "brandcode-runtime-contract/v1",
+              issues: err.issues,
+              slug: context.slug,
+            },
+          });
+        }
+        throw err;
+      }
+
+      const runtime = contractIngress?.runtime ?? extractRuntime(pkg);
       if (!runtime) {
         return buildResponse({
           what_happened: `No compiled runtime available for "${context.slug}" yet`,
@@ -440,7 +467,9 @@ export function registerRuntime(
       }
 
       const sliced = {
-        ...sliceRuntime(runtime, parsed.data.slice),
+        ...(contractIngress
+          ? sliceRuntimeContract(contractIngress.runtime, parsed.data.slice)
+          : sliceRuntime(runtime, parsed.data.slice)),
         ...(parsed.data.slice === "full" || parsed.data.slice === "voice"
           ? {
               taste_guidance: compactTasteGuidance(tasteGuidance),
@@ -480,6 +509,7 @@ export function registerRuntime(
           slug: context.slug,
           environment: context.auth.environment,
           taste_guidance_status: tasteGuidanceStatus,
+          runtime_contract_negotiation: contractIngress?.negotiation ?? null,
         },
       });
     },
