@@ -1482,6 +1482,21 @@ describe("hosted asset tools", () => {
           lifecycle: "runtime",
           packageUrl: "https://private-provider.example/runtime-logo.svg",
         },
+        {
+          id: "package-url-public",
+          title: "Public package asset",
+          category: "logo",
+          lifecycle: "production-approved",
+          productionApproved: true,
+          packageUrl: "https://www.brandcode.studio/api/brand/hosted/acme/assets/logo.svg",
+        },
+        {
+          id: "package-url-untrusted",
+          title: "Untrusted package asset",
+          category: "logo",
+          lifecycle: "runtime",
+          packageUrl: "https://cdn.example.com/acme/logo.svg",
+        },
       ],
     },
     brandData: {
@@ -1501,7 +1516,7 @@ describe("hosted asset tools", () => {
   it("list_brand_assets returns package-safe asset summaries with posture", async () => {
     const { client } = await connectClient(buildContext(ASSET_PACKAGE));
     const json = await call(client, "list_brand_assets", { limit: 10 });
-    expect(json.total_assets).toBe(5);
+    expect(json.total_assets).toBe(7);
     expect(json.next_cursor).toBeNull();
     expect(json.custody_safe).toBe(true);
     expect(json.selected_kit_artifact_support).toBe("not_implemented_in_v1");
@@ -1512,6 +1527,8 @@ describe("hosted asset tools", () => {
       "hero-runtime",
       "campaign-private",
       "package-url-private",
+      "package-url-public",
+      "package-url-untrusted",
       "approved-badge",
     ]);
     expect(assets[0]).toMatchObject({
@@ -1550,7 +1567,7 @@ describe("hosted asset tools", () => {
       (filtered.assets as Array<Record<string, unknown>>).map(
         (asset) => asset.id,
       ),
-    ).toEqual(["approved-badge"]);
+    ).toEqual(["package-url-public", "approved-badge"]);
   });
 
   it("get_brand_asset returns full safe metadata for a package asset", async () => {
@@ -1606,6 +1623,39 @@ describe("hosted asset tools", () => {
       blocked_private_provider_url: true,
     });
     expect(JSON.stringify(json)).not.toContain("private-provider.example");
+  });
+
+  it("get_brand_asset returns usable package URLs only from trusted Brandcode origins", async () => {
+    const { client } = await connectClient(buildContext(ASSET_PACKAGE));
+    const json = await call(client, "get_brand_asset", {
+      asset_id: "package-url-public",
+    });
+    const asset = json.asset as Record<string, unknown>;
+    expect(asset.delivery_ref).toEqual({
+      posture: "package_safe",
+      package_url: "https://www.brandcode.studio/api/brand/hosted/acme/assets/logo.svg",
+    });
+    expect(asset.custody).toMatchObject({
+      safe_for_mcp: true,
+      blocked_private_provider_url: false,
+    });
+  });
+
+  it("get_brand_asset blocks package URLs on untrusted third-party origins", async () => {
+    const { client } = await connectClient(buildContext(ASSET_PACKAGE));
+    const json = await call(client, "get_brand_asset", {
+      asset_id: "package-url-untrusted",
+    });
+    const asset = json.asset as Record<string, unknown>;
+    expect(asset.delivery_ref).toEqual({
+      posture: "blocked_untrusted_package_url",
+      reason: "Package delivery URL is not hosted on a trusted Brandcode origin",
+    });
+    expect(asset.custody).toMatchObject({
+      safe_for_mcp: false,
+      blocked_private_provider_url: true,
+    });
+    expect(JSON.stringify(json)).not.toContain("cdn.example.com");
   });
 
   it("get_brand_asset returns asset_not_found for unknown ids", async () => {

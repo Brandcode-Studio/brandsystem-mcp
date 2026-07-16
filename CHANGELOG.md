@@ -19,6 +19,7 @@
 
 ### Changed
 
+- **Hosted asset delivery now returns usable package URLs only from trusted Brandcode HTTPS origins.** Public Brandcode package endpoints remain intact for agents to consume; private-looking and untrusted third-party URLs stay blocked and redacted.
 - **Visual extraction now keeps Chromium sandboxed and validates every network request.** Single-page and representative-site extraction reject loopback, private-network, cloud-metadata, and unsupported-protocol navigations for both main documents and subresources. Constrained containers must explicitly set `BRANDSYSTEM_UNSAFE_DISABLE_CHROME_SANDBOX=1` to accept the sandbox downgrade.
 
 - **Hosted MCP runs are now first-class in UCS telemetry via the `mcp-hosted` surface.** UCS added `mcp-hosted` to its `AgentSupportSurface` enum (paired UCS change), so the MCP now tags hosted `brand_feedback` history writes with `surface: "mcp-hosted"` (was the placeholder `"runtime"`) and `brand_history` filters by that surface. The MCP no longer sends `provider=mcp` on the history query — UCS models provider as the downstream model (openai/claude/gemini), not the transport, so a `provider=mcp` filter matched nothing; surface is the correct discriminator. Closes the telemetry-attribution gap where MCP-originated runs were unfindable.

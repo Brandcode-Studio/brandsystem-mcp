@@ -162,6 +162,19 @@ function looksPrivateDeliveryUrl(value: string): boolean {
   );
 }
 
+function isTrustedBrandcodePackageUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      parsed.protocol === "https:" &&
+      (hostname === "brandcode.studio" || hostname.endsWith(".brandcode.studio"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function hasPrivateCustody(asset: Record<string, unknown>): boolean {
   const custody = [
     asset.custody,
@@ -228,10 +241,20 @@ function deliveryRef(asset: Record<string, unknown>): {
     };
   }
 
+  if (packageUrl && isUrl(packageUrl) && isTrustedBrandcodePackageUrl(packageUrl)) {
+    return {
+      ref: { posture: "package_safe", package_url: packageUrl },
+      blockedPrivateProviderUrl: false,
+    };
+  }
+
   if (packageUrl && isUrl(packageUrl)) {
     return {
-      ref: { posture: "package_safe", package_url: stripUrls(packageUrl) },
-      blockedPrivateProviderUrl: false,
+      ref: {
+        posture: "blocked_untrusted_package_url",
+        reason: "Package delivery URL is not hosted on a trusted Brandcode origin",
+      },
+      blockedPrivateProviderUrl: true,
     };
   }
 
