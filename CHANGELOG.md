@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.11.1 (2026-07-17)
+
+Patch release: the first eval-driven improvements, plus a parser fix the eval suite surfaced.
+
+### Fixed
+
+- **Compliance parser: font-family extraction no longer bleeds across joined CSS chunks** (#26, PR #27). A `font-family` declaration without a trailing semicolon could consume text past the newline where style chunks are joined, misreading fonts during compliance checks. Found while verifying eval fixtures reproduce.
+
+### Changed
+
+- **Adoption prompts now route to `brand_start`** (#28, PR #30). Description-only pass measured against the unchanged eval fixtures with claude-haiku-4-5: first-tool selection 66.7% → 100% in two iterations (the intermediate regression — team-sharing prompts pulled toward brand_start — is documented in eval/RESULTS.md). `brand_start` leads with adoption triggers (existing guidelines, PDF guide, Figma library) plus NOT-for boundaries; `brand_context` claims "write this in our voice"; `brand_brandcode_connect` claims team sharing.
+- **eval/RESULTS.md reframed**: the 12-prompt routing score is explicitly labeled a development set (descriptions were iterated against these fixtures); a source-split, hash-committed private holdout is planned for 0.12. Routing numbers are capability evidence, not generalization claims.
+
 ## 0.11.0 (2026-07-16)
 
 Reliable agent interoperability: protocol-native structured outputs, enforced token budgets, and a public agent-evaluation suite.
