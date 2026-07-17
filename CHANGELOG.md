@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.11.3 (2026-07-17)
+
+### Fixed
+
+- Keep the MCP Registry description within its 100-character publishing limit and enforce that constraint in the release metadata gate.
+
 ## 0.11.2 (2026-07-17)
 
 Agent onboarding and discovery release: a first-class Codex install path, clearer protocol guidance, and intent-led package metadata.
