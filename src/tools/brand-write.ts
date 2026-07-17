@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cleanColorName } from "../lib/color-namer.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
@@ -83,7 +84,7 @@ function buildVisualBrief(
 ): VisualBrief {
   // Colors with roles
   const colors = identity.colors.map((c) => ({
-    name: c.name,
+    name: cleanColorName(c),
     hex: c.value,
     role: c.role,
   }));

@@ -1,5 +1,6 @@
 import type { BrandConfigData, CoreIdentityData, VisualIdentityData, MessagingData, ContentStrategyData } from "../schemas/index.js";
 import { isTokenWorthy } from "./confidence.js";
+import { cleanColorName } from "./color-namer.js";
 
 /**
  * Approval state of a compiled runtime. In 0.9.6 every compile emits
@@ -121,7 +122,7 @@ function compileIdentity(identity: CoreIdentityData): RuntimeIdentity {
   const colors: Record<string, string> = {};
   for (const c of identity.colors) {
     if (!isTokenWorthy(c.confidence)) continue;
-    const key = c.role === "unknown" ? c.name : c.role;
+    const key = c.role === "unknown" ? cleanColorName(c) : c.role;
     colors[key] = c.value;
   }
 

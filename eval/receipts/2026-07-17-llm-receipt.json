@@ -1,0 +1,152 @@
+{
+  "commit": "afd05741d0859f1c1013b09ae89d1fd25e92c9d7",
+  "package_version": "@brandsystem/mcp@0.13.2",
+  "generated": "2026-07-17T22:57:50.468Z",
+  "model_dependent": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5-20251001",
+    "scenario": "second-agent",
+    "sets": [],
+    "second_agent": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "date": "2026-07-17T22:57:50.467Z",
+      "metric": "second_agent",
+      "runtime": {
+        "schema_version": "0.1.0",
+        "approval": "provisional_extracted"
+      },
+      "totals": {
+        "tasks": 5,
+        "job_completion_rate": 20,
+        "job_completion_value": "20.0% (1/5 completed; 2 incomplete, 0 unscored)",
+        "checker_acceptance_value": "80.0% (4/5)",
+        "mean_flags_per_task": 0.6,
+        "mean_output_tokens": 143,
+        "mean_context_tokens": 417,
+        "meta_commentary_count": 0
+      },
+      "tasks": [
+        {
+          "id": "social-post-launch",
+          "task_type": "social-post",
+          "budget": "compact",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 343,
+          "output_tokens": 42,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "output_contract": "satisfied",
+          "status": "completed"
+        },
+        {
+          "id": "blog-intro-consistency",
+          "task_type": "blog-article",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 455,
+          "output_tokens": 102,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "output_contract": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "email-renewal",
+          "task_type": "email",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 403,
+          "output_tokens": 84,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "output_contract": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "hero-section-css",
+          "task_type": "code-ui",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css",
+            "color"
+          ],
+          "context_tokens": 353,
+          "output_tokens": 227,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "color_checked": "#2a4494",
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "output_contract": "missing: css",
+          "status": "incomplete"
+        },
+        {
+          "id": "cta-card-html",
+          "task_type": "landing-page",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css"
+          ],
+          "context_tokens": 530,
+          "output_tokens": 258,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "fail",
+          "rules_checked": 8,
+          "output_contract": "missing: css",
+          "status": "incomplete"
+        }
+      ]
+    }
+  }
+}
