@@ -2,7 +2,7 @@
   "name": "@brandsystem/mcp",
   "version": "0.11.1",
   "mcpName": "io.github.Brandcode-Studio/brandsystem-mcp",
-  "description": "Author a portable .brand runtime — the governance layer that travels with your brand. Extract identity from websites, Figma, and PDFs; compile tokens, anti-patterns, and voice rules into a single .brand/ directory; connect directly to MCP clients like Claude Code, Claude Desktop, Cursor, and Windsurf, or carry the compiled runtime into any AI tool. One artifact, every surface on brand.",
+  "description": "Use existing brand guidelines with AI. This MCP server turns websites, PDFs, and Figma libraries into a portable .brand runtime with design tokens, voice rules, provenance, and compliance checks.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -15,6 +15,7 @@
     "dev": "tsc --watch",
     "smoke:hosted-mcp": "node scripts/hosted-mcp-smoke.mjs",
     "eval": "node scripts/agent-eval.mjs",
+    "eval:commit-holdout": "node scripts/holdout-commitment.mjs",
     "prestart": "npm run verify:release-metadata",
     "start": "node dist/index.js",
     "pretest": "npm run verify:release-metadata",
@@ -52,7 +53,11 @@
   ],
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
+    "ai-agents",
+    "agent-tools",
+    "ai-branding",
     "brand-runtime",
     "brand-governance",
     "claude-design",
@@ -71,6 +76,6 @@
     "type": "git",
     "url": "https://github.com/Brandcode-Studio/brandsystem-mcp"
   },
-  "homepage": "https://brandcode.studio/mcp",
+  "homepage": "https://github.com/Brandcode-Studio/brandsystem-mcp#readme",
   "bugs": "https://github.com/Brandcode-Studio/brandsystem-mcp/issues"
 }

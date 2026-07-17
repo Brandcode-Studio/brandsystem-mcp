@@ -38,10 +38,10 @@ export function resolveProfile(explicit?: string): ToolProfile {
   const normalized = candidate.trim().toLowerCase();
   if (normalized === "full") return "full";
   if (normalized === "core" || normalized === "") return "core";
-  // Unknown value: fail toward the larger surface rather than silently
-  // hiding tools a user asked for by name.
+  // Unknown value: preserve the agent-friendly default rather than silently
+  // expanding to the much larger authoring surface.
   console.error(
-    `[brandsystem-mcp] Unknown BRANDSYSTEM_PROFILE "${candidate}" — using "full". Valid values: core, full.`
+    `[brandsystem-mcp] Unknown BRANDSYSTEM_PROFILE "${candidate}" — using "core". Valid values: core, full.`
   );
-  return "full";
+  return "core";
 }

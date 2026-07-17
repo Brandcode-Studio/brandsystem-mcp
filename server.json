@@ -2,9 +2,9 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.Brandcode-Studio/brandsystem-mcp",
   "version": "0.11.1",
-  "title": "Brandsystem MCP — Build",
-  "description": "Build portable .brand runtimes from websites, Figma, and PDFs for use across AI tools.",
-  "websiteUrl": "https://brandcode.studio/mcp",
+  "title": "Brandsystem MCP — Brand Guidelines for AI",
+  "description": "Use existing brand guidelines with AI. Turn websites, PDFs, and Figma libraries into a portable .brand runtime with design tokens, voice rules, provenance, and compliance checks.",
+  "websiteUrl": "https://github.com/Brandcode-Studio/brandsystem-mcp#readme",
   "repository": {
     "url": "https://github.com/Brandcode-Studio/brandsystem-mcp",
     "source": "github"

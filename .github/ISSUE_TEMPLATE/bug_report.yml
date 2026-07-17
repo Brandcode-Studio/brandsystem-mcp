@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible Brandsystem MCP problem without sensitive data
+title: "[Bug]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not include credentials, private brand material, customer data, or vulnerability details. Report security issues privately through the repository Security page.
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: Run `npx @brandsystem/mcp inspect` if you are unsure.
+      placeholder: 0.11.1
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options:
+        - Codex
+        - Claude Code
+        - Claude Desktop
+        - Cursor
+        - Windsurf
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Brand source
+      options:
+        - Website
+        - PDF guideline
+        - Figma
+        - Existing .brand directory
+        - Brandcode Studio
+        - Not source-related
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and safe reproduction
+      description: Include the tool name and redacted inputs. Never include secrets or private brand content.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste safely redacted output from `npx @brandsystem/mcp doctor` when relevant.

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildServerEntry,
+  buildCodexAddArgs,
   resolveConfigPath,
   mergeMcpConfig,
   runInstall,
@@ -50,6 +51,24 @@ describe("buildServerEntry", () => {
   });
 });
 
+describe("buildCodexAddArgs", () => {
+  it("builds the official Codex CLI command for core", () => {
+    expect(buildCodexAddArgs("core")).toEqual([
+      "mcp",
+      "add",
+      "brandsystem",
+      "--",
+      "npx",
+      "-y",
+      "@brandsystem/mcp",
+    ]);
+  });
+
+  it("passes the full profile through to the MCP server", () => {
+    expect(buildCodexAddArgs("full")).toContain("--profile=full");
+  });
+});
+
 describe("resolveConfigPath", () => {
   const home = "/home/tester";
 
@@ -59,6 +78,12 @@ describe("resolveConfigPath", () => {
     );
     expect(resolveConfigPath("cursor", dir, home)).toBe(
       join(dir, ".cursor", "mcp.json"),
+    );
+  });
+
+  it("reports the shared Codex config path", () => {
+    expect(resolveConfigPath("codex", dir, home)).toBe(
+      join(home, ".codex", "config.toml"),
     );
   });
 
@@ -131,6 +156,58 @@ describe("mergeMcpConfig", () => {
 });
 
 describe("runInstall", () => {
+  it("prints a dry-run Codex command without invoking it", async () => {
+    const commandRunner = vi.fn(async () => 0);
+    const code = await runInstall({
+      client: "codex",
+      write: false,
+      profile: "core",
+      cwd: dir,
+      home: "/home/tester",
+      commandRunner,
+    });
+    expect(code).toBe(0);
+    expect(commandRunner).not.toHaveBeenCalled();
+    expect(loggedOutput()).toContain(
+      "codex mcp add brandsystem -- npx -y @brandsystem/mcp",
+    );
+  });
+
+  it("uses the official Codex CLI when --write is explicit", async () => {
+    const commandRunner = vi.fn(async () => 0);
+    const code = await runInstall({
+      client: "codex",
+      write: true,
+      profile: "full",
+      cwd: dir,
+      commandRunner,
+    });
+    expect(code).toBe(0);
+    expect(commandRunner).toHaveBeenCalledWith("codex", [
+      "mcp",
+      "add",
+      "brandsystem",
+      "--",
+      "npx",
+      "-y",
+      "@brandsystem/mcp",
+      "--profile=full",
+    ]);
+    expect(loggedOutput()).toContain("official Codex CLI");
+  });
+
+  it("reports a failed Codex CLI invocation", async () => {
+    const code = await runInstall({
+      client: "codex",
+      write: true,
+      profile: "core",
+      cwd: dir,
+      commandRunner: async () => 2,
+    });
+    expect(code).toBe(1);
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("code 2"));
+  });
+
   it("dry-run prints the target and writes nothing", async () => {
     const code = await runInstall({
       client: "claude-code",

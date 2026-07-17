@@ -5,9 +5,29 @@
 [![npm downloads](https://img.shields.io/npm/dw/@brandsystem/mcp)](https://www.npmjs.com/package/@brandsystem/mcp)
 [![MCP Badge](https://lobehub.com/badge/mcp/brandcode-studio-brandsystem-mcp)](https://lobehub.com/mcp/brandcode-studio-brandsystem-mcp)
 
-# @brandsystem/mcp — Build
+# Use your brand guidelines with AI
 
-**The authoring tool for the portable `.brand` runtime.** Extract identity from websites, Figma, and PDFs. Compile governance, tokens, and voice rules into a single `.brand/` directory. Deploy that runtime to Claude Design, Claude Code, Cursor, ChatGPT — every surface that can read a governed brand. One artifact, every surface on brand.
+**`@brandsystem/mcp` turns the brand material you already have into context AI agents can use.** Give it a website, PDF guide, Figma library, local files, or a Brandcode Studio brand. It produces a portable `.brand/` runtime with design tokens, voice rules, provenance, and compliance checks.
+
+Local-first. No account required. The default Core profile exposes 12 tools covering the complete adopt → use → check loop.
+
+## Start here
+
+Install it for your agent, then ask: **“How do I use my brand guidelines with AI?”**
+
+```bash
+# Codex
+npx @brandsystem/mcp install --client codex --write
+
+# Claude Code, Cursor, Windsurf, or Claude Desktop
+npx @brandsystem/mcp install --client claude-code --write
+```
+
+`install` is a dry run unless you pass `--write`. Replace `claude-code` with `cursor`, `windsurf`, or `claude-desktop` as needed. The installer preserves existing JSON client settings; Codex setup delegates to the official `codex mcp add` command.
+
+Already configured? Tell your agent:
+
+> Use my existing brand guidelines with AI. Start from this website/PDF/Figma library and show me what needs human confirmation.
 
 ## What It Solves
 
@@ -28,7 +48,7 @@ With brand-runtime.json loaded, agent prompts collapse from 200-400 tokens of in
 
 ### 1. Add to your MCP config
 
-Copy this into `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor), or Windsurf MCP settings:
+Copy this into `.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor), or Windsurf MCP settings. Codex users can run `npx @brandsystem/mcp install --client codex --write` instead:
 
 ```json
 {
@@ -307,6 +327,16 @@ After running the full pipeline, your `.brand/` directory looks like this:
 ---
 
 ## Platform Setup
+
+### Codex
+
+Use the package installer, which delegates to Codex's official MCP configuration command:
+
+```bash
+npx @brandsystem/mcp install --client codex --write
+```
+
+Start a new Codex task after installation. Codex CLI, the Codex app, and the IDE extension share the same MCP configuration.
 
 ### Claude Code
 

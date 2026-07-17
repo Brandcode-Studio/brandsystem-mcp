@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- **Codex installer path.** `npx @brandsystem/mcp install --client codex --write` delegates to the official `codex mcp add` command; dry-run remains the default.
+- **Protocol-level agent instructions.** MCP initialization now explains the adopt → resume → contextualize → check → export workflow, the untrusted-data boundary, and when not to invoke Brandsystem.
+
+### Changed
+
+- Unknown `BRANDSYSTEM_PROFILE` values now preserve the 12-tool Core default instead of silently expanding to the full authoring surface.
+- npm and MCP Registry descriptions now lead with the user intent “use existing brand guidelines with AI,” add agent-oriented discovery terms, and point to a working package homepage instead of the removed `/mcp` route.
+- README and `llms.txt` now put the shortest agent onboarding path before the deeper architecture.
+
 ## 0.11.1 (2026-07-17)
 
 Patch release: the first eval-driven improvements, plus a parser fix the eval suite surfaced.
