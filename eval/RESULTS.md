@@ -4,6 +4,14 @@ Results here come only from actual runs, stamped with package version, model, an
 Method: [eval/README.md](README.md). Reproduce with `npm run eval` (deterministic) or
 `ANTHROPIC_API_KEY=... npm run eval -- --with-llm` (adds first-tool selection).
 
+> **Scope note (added 2026-07-17):** the 12 first-tool-selection prompts below are a
+> **development set**. The tool descriptions shipped in 0.11.1 were iterated against
+> these exact fixtures, so the scores measure how well the descriptions fit these
+> prompts — not generalization to unfamiliar phrasing. A frozen, source-split holdout
+> set (collected from real usage, held privately, committed publicly by hash and
+> category distribution before any testing) is planned for 0.12; until holdout scores
+> exist, treat the routing numbers as capability evidence, not accuracy claims.
+
 ---
 
 ## Run: 2026-07-17

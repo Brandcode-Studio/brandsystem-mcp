@@ -77,6 +77,17 @@
 2. **Token-estimated response budgets:** budgets in tokens (~chars/4), `compact`/`standard`/`detailed` modes, hard compact target for entry tools, tests that fail on budget breach. **Never truncate JSON mid-object** — paginate or spill to an MCP resource. `brand_status` answers "where am I, what next?" in a few hundred tokens.
 3. **Public agent evaluation suite** (after the 0.10 surface stabilizes — evals against the pre-Core surface would be invalidated): real prompts ("I have a PDF brand guide", "write this in our voice", "check this post"…); measure first-tool selection, calls-to-first-artifact, context tokens, recovery from incomplete inputs, unsupported-claim rate, compliance accuracy, cross-client success, second-agent runtime usability. Publish fixtures, methodology, results.
 
+## 0.12 — Evidence release (planned; reconciled with Codex 2026-07-17)
+
+1. **Dogfood capture starts immediately** (before holdout design): privacy-safe logging from C5/Pendium/Brandcode client work — intent, selected tools, outcome, friction, repair; never confidential brand content. Real prompts feed the holdout.
+2. **Holdout protocol:** split dev/holdout by customer/source (not randomly, so paraphrases can't leak across sets); description authors see the dev set only; freeze holdout with canonical serialization; publish its SHA-256 + case count + category distribution BEFORE testing; separate evaluator/isolated session holds the prompts; publish hash + model id + package commit + date + score; optionally reveal-and-rotate after a release cycle. Negative cases (should NOT invoke brandsystem) heavily represented — false-positive invocation is the fastest way for an MCP to feel intrusive.
+3. Real stdio-process test launching `dist/index.js` (not only the in-memory SDK client).
+4. Multi-turn and negative routing cases; provider/model adapters (no hardcoded single model).
+5. Scripted clarify answers from fixture ground truth → deterministic end-to-end job scenarios (0.13 groundwork).
+6. **Extraction audit evolves into two lanes** (per Codex correction — today it's a live-yield canary, not a labeled benchmark): (a) deterministic quality corpus — frozen HTML/PDF/token fixtures with labeled expected identity/confidence/clarifications, release-gating; (b) live website canary — the existing ten brands, non-blocking drift detection. Also fix its hardcoded `0.3.12` version metadata.
+7. Continue per-tool schema specialization across the remaining Core tools.
+8. **Dependabot majors individually, never batched:** PDF.js 6 vs the PDF corpus; Puppeteer 25 vs visual extraction + SSRF/timeout/resource-limit tests; Vitest 4 vs full suite; TypeScript 7 as its own migration investigation (Go-based compiler rewrite, not routine); Actions majors only with re-verified commit SHA pins.
+
 ## Hosted (Use MCP) prerequisite — separate lane
 
 - Disposable browser worker with deny-by-default egress, socket/DNS-level policy, CPU/memory/process/time limits, ephemeral filesystem, no inherited credentials, narrow validated result channel — **before** any browser extraction is exposed remotely. Independently reviewed.
