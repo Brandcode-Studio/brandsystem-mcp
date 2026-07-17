@@ -364,6 +364,56 @@ describe("brand_audit_content", () => {
 });
 
 // ---------------------------------------------------------------------------
+// brand_check_compliance (read-only — uses complete fixture)
+// ---------------------------------------------------------------------------
+
+describe("brand_check_compliance", () => {
+  let tmpDir: string;
+  let client: Client;
+  let cleanup: () => Promise<void>;
+
+  beforeAll(async () => {
+    tmpDir = await copyFixture("brand-complete");
+    const conn = await connectWithCwd(tmpDir);
+    client = conn.client;
+    cleanup = conn.cleanup;
+  });
+
+  afterAll(async () => {
+    await cleanup();
+    await rm(tmpDir, { recursive: true });
+  });
+
+  it("passes on-brand inline styles when font-family has no trailing semicolon", async () => {
+    // Regression: font-family as the last declaration of an inline style
+    // (no trailing ";") must not bleed across the newline into the next
+    // element's joined style chunk and produce a phantom non-brand font.
+    const result = await callTool(client, "brand_check_compliance", {
+      content: [
+        "<html><body>",
+        `<h1 style="color:#2a4494;font-family:'Inter', sans-serif">Fixture Brand</h1>`,
+        `<div style="background:#f5a623">Structured clarity.</div>`,
+        "</body></html>",
+      ].join("\n"),
+    });
+    const checks = result.checks as Array<{ id: string; status: string; message: string }>;
+    const fontCheck = checks.find((c) => c.id === "CRT-FONT");
+    expect(fontCheck?.status).toBe("pass");
+    expect(result.result).toBe("pass");
+  });
+
+  it("fails on a genuinely non-brand font", async () => {
+    const result = await callTool(client, "brand_check_compliance", {
+      content:
+        '<div style="font-family: Comic Sans MS">Bad content</div>',
+    });
+    const checks = result.checks as Array<{ id: string; status: string }>;
+    expect(checks.find((c) => c.id === "CRT-FONT")?.status).toBe("fail");
+    expect(result.result).toBe("fail");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // brand_report (writes file — uses session-1-only fixture in tmpdir)
 // ---------------------------------------------------------------------------
 

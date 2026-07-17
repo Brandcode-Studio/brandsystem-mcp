@@ -46,7 +46,7 @@ function extractCssColors(css: string): string[] {
 
 function extractFontFamilies(css: string): string[] {
   const families: string[] = [];
-  const re = /font-family\s*:\s*([^;}"]+)/gi;
+  const re = /font-family\s*:\s*([^;}"\n\r]+)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(css)) !== null) {
     for (const part of m[1].split(",")) {

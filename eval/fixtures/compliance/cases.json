@@ -10,7 +10,7 @@
     },
     {
       "id": "pass-onbrand-inline-styles",
-      "content": "<section><p style=\"color:#2a4494;font-family:'Inter', sans-serif;\">Welcome to the platform.</p><span style=\"background:#f5a623;color:#111111\">New</span></section>",
+      "content": "<section><p style=\"color:#2a4494;font-family:'Inter', sans-serif\">Welcome to the platform.</p><span style=\"background:#f5a623;color:#111111\">New</span></section>",
       "expected": "pass",
       "reason": "Inline styles stay on-palette (primary + accent + neutrals) with the brand font."
     },
