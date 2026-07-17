@@ -4,13 +4,13 @@
     { "value": "#d90429", "role": "primary", "confidence": "medium", "note": "promoted to primary: most frequent chromatic color" },
     { "value": "#ffffff", "role": "surface", "confidence": "high" },
     { "value": "#212529", "role": "text", "confidence": "medium" },
-    { "value": "#1d3557", "role": ["secondary", "text"], "known_gap": true, "note": "dark navy falls below the chromatic threshold (near-black), so it is never a primary candidate and loses the text role slot to #212529" }
+    { "value": "#1d3557", "role": ["secondary", "text"], "known_gap": true, "note": "dark navy is now correctly chromatic (saturation-based isChromatic) and surfaces as a chromatic candidate, but still loses the single text role slot to #212529 in the one-color-per-role merge" }
   ],
   "fonts": [
     { "family": "Lora", "confidence": "medium" }
   ],
   "suggested_primary": "#d90429",
-  "chromatic_candidates_include": ["#d90429"],
+  "chromatic_candidates_include": ["#d90429", "#1d3557"],
   "logo": {
     "inline_svg_found": false
   },
@@ -26,6 +26,6 @@
     "font_recall": 0.95
   },
   "known_gaps": [
-    "Second brand candidate #1d3557 is invisible to the ambiguity flow: isChromatic() classifies dark navy as near-black, so only #d90429 appears in chromatic_candidates and #1d3557 is dropped by the role merge."
+    "#1d3557 reaches chromatic_candidates (dark-chromatic fix) but is still dropped from the merged identity: the one-color-per-role merge keeps #212529 in the single text slot."
   ]
 }

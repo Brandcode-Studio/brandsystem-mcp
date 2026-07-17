@@ -96,6 +96,85 @@ describe('extractFromCSS — font extraction', () => {
     const { fonts } = extractFromCSS(css);
     expect(fonts[0].family).toBe('Playfair Display');
   });
+
+  it('drops generic web-safe fallbacks behind a distinctive first-choice font', () => {
+    const css = `body { font-family: "Work Sans", Arial, Helvetica, sans-serif; }`;
+    const { fonts } = extractFromCSS(css);
+    const families = fonts.map((f) => f.family);
+    expect(families).toContain('Work Sans');
+    expect(families).not.toContain('Arial');
+    expect(families).not.toContain('Helvetica');
+  });
+
+  it('drops the full generic web-safe set when used as fallbacks', () => {
+    const css = `
+      body { font-family: "Inter", Verdana, Tahoma, sans-serif; }
+      h1 { font-family: "Fraunces", Georgia, "Times New Roman", serif; }
+      h2 { font-family: "Barlow", "Trebuchet MS", "Helvetica Neue", sans-serif; }
+    `;
+    const { fonts } = extractFromCSS(css);
+    const families = fonts.map((f) => f.family);
+    expect(families).toEqual(expect.arrayContaining(['Inter', 'Fraunces', 'Barlow']));
+    for (const generic of ['Verdana', 'Tahoma', 'Georgia', 'Times New Roman', 'Trebuchet MS', 'Helvetica Neue']) {
+      expect(families).not.toContain(generic);
+    }
+  });
+
+  it('keeps Arial when it is the first-choice font (Arial-only brand)', () => {
+    const css = `body { font-family: Arial, sans-serif; }`;
+    const { fonts } = extractFromCSS(css);
+    expect(fonts.map((f) => f.family)).toContain('Arial');
+  });
+
+  it('keeps a generic first choice but drops generic fallbacks behind it', () => {
+    const css = `body { font-family: Georgia, "Times New Roman", serif; }`;
+    const { fonts } = extractFromCSS(css);
+    const families = fonts.map((f) => f.family);
+    expect(families).toContain('Georgia');
+    expect(families).not.toContain('Times New Roman');
+  });
+
+  it('counts a generic font used as a first choice elsewhere even if it is a fallback in another stack', () => {
+    const css = `
+      body { font-family: "Inter", Georgia, serif; }
+      blockquote { font-family: Georgia, serif; }
+    `;
+    const { fonts } = extractFromCSS(css);
+    const georgia = fonts.find((f) => f.family === 'Georgia');
+    expect(georgia).toBeDefined();
+    expect(georgia!.frequency).toBe(1); // only the first-choice usage counts
+  });
+});
+
+describe('isChromatic', () => {
+  it('treats dark brand colors as chromatic (saturation-based, not luminance)', () => {
+    expect(isChromatic('#1d3557')).toBe(true); // dark navy
+    expect(isChromatic('#14532d')).toBe(true); // forest green
+    expect(isChromatic('#800020')).toBe(true); // burgundy
+    expect(isChromatic('#4a0e1e')).toBe(true); // deep maroon
+  });
+
+  it('treats bright saturated colors as chromatic', () => {
+    expect(isChromatic('#e63946')).toBe(true);
+    expect(isChromatic('#0f62fe')).toBe(true);
+    expect(isChromatic('#ff7f11')).toBe(true);
+  });
+
+  it('rejects true near-blacks', () => {
+    expect(isChromatic('#000000')).toBe(false);
+    expect(isChromatic('#111111')).toBe(false);
+  });
+
+  it('rejects near-whites', () => {
+    expect(isChromatic('#fefefe')).toBe(false);
+    expect(isChromatic('#ffffff')).toBe(false);
+  });
+
+  it('rejects grays and low-saturation neutrals', () => {
+    expect(isChromatic('#888888')).toBe(false);
+    expect(isChromatic('#212529')).toBe(false); // desaturated near-black text color
+    expect(isChromatic('#57534e')).toBe(false); // warm gray
+  });
 });
 
 describe('promotePrimaryColor', () => {
@@ -110,6 +189,29 @@ describe('promotePrimaryColor', () => {
     const promoted = result.find((c) => c.value === '#e63946') as ExtractedColor & { _promoted_role?: string };
     expect(promoted._promoted_role).toBe('primary');
     expect(inferColorRole(promoted)).toBe('primary');
+  });
+
+  it('promotes a dark chromatic color (navy) when it is the most frequent chromatic', () => {
+    const colors: ExtractedColor[] = [
+      { value: '#ffffff', property: 'background-color', frequency: 10, source_type: 'computed' },
+      { value: '#1d3557', property: 'color', frequency: 6, source_type: 'computed' },
+      { value: '#111111', property: 'color', frequency: 8, source_type: 'computed' },
+    ];
+    const result = promotePrimaryColor(colors);
+    const promoted = result.find((c) => c.value === '#1d3557') as ExtractedColor & { _promoted_role?: string };
+    expect(promoted._promoted_role).toBe('primary');
+  });
+
+  it('frequency still decides between a bright and a dark chromatic candidate', () => {
+    const colors: ExtractedColor[] = [
+      { value: '#d90429', property: 'color', frequency: 5, source_type: 'computed' },
+      { value: '#1d3557', property: 'color', frequency: 3, source_type: 'computed' },
+    ];
+    const result = promotePrimaryColor(colors);
+    const bright = result.find((c) => c.value === '#d90429') as ExtractedColor & { _promoted_role?: string };
+    const dark = result.find((c) => c.value === '#1d3557') as ExtractedColor & { _promoted_role?: string };
+    expect(bright._promoted_role).toBe('primary');
+    expect(dark._promoted_role).toBeUndefined();
   });
 
   it('does not promote when an explicit primary already exists', () => {

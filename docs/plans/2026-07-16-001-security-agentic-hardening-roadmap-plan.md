@@ -90,6 +90,10 @@
 7. Continue per-tool schema specialization across the remaining Core tools.
 8. **Dependabot majors individually, never batched:** PDF.js 6 vs the PDF corpus; Puppeteer 25 vs visual extraction + SSRF/timeout/resource-limit tests; Vitest 4 vs full suite; TypeScript 7 as its own migration investigation (Go-based compiler rewrite, not routine); Actions majors only with re-verified commit SHA pins.
 
+## 0.13 — Task-completion evidence — SHIPPED 2026-07-17
+
+(Second-agent benchmark live: 5/5 job completion, 0 flags, 144/325 tokens per artifact. Negative routing measured: 0% false-positive invocation. #35 gaps 2-4 fixed with fixture flips; gap 1 (merge collapse) deferred with schema recommendation on the issue. All five dependency majors merged individually; TS 7 typechecks clean, parked for 0.14 standalone PR with dist-diff review. Remaining ongoing: dogfood capture toward holdout freeze; 0.14 candidates: TS 7 migration, (role, theme) merge-key decision, design-partner measurement.)
+
 ## Hosted (Use MCP) prerequisite — separate lane
 
 - Disposable browser worker with deny-by-default egress, socket/DNS-level policy, CPU/memory/process/time limits, ephemeral filesystem, no inherited credentials, narrow validated result channel — **before** any browser extraction is exposed remotely. Independently reviewed.

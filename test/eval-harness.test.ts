@@ -4,6 +4,8 @@
  * behind an import.meta.url check, same pattern as holdout-commitment.mjs).
  */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   DEFAULT_MODEL,
   inferProvider,
@@ -14,6 +16,11 @@ import {
   formatCommitmentBlock,
   createAdapter,
   parseArgs,
+  CONTEXT_TASK_TYPES,
+  extractCssFromReply,
+  hasMetaCommentary,
+  extractFirstHex,
+  validateSecondAgentTasks,
 } from "../scripts/agent-eval.mjs";
 import { createHoldoutCommitment } from "../scripts/holdout-commitment.mjs";
 
@@ -183,5 +190,142 @@ describe("CLI parsing", () => {
       provider: "openai",
     });
     expect(parseArgs([])).toMatchObject({ command: "run", withLlm: false, model: null });
+  });
+
+  it("defaults --scenario to all and accepts routing | second-agent | all", () => {
+    expect(parseArgs([]).scenario).toBe("all");
+    expect(parseArgs(["--scenario", "routing"]).scenario).toBe("routing");
+    expect(parseArgs(["--scenario=second-agent"]).scenario).toBe("second-agent");
+    expect(parseArgs(["--with-llm", "--scenario", "all"]).scenario).toBe("all");
+  });
+
+  it("rejects unknown --scenario values", () => {
+    expect(() => parseArgs(["--scenario", "everything"])).toThrow(/--scenario must be/);
+    expect(() => parseArgs(["--scenario"])).toThrow(/--scenario must be/);
+  });
+});
+
+describe("second-agent helpers", () => {
+  describe("extractCssFromReply", () => {
+    it("extracts a language-tagged fenced block and returns the surrounding prose", () => {
+      const reply =
+        "Hero styles:\n```css\n.hero{background:#2a4494;color:#fff}\n```\nEnjoy.";
+      const out = extractCssFromReply(reply);
+      expect(out.fenced).toBe(true);
+      expect(out.language).toBe("css");
+      expect(out.css).toBe(".hero{background:#2a4494;color:#fff}");
+      expect(out.prose).toBe("Hero styles:\n\nEnjoy.");
+    });
+
+    it("extracts an untagged fence and only the FIRST fence when several exist", () => {
+      const reply = "```\n.a{color:#2a4494}\n```\ntext\n```css\n.b{color:red}\n```";
+      const out = extractCssFromReply(reply);
+      expect(out.fenced).toBe(true);
+      expect(out.language).toBeNull();
+      expect(out.css).toBe(".a{color:#2a4494}");
+      // the second fence stays in the prose remainder
+      expect(out.prose).toContain(".b{color:red}");
+    });
+
+    it("treats a fence-free reply as text-only (css null, fenced false)", () => {
+      const out = extractCssFromReply("Just a launch post, no code at all.");
+      expect(out).toMatchObject({ css: null, fenced: false, language: null });
+      expect(out.prose).toBe("Just a launch post, no code at all.");
+    });
+
+    it("reports an empty fenced block as css null but fenced true", () => {
+      const out = extractCssFromReply("```css\n\n```");
+      expect(out.fenced).toBe(true);
+      expect(out.css).toBeNull();
+    });
+
+    it("handles null/undefined input without throwing", () => {
+      expect(extractCssFromReply(null)).toMatchObject({ css: null, fenced: false });
+      expect(extractCssFromReply(undefined).prose).toBe("");
+    });
+  });
+
+  describe("hasMetaCommentary", () => {
+    it("flags replies opening with Here / Sure / Certainly / I", () => {
+      expect(hasMetaCommentary("Here's your launch post: ...")).toBe(true);
+      expect(hasMetaCommentary("Here is the CSS you asked for")).toBe(true);
+      expect(hasMetaCommentary("Sure, happy to help!")).toBe(true);
+      expect(hasMetaCommentary("Certainly! Subject: Renew today")).toBe(true);
+      expect(hasMetaCommentary("I wrote a two-sentence post:")).toBe(true);
+      expect(hasMetaCommentary("  here you go")).toBe(true);
+    });
+
+    it("does not flag content that merely contains those words", () => {
+      expect(hasMetaCommentary("Introducing our new analytics feature.")).toBe(false);
+      expect(hasMetaCommentary("Subject: Your renewal is here")).toBe(false);
+      expect(hasMetaCommentary("In minutes, every surface stays consistent.")).toBe(false);
+      expect(hasMetaCommentary("")).toBe(false);
+      expect(hasMetaCommentary(null)).toBe(false);
+    });
+  });
+
+  describe("extractFirstHex", () => {
+    it("returns the first 6- or 3-digit hex, lowercased", () => {
+      expect(extractFirstHex(".hero{background:#2A4494;color:#FFF}")).toBe("#2a4494");
+      expect(extractFirstHex("use #fff on top of #e8523f")).toBe("#fff");
+    });
+
+    it("returns null when no hex is present", () => {
+      expect(extractFirstHex("no colors here")).toBeNull();
+      expect(extractFirstHex(null)).toBeNull();
+    });
+  });
+});
+
+describe("second-agent task fixtures", () => {
+  const fixturePath = join(process.cwd(), "eval", "fixtures", "second-agent", "tasks.json");
+  const doc = JSON.parse(readFileSync(fixturePath, "utf-8"));
+
+  it("the shipped fixture validates against the schema", () => {
+    expect(() => validateSecondAgentTasks(doc)).not.toThrow();
+  });
+
+  it("has 4-6 tasks with unique ids, task_types from brand_context's enum, and exactly one compact-budget task", () => {
+    const tasks = validateSecondAgentTasks(doc);
+    expect(tasks.length).toBeGreaterThanOrEqual(4);
+    expect(tasks.length).toBeLessThanOrEqual(6);
+    const ids = tasks.map((t: { id: string }) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const t of tasks) {
+      expect(CONTEXT_TASK_TYPES, t.id).toContain(t.task_type);
+      expect(t.check_inputs, t.id).toContain("text");
+    }
+    expect(tasks.filter((t: { budget: string }) => t.budget === "compact")).toHaveLength(1);
+    // At least one markup task exercises css extraction.
+    expect(
+      tasks.some((t: { check_inputs: string[] }) => t.check_inputs.includes("css"))
+    ).toBe(true);
+  });
+
+  it("rejects structurally broken docs", () => {
+    const base = {
+      id: "t-1",
+      task_type: "social-post",
+      budget: "standard",
+      instruction: "Write a post.",
+      check_inputs: ["text"],
+    };
+    expect(() => validateSecondAgentTasks({})).toThrow(/non-empty tasks array/);
+    expect(() => validateSecondAgentTasks({ tasks: [base, { ...base }] })).toThrow(/duplicate id/);
+    expect(() =>
+      validateSecondAgentTasks({ tasks: [{ ...base, task_type: "tweetstorm" }] })
+    ).toThrow(/not in brand_context's enum/);
+    expect(() => validateSecondAgentTasks({ tasks: [{ ...base, instruction: "  " }] })).toThrow(
+      /non-empty instruction/
+    );
+    expect(() => validateSecondAgentTasks({ tasks: [{ ...base, check_inputs: ["css"] }] })).toThrow(
+      /including "text"/
+    );
+    expect(() =>
+      validateSecondAgentTasks({ tasks: [{ ...base, check_inputs: ["text", "font"] }] })
+    ).toThrow(/unknown check_input/);
+    expect(() => validateSecondAgentTasks({ tasks: [{ ...base, budget: "tiny" }] })).toThrow(
+      /budget must be/
+    );
   });
 });

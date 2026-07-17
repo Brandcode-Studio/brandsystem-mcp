@@ -18,7 +18,7 @@
     "candidate_types_include": ["favicon"]
   },
   "clarifications": {
-    "count": 4,
+    "count": 3,
     "question_substrings": [
       "Work Sans",
       "Barlow Condensed",
@@ -30,11 +30,10 @@
     "color_precision": 0.95,
     "color_recall": 0.95,
     "role_accuracy": 0.95,
-    "font_precision": 0.6,
+    "font_precision": 0.95,
     "font_recall": 0.95
   },
   "known_gaps": [
-    "Generic fallback font 'Arial' leaks through extraction (not in the system-font blocklist) — measured font precision 2/3, threshold set to 0.6.",
     "Dark text colors #222222 and #40312a are extracted but lost to the one-color-per-role merge."
   ]
 }

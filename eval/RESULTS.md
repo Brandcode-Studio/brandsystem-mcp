@@ -86,3 +86,39 @@ Deterministic tier re-run after the changes: 23/23 PASS (unchanged).
 to fixtures, never the reverse. The intermediate regression is reported
 because it is instructive: single-description edits are not free, and this
 suite is the instrument that catches the interaction effects.
+
+---
+
+## Run: 2026-07-17 (0.13 — negatives + second-agent benchmark, first live run)
+
+- **Package:** post-0.12.0 main (0.13 branch), all five dependency majors merged
+- **Model:** `claude-haiku-4-5-20251001` (anthropic adapter)
+
+### Routing — DEVELOPMENT set: 19/19 (12/12 positive, 0/7 false-positive invocations)
+
+The seven new negative cases (prompts where no brandsystem tool applies, with
+deliberate vocabulary bait — "design team", "logo quiz", "PDF contract") all
+correctly returned NONE. **False-positive invocation rate: 0.0%** — the
+headline anti-intrusiveness number. Dev-set caveats apply as before: the 12
+positive prompts were tuned against in 0.11.1; the negatives are new but
+maintainer-authored. Holdout scores remain the generalization standard.
+
+### Second-agent benchmark: 5/5 job completion
+
+A fresh model given ONLY `brand_context` output (system-prompted as data, not
+instructions) produced content for 5 tasks; the real `brand_check` +
+`brand_check_compliance` scored every artifact deterministically.
+
+| Metric | Value |
+|---|---|
+| Job completion (compliance PASS / tasks) | **100% (5/5)** |
+| Mean brand_check flags per artifact | 0.00 |
+| Token cost per artifact (output / context served) | 144 / 325 |
+| Meta-commentary despite content-only instruction | 0/5 |
+
+Honest notes: the `hero-section-css` reply contained no fenced CSS block, so
+that task scored text-only (recorded in-results, not hidden); tasks are
+synthetic and few; compliance is checker-approximate (rule-based), not human
+judgment. The claim this run supports: *a fresh model given only governed
+context produced content the deterministic checker accepts, at ~325 context
+tokens per task* — the runtime-transfer promise, measured.
