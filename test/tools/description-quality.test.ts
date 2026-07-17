@@ -61,7 +61,7 @@ const KNOWN_LEADING_VERBS = new Set([
   "publish", "score", "run", "load", "fetch", "parse", "detect", "compare",
   "merge", "split", "render", "export", "import", "convert", "apply",
   "record", "capture", "assess", "evaluate", "verify", "compute",
-  "discover", "sample", "toggle", "enrich", "diff", "gate", "lint", "select",
+  "discover", "sample", "toggle", "enrich", "diff", "gate", "lint", "select", "adopt",
   "preview", "start", "stop", "refresh", "clarify", "deepen", "ingest",
 ]);
 
