@@ -14,10 +14,12 @@
 import { readFile, writeFile, copyFile, mkdir, access } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { spawn } from "node:child_process";
 import type { ToolProfile } from "../lib/tool-profile.js";
 
 export const INSTALL_CLIENTS = [
   "claude-code",
+  "codex",
   "cursor",
   "windsurf",
   "claude-desktop",
@@ -39,7 +41,14 @@ export interface InstallOptions {
   home?: string;
   /** Overridable for tests. Defaults to process.platform. */
   platform?: NodeJS.Platform;
+  /** Overridable for tests. Runs the official Codex CLI for Codex installs. */
+  commandRunner?: CommandRunner;
 }
+
+export type CommandRunner = (
+  command: string,
+  args: string[],
+) => Promise<number>;
 
 export function isInstallClient(value: string): value is InstallClient {
   return (INSTALL_CLIENTS as readonly string[]).includes(value);
@@ -52,6 +61,13 @@ export function buildServerEntry(profile: ToolProfile): McpServerEntry {
   return { command: "npx", args };
 }
 
+/** Build the official `codex mcp add` invocation for this package. */
+export function buildCodexAddArgs(profile: ToolProfile): string[] {
+  const serverArgs = ["npx", "-y", "@brandsystem/mcp"];
+  if (profile === "full") serverArgs.push("--profile=full");
+  return ["mcp", "add", "brandsystem", "--", ...serverArgs];
+}
+
 /** Resolve where the MCP config lives for each supported client. */
 export function resolveConfigPath(
   client: InstallClient,
@@ -62,6 +78,8 @@ export function resolveConfigPath(
   switch (client) {
     case "claude-code":
       return join(cwd, ".mcp.json");
+    case "codex":
+      return join(home, ".codex", "config.toml");
     case "cursor":
       return join(cwd, ".cursor", "mcp.json");
     case "windsurf":
@@ -84,6 +102,14 @@ export function resolveConfigPath(
       return join(home, ".config", "Claude", "claude_desktop_config.json");
     }
   }
+}
+
+async function runCommand(command: string, args: string[]): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: "inherit" });
+    child.once("error", reject);
+    child.once("exit", (code) => resolve(code ?? 1));
+  });
 }
 
 /**
@@ -156,6 +182,45 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
       `Error: Unknown client "${opts.client}". Supported: ${INSTALL_CLIENTS.join(", ")}`,
     );
     return 1;
+  }
+
+  if (opts.client === "codex") {
+    const target = resolveConfigPath("codex", opts.cwd, opts.home, opts.platform);
+    const args = buildCodexAddArgs(opts.profile);
+    const renderedCommand = ["codex", ...args].join(" ");
+
+    if (!opts.write) {
+      console.log(`Dry run — nothing was written.`);
+      console.log(``);
+      console.log(`Codex stores MCP configuration in:`);
+      console.log(`  ${target}`);
+      console.log(``);
+      console.log(`The official Codex CLI would run:`);
+      console.log(`  ${renderedCommand}`);
+      console.log(``);
+      console.log(`Re-run with --write to apply.`);
+      return 0;
+    }
+
+    try {
+      const exitCode = await (opts.commandRunner ?? runCommand)("codex", args);
+      if (exitCode !== 0) {
+        console.error(
+          `Error: Codex CLI exited with code ${exitCode}. No brandsystem configuration was confirmed.`,
+        );
+        return 1;
+      }
+    } catch (err) {
+      const message = (err as NodeJS.ErrnoException).code === "ENOENT"
+        ? "Codex CLI was not found. Install Codex, then retry this command."
+        : (err as Error).message;
+      console.error(`Error: ${message}`);
+      return 1;
+    }
+
+    console.log(`Added "brandsystem" to Codex through the official Codex CLI.`);
+    console.log(`Start a new Codex task, then ask: "How do I use my brand guidelines with AI?"`);
+    return 0;
   }
 
   const target = resolveConfigPath(

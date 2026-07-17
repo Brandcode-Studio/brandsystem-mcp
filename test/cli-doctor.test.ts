@@ -218,11 +218,12 @@ describe("checkAuthFile", () => {
 
 describe("checkClientConfigs", () => {
   it("suggests install when no configs exist", async () => {
-    const checks = await checkClientConfigs(dir);
-    expect(checks).toHaveLength(2);
+    const checks = await checkClientConfigs(dir, dir);
+    expect(checks).toHaveLength(3);
     expect(checks.every((c) => c.status === "ok")).toBe(true);
     expect(checks[0].message).toContain("install --client claude-code");
-    expect(checks[1].message).toContain("install --client cursor");
+    expect(checks[1].message).toContain("install --client codex");
+    expect(checks[2].message).toContain("install --client cursor");
   });
 
   it("finds a brandsystem entry in .mcp.json", async () => {
@@ -234,7 +235,7 @@ describe("checkClientConfigs", () => {
         },
       }),
     );
-    const checks = await checkClientConfigs(dir);
+    const checks = await checkClientConfigs(dir, dir);
     const claudeCheck = checks.find((c) => c.message.includes(".mcp.json"));
     expect(claudeCheck?.status).toBe("ok");
     expect(claudeCheck?.message).toContain('"brandsystem" server entry');
@@ -246,16 +247,28 @@ describe("checkClientConfigs", () => {
       join(dir, ".cursor", "mcp.json"),
       JSON.stringify({ mcpServers: { other: { command: "foo" } } }),
     );
-    const checks = await checkClientConfigs(dir);
+    const checks = await checkClientConfigs(dir, dir);
     const cursorCheck = checks.find((c) => c.message.includes("Cursor"));
     expect(cursorCheck?.status).toBe("warn");
   });
 
   it("warns on invalid JSON without crashing", async () => {
     await writeFile(join(dir, ".mcp.json"), "{ not json");
-    const checks = await checkClientConfigs(dir);
+    const checks = await checkClientConfigs(dir, dir);
     const claudeCheck = checks.find((c) => c.message.includes(".mcp.json"));
     expect(claudeCheck?.status).toBe("warn");
+  });
+
+  it("finds a brandsystem entry in Codex config.toml", async () => {
+    await mkdir(join(dir, ".codex"), { recursive: true });
+    await writeFile(
+      join(dir, ".codex", "config.toml"),
+      '[mcp_servers.brandsystem]\ncommand = "npx"\nargs = ["-y", "@brandsystem/mcp"]\n',
+    );
+    const checks = await checkClientConfigs(dir, dir);
+    const codexCheck = checks.find((c) => c.message.includes("Codex"));
+    expect(codexCheck?.status).toBe("ok");
+    expect(codexCheck?.message).toContain('"brandsystem" server entry');
   });
 });
 

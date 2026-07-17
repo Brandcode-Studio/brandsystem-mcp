@@ -58,7 +58,7 @@ describe("tool profiles", () => {
     expect(resolveProfile("full")).toBe("full");
     expect(resolveProfile("FULL")).toBe("full");
     expect(resolveProfile("core")).toBe("core");
-    // Unknown values fail open to the larger surface.
-    expect(resolveProfile("everything")).toBe("full");
+    // Unknown values preserve the small, agent-friendly default surface.
+    expect(resolveProfile("everything")).toBe("core");
   });
 });

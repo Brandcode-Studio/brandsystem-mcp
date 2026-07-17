@@ -1,0 +1,50 @@
+name: Agent friction or discovery gap
+description: Share where an agent chose poorly, failed to finish, or could not discover Brandsystem
+title: "[Agent friction]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Real agent behavior helps improve routing and completed-job evaluation. Redact client and brand details before posting.
+  - type: input
+    id: model
+    attributes:
+      label: Agent, client, and model
+      placeholder: Codex app, model name if visible
+    validations:
+      required: true
+  - type: textarea
+    id: intent
+    attributes:
+      label: What were you trying to accomplish?
+      description: A paraphrase is fine if the original prompt contains private information.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What did the agent do?
+      description: Include selected tools, where it stopped, and any repair that worked.
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome
+      options:
+        - Could not discover Brandsystem
+        - Invoked Brandsystem when it should not have
+        - Chose the wrong first tool
+        - Chose the right tool but did not finish
+        - Finished with unnecessary friction
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, customer data, and confidential brand content.
+          required: true

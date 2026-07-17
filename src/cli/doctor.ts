@@ -8,6 +8,7 @@
 
 import { readFile, stat, access } from "node:fs/promises";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { parse as parseYaml } from "yaml";
 import { getVersion } from "../lib/version.js";
 import { resolveProfile, CORE_TOOL_NAMES } from "../lib/tool-profile.js";
@@ -254,49 +255,85 @@ export async function checkAuthFile(cwd: string): Promise<DoctorCheck[]> {
 }
 
 /**
- * Check nearby MCP client configs (.mcp.json for Claude Code,
- * .cursor/mcp.json for Cursor) for a "brandsystem" server entry.
+ * Check MCP client configs for a "brandsystem" server entry.
  */
-export async function checkClientConfigs(cwd: string): Promise<DoctorCheck[]> {
-  const targets: Array<{ rel: string; client: string; installKey: string }> = [
-    { rel: ".mcp.json", client: "Claude Code", installKey: "claude-code" },
+export async function checkClientConfigs(
+  cwd: string,
+  home: string = homedir(),
+): Promise<DoctorCheck[]> {
+  const targets: Array<{
+    path: string;
+    label: string;
+    client: string;
+    installKey: string;
+    format: "json" | "toml";
+  }> = [
     {
-      rel: join(".cursor", "mcp.json"),
+      path: join(cwd, ".mcp.json"),
+      label: ".mcp.json",
+      client: "Claude Code",
+      installKey: "claude-code",
+      format: "json",
+    },
+    {
+      path: join(home, ".codex", "config.toml"),
+      label: "~/.codex/config.toml",
+      client: "Codex",
+      installKey: "codex",
+      format: "toml",
+    },
+    {
+      path: join(cwd, ".cursor", "mcp.json"),
+      label: join(".cursor", "mcp.json"),
       client: "Cursor",
       installKey: "cursor",
+      format: "json",
     },
   ];
 
   const checks: DoctorCheck[] = [];
   for (const target of targets) {
-    const path = join(cwd, target.rel);
-    if (!(await fileExists(path))) {
+    if (!(await fileExists(target.path))) {
       checks.push({
         status: "ok",
-        message: `no ${target.rel} (${target.client}) — run \`install --client ${target.installKey}\` to add one`,
+        message: `no ${target.label} (${target.client}) — run \`install --client ${target.installKey}\` to add one`,
       });
       continue;
     }
     try {
-      const raw = await readFile(path, "utf-8");
+      const raw = await readFile(target.path, "utf-8");
+      if (target.format === "toml") {
+        if (/^\s*\[mcp_servers\.brandsystem\]\s*$/m.test(raw)) {
+          checks.push({
+            status: "ok",
+            message: `${target.label} (${target.client}) has a "brandsystem" server entry`,
+          });
+        } else {
+          checks.push({
+            status: "warn",
+            message: `${target.label} (${target.client}) exists but has no "brandsystem" entry — run \`install --client ${target.installKey}\``,
+          });
+        }
+        continue;
+      }
       const parsed = JSON.parse(raw) as {
         mcpServers?: Record<string, unknown>;
       };
       if (parsed.mcpServers && "brandsystem" in parsed.mcpServers) {
         checks.push({
           status: "ok",
-          message: `${target.rel} (${target.client}) has a "brandsystem" server entry`,
+          message: `${target.label} (${target.client}) has a "brandsystem" server entry`,
         });
       } else {
         checks.push({
           status: "warn",
-          message: `${target.rel} (${target.client}) exists but has no "brandsystem" entry — run \`install --client ${target.installKey}\``,
+          message: `${target.label} (${target.client}) exists but has no "brandsystem" entry — run \`install --client ${target.installKey}\``,
         });
       }
     } catch {
       checks.push({
         status: "warn",
-        message: `${target.rel} (${target.client}) is not valid JSON — cannot check for a "brandsystem" entry`,
+        message: `${target.label} (${target.client}) could not be parsed — cannot check for a "brandsystem" entry`,
       });
     }
   }
