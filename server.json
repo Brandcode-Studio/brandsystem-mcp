@@ -3,7 +3,7 @@
   "name": "io.github.Brandcode-Studio/brandsystem-mcp",
   "version": "0.9.6",
   "title": "Brandsystem MCP — Build",
-  "description": "Author a portable .brand runtime. Extract identity from websites, Figma, and PDFs; compile governance, tokens, and voice rules into a single .brand/ directory; connect directly to local MCP clients, or carry the compiled runtime into any AI tool. One artifact, every surface on brand.",
+  "description": "Build portable .brand runtimes from websites, Figma, and PDFs for use across AI tools.",
   "websiteUrl": "https://brandcode.studio/mcp",
   "repository": {
     "url": "https://github.com/Brandcode-Studio/brandsystem-mcp",

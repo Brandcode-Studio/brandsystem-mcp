@@ -2,6 +2,12 @@ name: Publish to npm
 
 on:
   workflow_dispatch:
+    inputs:
+      registry_only:
+        description: Publish existing package metadata to the MCP Registry only
+        required: false
+        type: boolean
+        default: false
   release:
     types: [created]
 
@@ -18,7 +24,25 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: npm publish --provenance --access public
+      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
+        run: npm ci
+      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
+        run: npm run build
+      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
+        run: npm test
+      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
+        run: npm publish --provenance --access public
+      - name: Install MCP Registry publisher
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.0
+          MCP_PUBLISHER_SHA256: 1370446bbe74d562608e8005a6ccce02d146a661fbd78674e11cc70b9618d6cf
+        run: |
+          curl -fsSLo /tmp/mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  /tmp/mcp-publisher.tar.gz" | sha256sum --check
+          tar -xzf /tmp/mcp-publisher.tar.gz -C /tmp mcp-publisher
+          chmod 700 /tmp/mcp-publisher
+      - name: Authenticate to the MCP Registry
+        run: /tmp/mcp-publisher login github-oidc
+      - name: Publish to the MCP Registry
+        run: /tmp/mcp-publisher publish server.json
