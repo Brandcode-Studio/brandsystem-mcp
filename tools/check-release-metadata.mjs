@@ -13,6 +13,12 @@ const serverJson = readJson(resolve(root, "server.json"));
 const expectedVersion = packageJson.version;
 const mismatches = [];
 
+if (typeof serverJson.description !== "string" || serverJson.description.length > 100) {
+  mismatches.push(
+    `server.json description must be a string of at most 100 characters (received ${serverJson.description?.length ?? "missing"})`,
+  );
+}
+
 if (packageLock.version !== expectedVersion) {
   mismatches.push(`package-lock.json version is ${packageLock.version}, expected ${expectedVersion}`);
 }
