@@ -108,6 +108,7 @@ export function register(server: McpServer) {
     "brand_extract_pdf",
     "Extract brand colors, typography, spacing, and guideline rules from a PDF brand guidelines document. Accepts a local file path to a PDF. Uses text extraction and pattern matching to identify hex color values, font names, size specifications, and spacing rules. Writes extracted values to core-identity.yaml with source='guidelines' and updates source-catalog.json. Guidelines source outranks web extraction by default based on brand.config.yaml source_priority. Use when the user has brand guidelines as a PDF file — this is the most accurate extraction source. Use after brand_extract_web to merge authoritative guideline values with web-extracted data. Run brand_resolve_conflicts afterward to review any disagreements between sources. NOT for website extraction — use brand_extract_web. NOT for Figma — use brand_extract_figma.",
     paramsShape,
+    { title: "Extract brand from PDF", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const result = safeParseParams(ParamsSchema, args);
       if (!result.success) return result.response;

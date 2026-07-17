@@ -254,6 +254,7 @@ export function register(server: McpServer) {
     "brand_enrich_skill",
     "Take a Claude Design-style auto-generated SKILL.md, diff it against this project's .brand/governance/ YAML (narrative-library, valid-proof-points, anti-patterns, application-rules, taste-codes), and return an enriched SKILL.md with missing governance content injected, cited by governance ID, and grouped into canonical sections. Additive only — never rewrites existing content. Requires a .brand/ directory with at least one governance file. The typical flow: Claude Design auto-generates a SKILL.md during onboarding → pass it to this tool → replace the original with the enriched version → every subsequent generation grounds on governed narratives, Active/Watch proof points, hard-rule anti-patterns, and taste signals. This is the low-friction wedge for putting Brandcode governance into any Anthropic-product generation surface.",
     paramsShape,
+    { title: "Enrich SKILL.md with governance", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

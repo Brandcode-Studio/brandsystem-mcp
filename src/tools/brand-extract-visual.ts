@@ -221,6 +221,7 @@ export function register(server: McpServer) {
     "brand_extract_visual",
     "Screenshot a website and extract brand colors, fonts, and visual personality using headless Chrome. Returns the screenshot as an image for your visual analysis PLUS computed styles from rendered elements. Use when brand_extract_web yields LOW quality (e.g. JS-rendered sites like Basecamp), when you need visual context for brand personality, or when CSS parsing misses colors. Requires Chrome/Chromium installed. NOT for Figma extraction — use brand_extract_figma instead.",
     paramsShape,
+    { title: "Extract brand visually", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async (args) => {
       const parsed = ParamsSchema.safeParse(args);
       if (!parsed.success) {

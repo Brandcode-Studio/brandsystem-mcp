@@ -184,6 +184,7 @@ export function register(server: McpServer) {
     "brand_connect_repo",
     'Connect a GitHub repository to Brandcode Studio for automatic brand syncing. The repo\'s .brand/ directory becomes the source of truth — push changes to git and Studio picks them up every 5 minutes. Requires auth (run brand_brandcode_auth first). Use when the user says "connect my repo", "sync from GitHub", "link my brand repo", or "set up git-connected brand".',
     paramsShape,
+    { title: "Connect repo to Studio", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async (input) => handler(input as unknown as Record<string, unknown>),
   );
 }

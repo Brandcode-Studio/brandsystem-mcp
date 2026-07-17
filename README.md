@@ -133,6 +133,25 @@ The `.brand/` directory is engineered as a first-class input for [Claude Design]
 
 ## Tools Reference
 
+### Tool Profiles (0.10+)
+
+By default the server registers the **Core profile** — 12 tools covering the complete loop: adopt → runtime/context → create → check → export, plus the Studio connector entry points and the clarify/promote path. This keeps first-tool selection sharp for agents.
+
+The **full profile** registers the entire authoring system (all tools below). Opt in via env or args:
+
+```json
+{
+  "mcpServers": {
+    "brandsystem": {
+      "command": "npx",
+      "args": ["-y", "@brandsystem/mcp", "--profile=full"]
+    }
+  }
+}
+```
+
+Or set `BRANDSYSTEM_PROFILE=full`. Core tools: `brand_start`, `brand_status`, `brand_runtime`, `brand_context`, `brand_check`, `brand_preflight`, `brand_report`, `brand_export`, `brand_clarify`, `brand_compile`, `brand_brandcode_auth`, `brand_brandcode_connect`.
+
 ### Entry Points
 
 | Tool | What it does |
@@ -193,6 +212,7 @@ The `.brand/` directory is engineered as a first-class input for [Claude Design]
 | Tool | What it does |
 |------|-------------|
 | `brand_runtime` | Read the compiled brand runtime contract (single-document brand context for AI agents). |
+| `brand_context` | Select a task-scoped slice of the runtime deterministically (task_type → sections, audience → persona match, compact budget). Returns matched selectors and explicit no-match — never silent fallback. |
 | `brand_write` | Load full brand context (visual + voice + strategy) for content generation. |
 | `brand_export` | Generate portable brand files for Chat, Code, team sharing, or email. |
 | `brand_feedback` | Report bugs, friction, or feature ideas to the brandsystem team. |
@@ -219,17 +239,22 @@ Session 4: brand_build_personas → brand_build_journey → brand_build_themes �
 
 `brand_status` can be called at any point. `brand_preflight` runs after any content generation.
 
-### CLI Connector Commands
+### CLI Commands
 
-The npm package also ships a CLI entrypoint for the hosted-brand connector:
+The npm package ships a CLI entrypoint for setup, diagnostics, and the hosted-brand connector:
 
 ```bash
+npx @brandsystem/mcp doctor                      # local checkup: Node, profile, .brand/ state, credential permissions, client configs
+npx @brandsystem/mcp install --client claude-code # write MCP config (dry-run by default; add --write to apply, existing config backed up)
+npx @brandsystem/mcp install --client cursor --profile full
+npx @brandsystem/mcp inspect                     # version, profile, tool list, .brand/ artifact inventory
+
 npx @brandsystem/mcp brandcode connect https://brandcode.studio/start/brands/pendium
 npx @brandsystem/mcp brandcode sync
 npx @brandsystem/mcp brandcode status
 ```
 
-For protected hosted brands, add `--share-token=TOKEN`.
+`install` never overwrites other servers' entries: it deep-merges, backs up the existing file first, and refuses invalid JSON. For protected hosted brands, add `--share-token=TOKEN`.
 
 ---
 

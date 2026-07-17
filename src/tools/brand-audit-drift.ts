@@ -382,6 +382,7 @@ export function register(server: McpServer) {
     "brand_audit_drift",
     "Batch audit multiple content items to detect systematic brand drift. Scores each item against brand identity, computes corpus-level statistics (mean, median, stddev), and identifies recurring patterns across items (e.g., same off-palette color in 4/5 items). Writes a detailed drift report to .brand/drift-report.md. Use when reviewing a content corpus, auditing a website, or checking whether brand identity is being applied consistently across multiple pieces.",
     paramsShape,
+    { title: "Audit brand drift", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

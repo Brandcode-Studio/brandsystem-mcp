@@ -5,6 +5,7 @@ import { BrandConfigSchema, CoreIdentitySchema } from "../schemas/index.js";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { ERROR_CODES } from "../types/index.js";
+import { checkProvenanceIntegrity } from "../lib/provenance-integrity.js";
 
 interface AuditResult {
   check: string;
@@ -119,6 +120,10 @@ async function handler() {
     detail: `confirmed: ${allConf.filter((c) => c === "confirmed").length}, high: ${allConf.filter((c) => c === "high").length}, medium: ${allConf.filter((c) => c === "medium").length}, low: ${lowCount}`,
   });
 
+  // Provenance integrity: does the runtime on disk match the sources and a
+  // supported approval level? (Poisoned-runtime runbook detection mechanism.)
+  results.push(...(await checkProvenanceIntegrity(process.cwd())));
+
   return formatResults(results);
 }
 
@@ -151,6 +156,7 @@ export function register(server: McpServer) {
   server.tool(
     "brand_audit",
     "Validate the .brand/ directory for completeness and correctness. Checks file existence, YAML schema validity, primary color assignment, typography coverage, logo embedding (SVG well-formedness), and confidence distribution. Use after brand_compile to verify readiness, or anytime to diagnose issues. Returns pass/warn/fail for each check with actionable details. NOT for checking content copy — use brand_audit_content. NOT for checking HTML/CSS — use brand_preflight.",
+    { title: "Audit .brand/ directory", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async () => handler()
   );
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { readdir, access } from "node:fs/promises";
 import * as cheerio from "cheerio";
+import { isRealPathWithinBase } from "../lib/path-security.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams, startToolTimer } from "../lib/response.js";
@@ -24,13 +26,58 @@ import { ERROR_CODES, type ColorEntry, type TypographyEntry, type LogoSpec, type
 const paramsShape = {
   client_name: z.string().describe("Company or brand name (e.g. 'Acme Corp')"),
   website_url: z.string().url().optional().describe("Company website URL to extract brand identity from (e.g. 'https://acme.com')"),
+  guideline_pdf: z.string().optional().describe("Path to a PDF brand guideline in or under the working directory (e.g. './brand-guidelines.pdf'). Routes adoption through brand_extract_pdf."),
+  figma_file_key: z.string().optional().describe("Figma file key for design-file extraction. Routes adoption through brand_extract_figma."),
+  brandcode_url: z.string().url().optional().describe("Brandcode Studio brand URL for adopting an existing hosted brand (e.g. 'https://brandcode.studio/start/brands/acme'). Routes adoption through brand_brandcode_connect."),
   industry: z.string().optional().describe("Industry vertical for smarter extraction (e.g. 'fintech', 'healthcare', 'content marketing')"),
   mode: z.enum(["interactive", "auto"]).default("interactive")
-    .describe("'auto' (recommended): runs full pipeline in one call when website_url is provided. 'interactive': presents source menu for user to choose extraction method."),
+    .describe("'auto' (recommended): runs full pipeline in one call when website_url is provided. 'interactive': assesses available sources (including files discovered in the working directory) and presents a source menu."),
 };
 
 const ParamsSchema = z.object(paramsShape);
 type Params = z.infer<typeof ParamsSchema>;
+
+/**
+ * Privacy explanation returned with every adoption assessment — part of the
+ * brand_start contract: users deciding how to adopt deserve to know what
+ * leaves the machine before anything runs.
+ */
+const PRIVACY_EXPLANATION =
+  "All extraction and compilation run locally in .brand/. Network access happens only to fetch sources you explicitly provide (your website URL or Figma file). Nothing about your brand leaves this machine unless you later connect Brandcode Studio (brand_brandcode_connect) or send feedback (brand_feedback).";
+
+export interface DiscoveredSources {
+  guideline_pdfs: string[];
+  token_files: string[];
+  asset_dirs: string[];
+}
+
+/**
+ * Depth-1 scan of the working directory for adoptable brand sources.
+ * Read-only — discovery never writes anything.
+ */
+async function discoverAdoptionSources(cwd: string): Promise<DiscoveredSources> {
+  const found: DiscoveredSources = { guideline_pdfs: [], token_files: [], asset_dirs: [] };
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await readdir(cwd, { withFileTypes: true });
+  } catch {
+    return found;
+  }
+  for (const entry of entries) {
+    const name = entry.name;
+    if (name.startsWith(".")) continue;
+    if (entry.isFile()) {
+      if (/\.pdf$/i.test(name) && /brand|guide|identity|style/i.test(name)) {
+        found.guideline_pdfs.push(name);
+      } else if (/^(design-)?tokens(\.[\w-]+)?\.json$/i.test(name) || /\.tokens\.json$/i.test(name)) {
+        found.token_files.push(name);
+      }
+    } else if (entry.isDirectory() && /^(assets?|logos?|brand)$/i.test(name)) {
+      found.asset_dirs.push(name);
+    }
+  }
+  return found;
+}
 
 interface SourceOption {
   key: string;
@@ -909,11 +956,30 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
 }
 
 async function handler(input: Params) {
-  const brandDir = new BrandDir(process.cwd());
+  const cwd = process.cwd();
+  const brandDir = new BrandDir(cwd);
 
   // If .brand/ already exists, return status + actionable next steps
   if (await brandDir.exists()) {
     return handleExistingBrand(brandDir);
+  }
+
+  // Validate a provided guideline PDF before writing anything: it must exist
+  // and resolve inside the working directory (symlink-aware).
+  if (input.guideline_pdf) {
+    const ok =
+      isRealPathWithinBase(input.guideline_pdf, cwd) &&
+      (await access(input.guideline_pdf).then(() => true, () => false));
+    if (!ok) {
+      return buildResponse({
+        what_happened: "guideline_pdf not found or outside the working directory",
+        next_steps: [
+          "Provide a path to a PDF inside the current working directory (e.g. './brand-guidelines.pdf')",
+          "Or run brand_start without guideline_pdf to see the source menu",
+        ],
+        data: { error: ERROR_CODES.INVALID_PATH, privacy: PRIVACY_EXPLANATION },
+      });
+    }
   }
 
   // Initialize the .brand/ directory (shared logic with brand_init)
@@ -926,12 +992,82 @@ async function handler(input: Params) {
     created_at: new Date().toISOString(),
   });
 
+  // ── Source routing: delegate to the canonical tool for each source ──
+  if (input.brandcode_url) {
+    return buildResponse({
+      what_happened: `Created .brand/ for "${input.client_name}" — adopting from Brandcode Studio`,
+      next_steps: [
+        `Run brand_brandcode_connect with url "${input.brandcode_url}" to pull the hosted brand package`,
+        "Then run brand_status to see what was adopted",
+      ],
+      data: {
+        client_name: input.client_name,
+        source_assessment: {
+          source: "brandcode_studio",
+          detail: input.brandcode_url,
+          confidence: "high — governed hosted brand",
+        },
+        privacy: PRIVACY_EXPLANATION,
+      },
+    });
+  }
+
+  if (input.guideline_pdf) {
+    return buildResponse({
+      what_happened: `Created .brand/ for "${input.client_name}" — adopting from PDF guidelines`,
+      next_steps: [
+        `Run brand_extract_pdf with path "${input.guideline_pdf}" to extract colors, fonts, and rules`,
+        "Then run brand_compile to produce tokens, runtime, and interaction policy",
+        "Then run brand_report for the visual report",
+      ],
+      data: {
+        client_name: input.client_name,
+        source_assessment: {
+          source: "pdf_guidelines",
+          detail: input.guideline_pdf,
+          confidence: "high — authored guidelines usually beat website inference",
+        },
+        privacy: PRIVACY_EXPLANATION,
+      },
+    });
+  }
+
+  if (input.figma_file_key && !input.website_url) {
+    return buildResponse({
+      what_happened: `Created .brand/ for "${input.client_name}" — adopting from Figma`,
+      next_steps: [
+        `Run brand_extract_figma in plan mode with file key "${input.figma_file_key}"`,
+        "Then run brand_compile and brand_report",
+      ],
+      data: {
+        client_name: input.client_name,
+        source_assessment: {
+          source: "figma",
+          detail: input.figma_file_key,
+          confidence: "high — design-file variables beat website inference",
+        },
+        privacy: PRIVACY_EXPLANATION,
+      },
+    });
+  }
+
   // Auto mode: run entire Session 1 pipeline if website_url is provided
   if (input.mode === "auto" && input.website_url) {
     return handleAutoMode(input, brandDir);
   }
 
+  // Interactive: discover local adoption candidates before presenting the menu
+  const discovered = await discoverAdoptionSources(cwd);
   const sourceMenu = buildSourceMenu(input.website_url);
+  if (discovered.guideline_pdfs.length > 0) {
+    const optionC = sourceMenu.find((o) => o.key === "C");
+    if (optionC) {
+      optionC.ready = true;
+      optionC.tool_to_run = "brand_extract_pdf";
+      optionC.ready_reason = `Found in working directory: ${discovered.guideline_pdfs.join(", ")}`;
+      optionC.recommended = true;
+    }
+  }
   const recommended = "A";
 
   const nextSteps = [
@@ -952,6 +1088,8 @@ async function handler(input: Params) {
       files_created: ["brand.config.yaml", "core-identity.yaml", "assets/logo/"],
       source_menu: sourceMenu,
       recommended,
+      discovered_sources: discovered,
+      privacy: PRIVACY_EXPLANATION,
       conversation_guide: {
         instruction: [
           `Welcome the user and confirm the brand system was created for "${input.client_name}".`,
@@ -997,6 +1135,7 @@ export function register(server: McpServer) {
     "brand_start",
     "Create a brand system from any website URL — extract brand colors, fonts, and logo in under 60 seconds. Use when the user says 'create a brand system', 'extract brand from website', 'set up brand guidelines', 'get design tokens', or 'brand identity'. Set mode='auto' with a website_url to run the full pipeline (extract, compile DTCG tokens + design-synthesis.json + DESIGN.md + brand runtime + interaction policy, generate HTML report) in one call. If .brand/ already exists, returns current status with next steps. Returns colors with roles, typography, logo (SVG/PNG), and confidence scores. After creation, suggest Brandcode Studio connector for team sync.",
     paramsShape,
+    { title: "Start a brand system", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

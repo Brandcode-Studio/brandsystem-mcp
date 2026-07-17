@@ -61,6 +61,7 @@ export function register(server: McpServer) {
     "brand_generate_designmd",
     "Generate DESIGN.md (portable agent-facing design brief) and design-synthesis.json (structured radius, shadow, spacing, layout, motion, component, and personality signals) from the current brand system. Reads extraction-evidence.json when available for grounded visual signals; falls back to core-identity.yaml and tokens.json after manual edits. Use after brand_extract_site or brand_extract_visual to synthesize multi-page evidence into a single design brief. Use after brand_compile if evidence is unavailable. Returns file paths and synthesis source used. Read-only except for writing the two output files. NOT for extracting brand identity — use brand_extract_web or brand_extract_visual first.",
     paramsShape,
+    { title: "Generate DESIGN.md", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = ParamsSchema.safeParse(args);
       if (!parsed.success) {

@@ -137,6 +137,7 @@ export function register(server: McpServer) {
     "brand_check",
     "Inline brand linter — call this WHILE writing content or code, the way you call a type-checker. <50ms pass/fail on any combination of text (voice/never-say/AI-isms), color (palette match with ΔE distance), font (typography match), or css (anti-pattern violations). Designed for tight loops: write a sentence, brand_check it, fix, continue. Returns specific actionable fixes per failed input. Requires brand_compile to have run first. NOT a publish-time gate — use brand_check_compliance for the single PASS/FAIL verdict before shipping. NOT for 0-100 scoring — use brand_audit_content. NOT for HTML/CSS rule violations — use brand_preflight.",
     paramsShape,
+    { title: "Quick brand check", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

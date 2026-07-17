@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 0.10.0 (2026-07-16)
+
+Agent-first product surface. One breaking-by-default change: the server now registers the **Core profile** (12 tools) unless the full authoring surface is requested.
+
+### Added
+
+- **Core tool profile (default).** The server registers 12 tools covering the complete value loop — adopt (`brand_start`), orient (`brand_status`), consume (`brand_runtime`, `brand_context`), verify (`brand_check`, `brand_preflight`), deliver (`brand_report`, `brand_export`), review/promote (`brand_clarify`, `brand_compile`), and connect (`brand_brandcode_auth`, `brand_brandcode_connect`). The full 44-tool authoring surface is available via `BRANDSYSTEM_PROFILE=full` or `--profile=full` in the MCP config args. Tests pin the core set exactly and prove full is a strict superset with no tool renamed or removed.
+- **`brand_context` — task-scoped deterministic context selection.** `task_type` (enum) maps to runtime sections through a fixed table; `audience` matches governed personas by normalized comparison; `budget: compact` returns identity + hard rules only. Returns `matched_selectors` (what was chosen and why) and an explicit `no_governed_match` instead of silently falling back. No model-side inference — judgment stays with the calling agent.
+- **Promotion gate.** Approval levels: `provisional_extracted` → `human_confirmed_local` (conferred when a human resolves the final clarification via `brand_clarify`) → `production_approved` (conferred **only** by Brandcode Studio, per the Phase 0 lock reserving canonical approval). The state is bound to a sha256 fingerprint of the source YAMLs — any re-extraction or edit demotes the effective level back to provisional at the next compile. Exports stamp the level-appropriate provenance notice; every level keeps the data-not-instructions clause.
+- **Provenance-integrity detector** (`brand_audit`). Fails when the runtime claims an approval level the stored state doesn't support, or when any policy-bearing field (anti-patterns, never_say, ai-ism patterns, tone, anchor terms) diverges from a fresh compile of current sources — catching tampered or stale runtimes. This is the detection mechanism the poisoned-runtime response runbook referenced.
+- **`brand_start` universal adoption.** New source params: `guideline_pdf` (routes through `brand_extract_pdf`; path validated symlink-safe inside the working directory), `figma_file_key`, `brandcode_url` (routes through the connector). Interactive mode now runs a read-only depth-1 discovery scan of the working directory (guideline PDFs, token files, asset folders) and returns a `source_assessment` plus a `privacy` explanation of exactly what leaves the machine, before anything runs.
+- **CLI helpers:** `npx @brandsystem/mcp doctor` (Node version, profile, `.brand/` state, credential permissions, runtime approval, client configs — local-only checks), `install --client <claude-code|cursor|windsurf|claude-desktop>` (dry-run by default; `--write` deep-merges preserving other servers and backs up the existing config first; refuses invalid JSON), and `inspect` (version, profile, tool list, artifact inventory).
+- **Tool annotations** on every registration: `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — advisory hints for client display and risk handling, not security controls.
+
+### Changed
+
+- **Runtime schema-version migration (step 1).** `brand-runtime.json` now emits explicit `schema_version`; the ambiguous `version` field remains as a deprecated alias through a compatibility window (both carry the contract schema version). Consumers should migrate to `schema_version`; `version` will be redefined or removed no earlier than 0.12.
+- `brand_write` conversation guidance and `brand_export` artifacts now reflect the effective approval level; connector pulls that declare `production_approved` record a Brandcode-Studio-authority approval state bound to the post-pull fingerprint.
+
+### Migration notes
+
+- Agents that call authoring tools (extract/deepen/build/messaging/drift) must opt into the full profile: add `"--profile=full"` to the server args or set `BRANDSYSTEM_PROFILE=full`.
+- `brand-runtime.json` consumers: read `schema_version ?? version`.
+
 ## 0.9.6 (2026-07-16)
 
 Security and distribution-integrity release. No new tools; no breaking changes to the tool surface.

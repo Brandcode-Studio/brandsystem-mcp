@@ -324,6 +324,7 @@ export function register(server: McpServer) {
     "brand_build_journey",
     "Define the buyer journey stages a content strategy targets — the path from first touch to decision. Ships with 4 defaults that work for most B2B brands (First Touch, Context & Meaning, Validation & Proof, Decision Support), each with buyer mindset, content goal, story types, narrative elements, claims policy, and tone shift. Mode 'interview' presents the defaults as a table and prompts for customization. Mode 'record' writes the final stages to .brand/strategy.yaml — pass `answers` as a JSON array of stage objects (or a single stage to update one), or omit to accept the defaults verbatim. Mode 'view' returns the current stages. Use during Session 4 (content strategy) after personas/themes are sketched. Returns stage definitions and writes strategy.yaml in record mode. After this, run brand_build_personas.",
     paramsShape,
+    { title: "Map buyer journey", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

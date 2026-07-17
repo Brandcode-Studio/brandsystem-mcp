@@ -86,6 +86,7 @@ export function register(server: McpServer) {
   server.tool(
     "brand_preview",
     'Generate a visual proof page showing the brand applied to common UI patterns — color swatches, typography hierarchy, buttons, cards, and a WCAG contrast matrix. Writes .brand/brand-preview.html. Screenshot-ready, shareable, built from brand-runtime.json only. Use when the user says "show me my brand", "preview the brand", "does this look right?", or after extraction to validate results. Requires brand_compile to have run first. NOT the full report — use brand_report for comprehensive data.',
+    { title: "Generate brand preview", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async () => handler(),
   );
 }

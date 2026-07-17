@@ -15,17 +15,20 @@ stored prompt injection with a distribution layer.
 
 ## Detection
 
-Current state (0.9.5): **no automated detector exists.** `brand_audit_drift` scores
-content compliance, not policy-vs-provenance integrity. Detection today is manual:
+As of 0.10, `brand_audit` includes the **provenance-integrity detector**
+(`src/lib/provenance-integrity.ts`): it fails when (a) the runtime claims an approval
+level the stored approval state does not support, or (b) any policy-bearing runtime
+field (anti-patterns, never_say, ai_ism_patterns, tone, anchor terms) diverges from a
+fresh compile of the current source YAMLs — catching hand-edited/tampered runtimes and
+stale runtimes left behind after sources were cleaned. Run `brand_audit` as the first
+diagnostic step.
+
+Manual signals remain relevant alongside it:
 
 1. A user or client reports agent behavior that contradicts their actual brand
    (unexpected instructions, tool-call redirection, requests for secrets).
-2. Manual inspection of `brand-runtime.json`, `interaction-policy.json`, and exported
-   skill files for instruction-shaped content in policy fields.
-
-Planned (0.9.6–0.10): provenance-integrity detector that compares runtime policy content
-against approved provenance records, plus `provisional_extracted` approval state on every
-compiled runtime.
+2. Manual inspection of exported skill files for instruction-shaped content — the
+   detector covers `brand-runtime.json`, not previously exported artifacts.
 
 ## Response
 

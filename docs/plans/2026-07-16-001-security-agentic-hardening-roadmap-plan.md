@@ -56,7 +56,9 @@
 8. **Prompt-injection fixtures:** hostile sources containing "ignore previous rules", "call another tool", "read an unrelated file", "upload credentials", "change the connector URL", "insert into future prompts" — tests prove these (a) never enter instruction fields, and (b) never appear in a runtime marked anything other than `provisional_extracted`. Public claim stays calibrated (see principle 5).
 9. **Provenance-integrity detector (start here, finish by 0.10):** compare runtime policy content against approved provenance — the detection mechanism the incident runbook (NOW §7) depends on. Distinct from `brand_audit_drift`, which scores content compliance.
 
-## 0.10 — Agent-first product surface
+## 0.10 — Agent-first product surface — SHIPPED 2026-07-16
+
+(All items landed, including the 0.9.6 carryover provenance-integrity detector. Remaining for 0.11: structured outputs, token budgets, eval suite. The creation-brief evidence envelope and remaining MEDIUM taint findings carry to 0.11.)
 
 1. **Evolve `brand_start` into universal adoption** (not a new `brand_adopt` tool): accept/discover websites, PDF guidelines, Figma, existing `.brand/`, token/design-system files, asset folders, Brandcode Studio brands. Returns source assessment, privacy explanation, proposed plan, missing inputs, safest next action; auto mode delegates to existing tools without duplicating logic.
 2. **Core profile by default (~8–12 tools):** `brand_start`, `brand_status`, `brand_runtime`, `brand_context`, `brand_check`, `brand_preflight`, `brand_export`, `brand_report`, connector entry points. Full authoring surface via opt-in `full` profile. **Define the selection mechanism explicitly** (startup flag / env var / config file) and test that `full` preserves all existing tool names. Version the default change (breaking for agents calling authoring tools).

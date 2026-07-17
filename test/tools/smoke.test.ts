@@ -15,7 +15,7 @@ import { homedir } from "node:os";
 let client: Client;
 
 beforeAll(async () => {
-  const server = createServer();
+  const server = createServer({ profile: "full" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
 

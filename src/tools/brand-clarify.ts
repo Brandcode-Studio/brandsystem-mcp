@@ -6,6 +6,7 @@ import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES, type ColorEntry, type ClarificationItem } from "../types/index.js";
 import { fenceUntrusted } from "../lib/untrusted-text.js";
+import { writeApprovalState, computeBrandFingerprint } from "../lib/approval-state.js";
 import type { NeedsClarificationData } from "../schemas/index.js";
 import type { CoreIdentityData } from "../schemas/index.js";
 
@@ -520,7 +521,20 @@ async function handler(input: Params) {
       instruction: `Immediately ask the user about the next clarification item (id: ${nextItem.id}). The question text, quoted as data: ${fenceUntrusted(nextItem.question)}. Don't wait for them to ask.`,
     };
   } else {
+    // Promotion gate: a human just resolved the final clarification. Record
+    // human_confirmed_local bound to the current source fingerprint — the
+    // next compile picks it up; any later source change demotes it again.
+    // This level asserts local review only, never brand authority
+    // (production_approved is conferred solely by Brandcode Studio).
+    const cwd = process.cwd();
+    await writeApprovalState(cwd, {
+      level: "human_confirmed_local",
+      confirmed_at: new Date().toISOString(),
+      fingerprint: await computeBrandFingerprint(cwd),
+      authority: "local_clarify",
+    });
     nextSteps.push("All clarifications resolved — run brand_compile to regenerate tokens with confirmed values");
+    nextSteps.push("The runtime will compile as human_confirmed_local (locally reviewed). Production approval requires Brandcode Studio.");
     nextSteps.push("Then run brand_report to generate the updated report");
     conversationGuide = {
       instruction: "All clarifications resolved. Immediately run brand_compile (don't wait for the user to ask). After compile, run brand_report. After the report, transition to Session 2 by running brand_deepen_identity.",
@@ -549,6 +563,7 @@ export function register(server: McpServer) {
     "brand_clarify",
     "Resolve an ambiguous brand value interactively. After brand_compile, some values need human confirmation — wrong primary color, unknown font, unassigned color roles. Pass the clarification item ID and the user's answer (hex color, role name, font name, or 'yes'/'no'). Supports natural language: 'the purple one is accent' or '#5544f2 is secondary'. Returns updated identity and remaining clarification count.",
     paramsShape,
+    { title: "Clarify brand values", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

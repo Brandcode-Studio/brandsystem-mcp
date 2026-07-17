@@ -2,6 +2,9 @@
  * CLI commands for the brandsystem-mcp package.
  *
  * Usage:
+ *   npx @brandsystem/mcp doctor
+ *   npx @brandsystem/mcp install --client <claude-code|cursor|windsurf|claude-desktop> [--write] [--profile core|full]
+ *   npx @brandsystem/mcp inspect
  *   npx @brandsystem/mcp brandcode connect <url> [--share-token=TOKEN]
  *   npx @brandsystem/mcp brandcode sync [--share-token=TOKEN]
  *   npx @brandsystem/mcp brandcode status
@@ -23,6 +26,10 @@ import {
 } from "./connectors/brandcode/persistence.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { SCHEMA_VERSION } from "./schemas/index.js";
+import { runDoctor } from "./cli/doctor.js";
+import { runInstall, INSTALL_CLIENTS } from "./cli/install.js";
+import { runInspect } from "./cli/inspect.js";
+import { resolveProfile } from "./lib/tool-profile.js";
 import type {
   ConnectorConfig,
   SyncHistoryEvent,
@@ -33,11 +40,21 @@ function printHelp() {
 brandsystem-mcp — Brand identity MCP server + Brandcode Studio connector
 
 Commands:
+  doctor                     Run a local environment checkup (Node version,
+                             profile, .brand/ state, credentials, MCP configs)
+  install --client <name>    Write the MCP client config for this package.
+                             Clients: claude-code, cursor, windsurf, claude-desktop.
+                             Dry-run by default; pass --write to apply.
+  inspect                    Print package version, resolved tool profile,
+                             core tool list, and the .brand/ artifact inventory
   brandcode connect <url>    Connect to a hosted Brandcode Studio brand
   brandcode sync             Sync with the connected hosted brand
   brandcode status           Show connection and sync status
 
 Options:
+  --client=NAME              Target MCP client for install
+  --write                    Apply changes (install is dry-run without it)
+  --profile=core|full        Tool profile (default: core)
   --share-token=TOKEN        Share token for protected brands
   --help                     Show this help message
 
@@ -49,6 +66,29 @@ function parseFlag(args: string[], flag: string): string | undefined {
   const prefix = `--${flag}=`;
   const match = args.find((a) => a.startsWith(prefix));
   return match ? match.slice(prefix.length) : undefined;
+}
+
+/** Parse `--flag=value` or `--flag value` from an argument list. */
+function parseOption(args: string[], flag: string): string | undefined {
+  const eq = parseFlag(args, flag);
+  if (eq !== undefined) return eq;
+  const idx = args.indexOf(`--${flag}`);
+  if (idx !== -1 && idx + 1 < args.length && !args[idx + 1].startsWith("--")) {
+    return args[idx + 1];
+  }
+  return undefined;
+}
+
+/**
+ * The stdio entry point (src/index.ts) consumes --profile from the args it
+ * forwards to runCli (so MCP server configs can pass it), so for CLI
+ * commands we also look at the raw process.argv.
+ */
+function parseProfileOption(args: string[]): string | undefined {
+  return (
+    parseOption(args, "profile") ??
+    parseOption(process.argv.slice(2), "profile")
+  );
 }
 
 async function cmdConnect(url: string, shareToken?: string) {
@@ -298,6 +338,37 @@ export async function runCli(args: string[]): Promise<void> {
   }
 
   const [group, command, ...rest] = args;
+
+  if (group === "doctor") {
+    process.exitCode = await runDoctor(process.cwd());
+    return;
+  }
+
+  if (group === "inspect") {
+    process.exitCode = await runInspect(
+      process.cwd(),
+      parseProfileOption(args),
+    );
+    return;
+  }
+
+  if (group === "install") {
+    const client = parseOption(args, "client");
+    if (!client) {
+      console.error("Error: Missing --client.");
+      console.error(
+        `Usage: npx @brandsystem/mcp install --client <${INSTALL_CLIENTS.join("|")}> [--write] [--profile core|full]`,
+      );
+      process.exit(1);
+    }
+    process.exitCode = await runInstall({
+      client,
+      write: args.includes("--write"),
+      profile: resolveProfile(parseProfileOption(args)),
+      cwd: process.cwd(),
+    });
+    return;
+  }
 
   if (group !== "brandcode") {
     printHelp();

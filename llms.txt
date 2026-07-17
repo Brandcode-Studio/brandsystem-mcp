@@ -30,9 +30,13 @@ With brand-runtime.json loaded, the brief collapses to the delta. The agent alre
 Tested in production: visual consistency is near-instant from the runtime. Voice consistency is meaningfully faster. The brief shrinks to what's new, not what's already true.
 
 ## Key capabilities
+- Adopt: brand_start accepts a website URL, PDF guidelines, Figma file key, or a Brandcode Studio brand — and discovers local sources (guideline PDFs, token files) with a source assessment and privacy explanation before anything runs
 - Extract: logos (SVG/PNG), colors with roles, typography, voice signals, anti-patterns from any URL, JS-rendered site, PDF brand guideline, or Figma file
-- Compile: DTCG design tokens, design-synthesis.json, DESIGN.md, brand-runtime.json, interaction-policy.json
-- Enforce: brand_audit_content (0-100 scoring), brand_check_compliance (pass/fail gate), brand_preflight (HTML/CSS rules)
+- Compile: DTCG design tokens, design-synthesis.json, DESIGN.md, brand-runtime.json (with approval + provenance), interaction-policy.json
+- Contextualize: brand_context returns a task-scoped slice (task_type/audience/budget → deterministic section selection with explicit no-match)
+- Enforce: brand_audit_content (0-100 scoring), brand_check_compliance (pass/fail gate), brand_preflight (HTML/CSS rules), provenance-integrity detection in brand_audit
+- Profiles: Core (12 tools, default — the complete adopt→create→check loop) or full (entire authoring system, BRANDSYSTEM_PROFILE=full)
+- Setup: npx @brandsystem/mcp doctor | install --client <claude-code|cursor|windsurf|claude-desktop> | inspect
 - Subscribe: brand://runtime and brand://policy as MCP resources
 - Connect: sync with hosted brands on Brandcode Studio; Live Mode refreshes reads from the hosted runtime within a short cache TTL (brand_brandcode_connect, brand_brandcode_sync, brand_brandcode_live)
 - Deploy: the `.brand/` directory is the product — works standalone, syncs to a team via Brandcode Studio, and travels unchanged to every consumption surface

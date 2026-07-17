@@ -218,6 +218,7 @@ export function register(server: McpServer) {
     "brand_brandcode_live",
     'Enable, disable, or inspect Live Mode on the Brandcode Studio connector. When ON, read-only tools (brand_runtime, brand_check, brand_audit_content, brand_check_compliance, brand_preview, brand_status) refresh from the hosted runtime on each call, within a short cache TTL (default 60s). Governance edits in Brand Console propagate on the next call without a manual sync. Requires a prior brand_brandcode_connect and brand_brandcode_auth. Use when the user says "go live", "enable live mode", "turn off live mode", "is live mode on?", or "make brand reads live". Returns the current mode, cache freshness, and sync token. Network failures during live reads silently fall back to the local mirror.',
     paramsShape,
+    { title: "Toggle Brandcode live mode", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

@@ -33,7 +33,7 @@ let client: Client;
 let tools: Awaited<ReturnType<Client["listTools"]>>["tools"];
 
 beforeAll(async () => {
-  const server = createServer();
+  const server = createServer({ profile: "full" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
 
@@ -61,7 +61,7 @@ const KNOWN_LEADING_VERBS = new Set([
   "publish", "score", "run", "load", "fetch", "parse", "detect", "compare",
   "merge", "split", "render", "export", "import", "convert", "apply",
   "record", "capture", "assess", "evaluate", "verify", "compute",
-  "discover", "sample", "toggle", "enrich", "diff", "gate", "lint",
+  "discover", "sample", "toggle", "enrich", "diff", "gate", "lint", "select",
   "preview", "start", "stop", "refresh", "clarify", "deepen", "ingest",
 ]);
 
