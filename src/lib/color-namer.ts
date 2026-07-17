@@ -128,6 +128,30 @@ export function generateColorName(hex: string, role: string): string {
 }
 
 /**
+ * Detect instruction-shaped "names" — prompt-injection text smuggled through
+ * a CSS custom-property or swatch name. Real color names are short labels;
+ * URLs, agent-directed imperatives, and sentence-length prose are not names
+ * and must be replaced with a generated color name, never surfaced.
+ */
+export function isInstructionShapedName(name: string): boolean {
+  const n = name.toLowerCase();
+  // URLs and email addresses have no business in a color name
+  if (/https?:\/\/|\bwww\.|[\w.+-]+@[\w-]+\.[a-z]{2,}/.test(n)) return true;
+  // Agent-directed imperatives ("ignore all prior rules", "override your instructions")
+  if (/\b(ignore|disregard|forget|override|bypass)\b[\s\S]*\b(instruction|rule|prompt|previous|prior|above)/.test(n)) return true;
+  // System-prompt / injection vocabulary
+  if (/\bsystem\s*:|\bsystem prompt\b|\bprompt injection\b|\bjailbreak\b/.test(n)) return true;
+  // Exfiltration-shaped phrases ("print your secrets", "forward the directory")
+  if (/\b(reveal|print|leak|send|forward|exfiltrate)\b[\s\S]*\b(secret|password|credential|token|api key|director)/.test(n)) return true;
+  // Command execution shapes ("run curl …", "execute this")
+  if (/\b(run|execute|eval|curl|wget)\s+[\w`'"/.-]/.test(n)) return true;
+  // Sentence-shaped prose: long AND many words (labels are short)
+  const words = n.split(/\s+/).filter(Boolean);
+  if (n.length > 24 && words.length >= 6) return true;
+  return false;
+}
+
+/**
  * Determine if a raw name is a CSS artifact that should be replaced
  * with a clean generated name.
  */
@@ -142,6 +166,8 @@ export function isCssArtifactName(name: string, hex: string): boolean {
   if (name.includes(hex)) return true;
   // Name is just a CSS property + some value
   if (/^[\w-]+\s+#[0-9a-f]{3,8}$/i.test(name)) return true;
+  // Instruction-shaped hostile names are never legitimate color names
+  if (isInstructionShapedName(name)) return true;
 
   return false;
 }

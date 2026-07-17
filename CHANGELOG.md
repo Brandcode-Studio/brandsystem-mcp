@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 0.13.0 (2026-07-17)
+
+Second-agent benchmarks, extraction quality fixes, and the dependency majors — individually triaged.
+
+### Added
+
+- **Second-agent benchmark** (`npm run eval -- --with-llm --scenario second-agent`). Measures the product's core promise: a fresh model given ONLY `brand_context` output (system-prompted as data, not instructions) produces content for 5 task fixtures; the real `brand_check` + `brand_check_compliance` score every artifact deterministically. Metrics: job completion rate, mean flags per artifact, token cost per artifact, meta-commentary count. First live run (claude-haiku-4-5): **5/5 compliance PASS, 0 flags, 144 output / 325 context tokens per artifact** (eval/RESULTS.md).
+- **First live negative-routing run:** false-positive invocation rate **0.0% (0/7)** on vocabulary-baited prompts — the anti-intrusiveness number, now measured.
+- `--scenario` flag (routing | second-agent | all) so LLM scenarios run independently.
+
+### Fixed (extraction gaps from #35, each flipping labeled corpus expectations)
+
+- **Dark chromatic colors can now be primary candidates.** `isChromatic()` rewritten to HSL (saturation ≥ 25%, lightness 8–90%): dark navy/forest/burgundy brands extract correctly; true near-blacks/whites/grays still excluded. Frequency still decides promotion.
+- **Generic web-safe fallbacks (Arial et al.) no longer leak** from font stacks — position-aware: dropped only as fallbacks (stack index > 0); a brand genuinely using Arial first still extracts it. Corpus font-precision threshold restored 0.6 → 0.95.
+- **Instruction-shaped extracted color names are replaced** with generated color names (URL/imperative/system-prompt/exfiltration patterns, >24-char multi-word prose) at both extraction-time naming and display cleaning; 48-char flatten kept as backstop.
+- Merge-collapse (one color per role, dual-theme loss) analyzed and deferred with a schema recommendation on #35 — a `(role, theme)` merge-key decision, not a patch.
+
+### Changed
+
+- **Dependency majors, individually triaged:** vitest 4.1, actions/checkout v7 + setup-node v7 (immutable SHA re-pins verified), puppeteer-core 25 (8-method stable API surface reviewed), pdfjs-dist 6 (gated by the real end-to-end PDF parse test in CI). TypeScript 7 investigated — the full project typechecks clean under 7.0.2 — and deliberately parked for a standalone 0.14 PR with dist-diff review (findings on PR #18).
+
+Tests: 859 → 896 passing.
+
 ## 0.12.0 (2026-07-17)
 
 Evidence release: unbiased evaluation infrastructure, real-transport testing, labeled extraction quality, and the end-to-end job scenario. No tool-surface changes.

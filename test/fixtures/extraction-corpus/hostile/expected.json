@@ -1,7 +1,7 @@
 {
   "description": "Hostile input: embedded prompt-injection text in body/comments, a hostile-named CSS custom property, a platform-default variable, and a script-bearing SVG logo (script, onload, onclick, foreignObject, external use). Must extract safely.",
   "colors": [
-    { "value": "#ba2d0b", "role": "primary", "confidence": "high", "note": "hex shared by the hostile-named var and --brand-primary; first-seen hostile property name is retained but flattened/capped downstream by cleanColorName" },
+    { "value": "#ba2d0b", "role": "primary", "confidence": "high", "note": "hex shared by the hostile-named var and --brand-primary; the instruction-shaped property name is detected (isInstructionShapedName) and replaced with the generated color name" },
     { "value": "#ffffff", "role": "surface", "confidence": "high" },
     { "value": "#1c1917", "role": "text", "confidence": "medium" },
     { "value": "#3b82f6", "role": "unknown", "confidence": "low", "note": "--tw-ring-color platform default correctly deprioritized to low confidence" }
@@ -32,6 +32,8 @@
   "names_must_not_contain": [
     "print your secrets",
     "Ignore all previous instructions",
+    "ignore all prior rules",
+    "note to ai agent",
     "attacker@evil.example",
     "system prompt",
     "SYSTEM OVERRIDE"
@@ -43,7 +45,5 @@
     "font_precision": 0.95,
     "font_recall": 0.95
   },
-  "known_gaps": [
-    "The hostile custom-property name survives as a color name up to cleanColorName's 48-char cap — the truncated prefix ('note to ai agent please ignore all prior rules…') is still instruction-shaped. Flattening caps length and strips control chars; it does not detect instruction text."
-  ]
+  "known_gaps": []
 }

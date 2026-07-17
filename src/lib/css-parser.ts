@@ -265,10 +265,15 @@ export function extractFromCSS(cssText: string): {
         const families = raw
           .split(",")
           .map((f) => f.trim().replace(/^["']|["']$/g, ""))
-          .filter((f) => !isSystemFont(f));
+          .filter((f) => f.length > 0 && !isSystemFont(f));
 
-        for (const family of families) {
-          fontMap.set(family, (fontMap.get(family) || 0) + 1);
+        // Generic web-safe fonts (Arial, Helvetica, Georgia, …) only count as
+        // brand signal when they lead the stack. Behind a distinctive first
+        // choice they are fallbacks, not brand fonts — a site whose only font
+        // IS Arial still extracts Arial.
+        for (let i = 0; i < families.length; i++) {
+          if (i > 0 && isGenericWebSafeFont(families[i])) continue;
+          fontMap.set(families[i], (fontMap.get(families[i]) || 0) + 1);
         }
       }
     },
@@ -380,6 +385,24 @@ function isSystemFont(name: string): boolean {
   return SYSTEM_FONTS.has(name.toLowerCase());
 }
 
+/**
+ * Generic web-safe fonts. Unlike SYSTEM_FONTS these are never filtered
+ * outright — a brand can legitimately use Arial — but when they appear as
+ * fallbacks in a stack behind a distinctive first-choice font they are noise,
+ * not brand signal. (Courier/Courier New are already in SYSTEM_FONTS.)
+ */
+const GENERIC_WEB_SAFE_FONTS = new Set([
+  "arial", "arial black", "helvetica", "helvetica neue",
+  "verdana", "tahoma", "trebuchet ms",
+  "times new roman", "times", "georgia", "garamond",
+  "palatino", "palatino linotype", "book antiqua",
+  "lucida grande", "lucida sans", "lucida sans unicode", "impact",
+]);
+
+export function isGenericWebSafeFont(name: string): boolean {
+  return GENERIC_WEB_SAFE_FONTS.has(name.toLowerCase());
+}
+
 // --- Color analysis utilities ---
 
 function hexToRGB(hex: string): { r: number; g: number; b: number } {
@@ -414,9 +437,29 @@ export function isNeutral(hex: string): boolean {
   return (Math.max(r, g, b) - Math.min(r, g, b)) < 30;
 }
 
-/** Has noticeable hue — not white, black, or gray */
+/** Hex → HSL saturation/lightness, both 0–100 */
+function hexToSL(hex: string): { s: number; l: number } {
+  const { r, g, b } = hexToRGB(hex);
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  return { s: s * 100, l: l * 100 };
+}
+
+/**
+ * Has noticeable hue. Saturation-based (not luminance-based) so dark brand
+ * colors — navy, forest green, burgundy — qualify as chromatic. The lightness
+ * band is deliberately wide: it only excludes true near-blacks (#000, #111)
+ * and near-whites (#fefefe); grays are excluded by the saturation floor.
+ */
 export function isChromatic(hex: string): boolean {
-  return !isNeutral(hex) && !isNearWhite(hex) && !isNearBlack(hex);
+  const { s, l } = hexToSL(hex);
+  return s >= 25 && l >= 8 && l <= 90;
 }
 
 /**
