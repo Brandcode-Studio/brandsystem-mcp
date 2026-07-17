@@ -132,6 +132,7 @@ async function handler(input: Params) {
 
   return {
     content: [...summaryImages, textResponse.content[0]],
+    structuredContent: textResponse.structuredContent,
   };
 }
 

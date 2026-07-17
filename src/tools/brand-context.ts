@@ -67,6 +67,33 @@ const paramsShape = {
 const ParamsSchema = z.object(paramsShape);
 type Params = z.infer<typeof ParamsSchema>;
 
+/**
+ * Per-tool output schema (0.11): tightest contract in the surface — the
+ * exemplar for gradually specializing other tools beyond the shared response
+ * envelope. Success fields are optional because error responses carry only
+ * the envelope + error code.
+ */
+export const CONTEXT_OUTPUT_SCHEMA = z
+  .object({
+    _metadata: z
+      .object({ what_happened: z.string(), next_steps: z.array(z.string()) })
+      .passthrough(),
+    context: z.record(z.unknown()).optional(),
+    matched_selectors: z
+      .object({
+        task_type: z.string(),
+        sections_selected: z.array(z.string()),
+        sections_missing: z.array(z.string()),
+        budget: z.string(),
+      })
+      .passthrough()
+      .optional(),
+    no_governed_match: z.boolean().optional(),
+    approval: z.string().optional(),
+    error: z.string().optional(),
+  })
+  .passthrough();
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.11.0 (2026-07-16)
+
+Reliable agent interoperability: protocol-native structured outputs, enforced token budgets, and a public agent-evaluation suite.
+
+### Added
+
+- **Structured outputs on every tool.** All responses now carry MCP `structuredContent` (mirroring the text payload, which remains the fallback), and every registration declares the response-envelope `outputSchema` (`{_metadata: {what_happened, next_steps}, ...data}`) via a single registration choke point — the SDK validates every response against it. `brand_context` ships the first stabilized per-tool schema as the exemplar; others specialize over time via `TOOL_OUTPUT_SCHEMAS`.
+- **Enforced token budgets** (`test/response-budgets.test.ts`). Budgets are token estimates (~4 chars each) set from measured actuals with headroom; the tests fail on breach and the numbers are not to be raised without a deliberate decision. `brand_status` getting-started: ≤950; recurring with-brand status: ≤850 (measured 808 on the maximal all-sessions fixture); `brand_context` standard ≤900 / compact ≤500.
+- **Public agent-evaluation suite** (`eval/`, `npm run eval`). Fixtures from real user prompts (first-tool selection), labeled compliance cases derived from the test brand, and a runnable harness with two tiers: deterministic (CI-safe — budgets, envelope conformance, second-agent runtime usability, compliance accuracy) and model-dependent (first-tool selection via the Claude API, opt-in, results stamped with model + date). The repo ships fixtures and methodology; results are published only from actual runs.
+
+### Changed
+
+- **Compact JSON serialization** for all tool responses (~25% token reduction on every response at zero information loss; agents parse, they don't read indentation).
+- **No more mid-JSON truncation.** Oversized responses now elide their largest data values behind a structured `response_overflow` marker (with original size and retrieval hint) — the payload stays valid JSON at every size.
+- **`brand_status` slimmed** — 1830 → ~880 tokens (getting-started) and 1567 → ~810 (maximal with-brand): removed the 30-line tool list (agents have `listTools`), compressed session overviews, moved the `tool_sessions` taxonomy to the getting-started response only, and reduced structured recovery data to readiness (formatted guidance stays in `status`, top actions in `next_steps`).
+- **Taint-audit carryovers closed:** `brand_write` responses carry a `brief_provenance` evidence envelope (approval level, `instructional: false`, data-not-commands note); `cleanColorName` flattens control characters and caps length on extracted color names (hostile CSS custom-property/Figma swatch names can no longer smuggle multi-line content into VIM/exports/DESIGN.md); interaction-policy rule presentation reviewed — covered by approval surfacing + the provenance-integrity detector, no further change.
+
+### Migration notes
+
+- Tool response text is now compact JSON (no indentation). Anything parsing it is unaffected; anything regex-matching pretty-printed layout must switch to parsing.
+- Recurring `brand_status` calls no longer include `tool_sessions`; read it from the getting-started (no `.brand/`) response or `listTools`.
+
 ## 0.10.0 (2026-07-16)
 
 Agent-first product surface. One breaking-by-default change: the server now registers the **Core profile** (12 tools) unless the full authoring surface is requested.

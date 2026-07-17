@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
 import { CORE_TOOL_NAMES, resolveProfile, type ToolProfile } from "./lib/tool-profile.js";
+import { RESPONSE_ENVELOPE_SCHEMA } from "./lib/response.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
@@ -34,7 +35,12 @@ import { register as registerAuditContent } from "./tools/brand-audit-content.js
 import { register as registerCheckCompliance } from "./tools/brand-check-compliance.js";
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 import { register as registerRuntime } from "./tools/brand-runtime.js";
-import { register as registerContext } from "./tools/brand-context.js";
+import { register as registerContext, CONTEXT_OUTPUT_SCHEMA } from "./tools/brand-context.js";
+
+/** Tools with stabilized per-tool output schemas (beyond the shared envelope). */
+const TOOL_OUTPUT_SCHEMAS: Record<string, unknown> = {
+  brand_context: CONTEXT_OUTPUT_SCHEMA,
+};
 import { register as registerCheck } from "./tools/brand-check.js";
 import { register as registerPreview } from "./tools/brand-preview.js";
 import { register as registerExtractVisual } from "./tools/brand-extract-visual.js";
@@ -56,19 +62,40 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
     version: getVersion(),
   });
 
-  // Core profile: intercept registration so only core tools register.
-  // register() functions are unchanged — filtering happens at the choke
-  // point, and the full profile is a pure superset (verified by test).
-  if (profile === "core") {
-    const originalTool = server.tool.bind(server) as (...args: unknown[]) => unknown;
-    (server as unknown as { tool: (...args: unknown[]) => unknown }).tool = (
-      ...args: unknown[]
-    ) => {
-      const name = args[0] as string;
-      if (!CORE_TOOL_NAMES.has(name)) return undefined;
-      return originalTool(...args);
+  // Registration choke point. Every register() calls server.tool() in one of
+  // two shapes: (name, desc, params, annotations, cb) or, for zero-param
+  // tools, (name, desc, annotations, cb). We intercept to:
+  //   1. filter to the core set when the core profile is active, and
+  //   2. translate to registerTool() so every tool declares the response
+  //      envelope outputSchema — buildResponse always supplies a matching
+  //      structuredContent, so declared-schema validation always passes.
+  const registerToolBound = server.registerTool.bind(server) as (
+    name: string,
+    config: Record<string, unknown>,
+    cb: unknown
+  ) => unknown;
+  (server as unknown as { tool: (...args: unknown[]) => unknown }).tool = (
+    ...args: unknown[]
+  ) => {
+    const name = args[0] as string;
+    if (profile === "core" && !CORE_TOOL_NAMES.has(name)) return undefined;
+    const description = args[1] as string;
+    const cb = args[args.length - 1];
+    const config: Record<string, unknown> = {
+      description,
+      // Per-tool schemas override the shared envelope as they stabilize.
+      outputSchema: TOOL_OUTPUT_SCHEMAS[name] ?? RESPONSE_ENVELOPE_SCHEMA,
     };
-  }
+    if (args.length === 5) {
+      config.inputSchema = args[2];
+      config.annotations = args[3];
+    } else if (args.length === 4) {
+      config.annotations = args[2];
+    }
+    const annotations = config.annotations as { title?: string } | undefined;
+    if (annotations?.title) config.title = annotations.title;
+    return registerToolBound(name, config, cb);
+  };
 
   // ── Entry points (register first — agents see these first) ──
   registerStart(server);       // #1: Entry point for new brands

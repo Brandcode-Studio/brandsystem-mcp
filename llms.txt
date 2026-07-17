@@ -37,6 +37,8 @@ Tested in production: visual consistency is near-instant from the runtime. Voice
 - Enforce: brand_audit_content (0-100 scoring), brand_check_compliance (pass/fail gate), brand_preflight (HTML/CSS rules), provenance-integrity detection in brand_audit
 - Profiles: Core (12 tools, default — the complete adopt→create→check loop) or full (entire authoring system, BRANDSYSTEM_PROFILE=full)
 - Setup: npx @brandsystem/mcp doctor | install --client <claude-code|cursor|windsurf|claude-desktop> | inspect
+- Protocol-native: every response carries MCP structuredContent with a declared envelope outputSchema; compact JSON; enforced token budgets on entry tools; structured overflow markers instead of truncation
+- Evidence: public agent-evaluation suite in eval/ (fixtures + methodology + runnable harness, npm run eval); results published only from actual runs
 - Subscribe: brand://runtime and brand://policy as MCP resources
 - Connect: sync with hosted brands on Brandcode Studio; Live Mode refreshes reads from the hosted runtime within a short cache TTL (brand_brandcode_connect, brand_brandcode_sync, brand_brandcode_live)
 - Deploy: the `.brand/` directory is the product — works standalone, syncs to a team via Brandcode Studio, and travels unchanged to every consumption surface

@@ -949,6 +949,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
         } as unknown as { type: "text"; text: string },
         textContent,
       ],
+      structuredContent: textResponse.structuredContent,
     };
   }
 

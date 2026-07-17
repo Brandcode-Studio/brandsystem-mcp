@@ -213,6 +213,7 @@ async function handler(input: Params) {
       } as unknown as { type: "text"; text: string },
       textContent,
     ],
+    structuredContent: textData.structuredContent,
   };
 }
 

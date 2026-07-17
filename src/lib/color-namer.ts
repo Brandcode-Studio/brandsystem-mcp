@@ -154,5 +154,13 @@ export function cleanColorName(color: { name: string; value: string; role: strin
   if (isCssArtifactName(color.name, color.value)) {
     return generateColorName(color.value, color.role);
   }
-  return color.name;
+  // Extracted names are untrusted: flatten control characters/newlines and
+  // cap length so a hostile CSS custom-property or Figma swatch name cannot
+  // smuggle multi-line content into VIM/exports/DESIGN.md as a "name".
+  const flattened = color.name
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (flattened.length === 0) return generateColorName(color.value, color.role);
+  return flattened.length > 48 ? `${flattened.slice(0, 47)}…` : flattened;
 }

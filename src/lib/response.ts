@@ -6,6 +6,8 @@ import { trackToolCall as _trackToolCall } from "./telemetry.js";
 export { trackToolCall, startToolTimer } from "./telemetry.js";
 
 const MAX_RESPONSE_CHARS = 50000;
+/** Standard per-response token target; entry tools have tighter budgets in tests. */
+const RESPONSE_TOKEN_WARN = 1250;
 
 /**
  * Parse an answers parameter that may arrive as a JSON string, a plain object,
@@ -72,8 +74,30 @@ export async function checkOnramp(options?: { studioBaseUrl?: string }): Promise
   return _cachedOnramp;
 }
 
+/**
+ * Response envelope shape, exposed for outputSchema declaration at the
+ * registration choke point (server.ts). structuredContent always matches:
+ * { _metadata: { what_happened, next_steps }, ...tool data keys }.
+ */
+export const RESPONSE_ENVELOPE_SCHEMA = z
+  .object({
+    _metadata: z
+      .object({
+        what_happened: z.string(),
+        next_steps: z.array(z.string()),
+      })
+      .passthrough(),
+  })
+  .passthrough(); // tool data keys live at the top level alongside _metadata
+
+/** Rough token estimate for budget discipline (~4 chars/token). */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
 export function buildResponse(input: McpResponseData): {
   content: Array<{ type: "text"; text: string }>;
+  structuredContent: Record<string, unknown>;
 } {
   const output: Record<string, unknown> = {
     _metadata: {
@@ -95,26 +119,35 @@ export function buildResponse(input: McpResponseData): {
     };
   }
 
-  // Response size discipline: warn if over 5K chars
-  let text = JSON.stringify(output, null, 2);
-  if (text.length > 5000) {
+  // Response budget discipline (tokens, ~4 chars each): warn past the
+  // standard target; never truncate mid-JSON — oversized responses drop
+  // their largest data values behind a structured overflow marker instead,
+  // so the payload stays valid JSON and the agent knows exactly what was
+  // elided and how to get it back.
+  // Compact serialization: agents parse, humans rarely read this raw, and
+  // indentation costs ~25% of every response's token budget.
+  let text = JSON.stringify(output);
+  if (estimateTokens(text) > RESPONSE_TOKEN_WARN) {
     console.error(
-      `[brandsystem] Response size ${text.length} chars exceeds 5K target`
+      `[brandsystem] Response ~${estimateTokens(text)} tokens exceeds ${RESPONSE_TOKEN_WARN}-token target`
     );
   }
 
-  // Hard truncation with warning for very large responses
-  if (text.length > MAX_RESPONSE_CHARS) {
-    output["response_size_warning"] = {
-      original_chars: text.length,
-      truncated_to: MAX_RESPONSE_CHARS,
-      message: "Response was truncated. Some data may be missing. Use more specific parameters to reduce response size.",
+  while (text.length > MAX_RESPONSE_CHARS) {
+    const candidates = Object.entries(output)
+      .filter(([k]) => k !== "_metadata" && k !== "response_overflow")
+      .map(([k, v]) => [k, JSON.stringify(v)?.length ?? 0] as const)
+      .sort((a, b) => b[1] - a[1]);
+    if (candidates.length === 0 || candidates[0][1] < 256) break;
+    const [largestKey, size] = candidates[0];
+    const overflow = (output["response_overflow"] ??= {}) as Record<string, unknown>;
+    overflow[largestKey] = {
+      elided: true,
+      original_chars: size,
+      message: `Value elided to stay under the response limit. Re-run with narrower parameters (e.g. a slice, page, or filter) to retrieve "${largestKey}".`,
     };
-    // Re-serialize with warning included, then truncate
-    text = JSON.stringify(output, null, 2);
-    if (text.length > MAX_RESPONSE_CHARS) {
-      text = text.substring(0, MAX_RESPONSE_CHARS) + "\n...[TRUNCATED]";
-    }
+    delete output[largestKey];
+    text = JSON.stringify(output);
   }
 
   // Auto-telemetry: track every tool response (opt-in via BRANDSYSTEM_TELEMETRY)
@@ -127,5 +160,8 @@ export function buildResponse(input: McpResponseData): {
 
   return {
     content: [{ type: "text", text }],
+    // Structured twin of the text payload (MCP structuredContent). Same
+    // object — clients get typed access, text remains the fallback.
+    structuredContent: output,
   };
 }
