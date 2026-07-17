@@ -1,0 +1,40 @@
+{
+  "description": "Messy site: no custom properties, colors only as shorthand hex (#e63) and rgb() in style blocks plus inline style attributes, fonts only via inline styles, no logo (favicon link only).",
+  "colors": [
+    { "value": "#ee6633", "role": "primary", "confidence": "medium", "note": "no role naming anywhere — promoted to primary by chromatic frequency" },
+    { "value": "#fdf6ec", "role": "surface", "confidence": "high" },
+    { "value": "#ffffff", "role": ["text", "surface"], "confidence": "high", "note": "used as text-on-primary; role 'text' is the extractor's defensible read" },
+    { "value": "#222222", "role": "text", "known_gap": true, "note": "body text color loses the single text role slot to the more frequent #ffffff" },
+    { "value": "#40312a", "role": ["neutral", "text"], "known_gap": true, "note": "dark brown reads as near-black neutral; dropped by the one-color-per-role merge" }
+  ],
+  "fonts": [
+    { "family": "Work Sans", "confidence": "low" },
+    { "family": "Barlow Condensed", "confidence": "low" }
+  ],
+  "suggested_primary": "#ee6633",
+  "chromatic_candidates_include": ["#ee6633"],
+  "logo": {
+    "inline_svg_found": false,
+    "candidate_types_include": ["favicon"]
+  },
+  "clarifications": {
+    "count": 4,
+    "question_substrings": [
+      "Work Sans",
+      "Barlow Condensed",
+      "low confidence",
+      "No logo detected"
+    ]
+  },
+  "thresholds": {
+    "color_precision": 0.95,
+    "color_recall": 0.95,
+    "role_accuracy": 0.95,
+    "font_precision": 0.6,
+    "font_recall": 0.95
+  },
+  "known_gaps": [
+    "Generic fallback font 'Arial' leaks through extraction (not in the system-font blocklist) — measured font precision 2/3, threshold set to 0.6.",
+    "Dark text colors #222222 and #40312a are extracted but lost to the one-color-per-role merge."
+  ]
+}

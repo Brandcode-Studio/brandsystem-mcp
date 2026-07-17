@@ -178,6 +178,20 @@ async function handler(input: Params) {
   });
 }
 
+/** Per-tool output schema (0.12); success fields optional, passthrough for compat. */
+export const RUNTIME_OUTPUT_SCHEMA = z
+  .object({
+    _metadata: z
+      .object({ what_happened: z.string(), next_steps: z.array(z.string()) })
+      .passthrough(),
+    runtime: z.record(z.unknown()).optional(),
+    approval: z.string().optional(),
+    agent_tip: z.string().optional(),
+    runtime_origin: z.string().optional(),
+    error: z.string().optional(),
+  })
+  .passthrough();
+
 export function register(server: McpServer) {
   server.tool(
     "brand_runtime",

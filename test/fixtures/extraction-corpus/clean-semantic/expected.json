@@ -1,0 +1,34 @@
+{
+  "description": "Clean semantic site: CSS custom properties with role-named variables (--brand-primary, --accent-color), two web fonts, inline SVG logo in header.",
+  "colors": [
+    { "value": "#0f62fe", "role": "primary", "confidence": "high" },
+    { "value": "#6f2dbd", "role": "secondary", "confidence": "high" },
+    { "value": "#ff7f11", "role": "accent", "confidence": "high" },
+    { "value": "#f4f4f4", "role": "surface", "confidence": "high" },
+    { "value": "#161616", "role": "text", "confidence": "high" },
+    { "value": "#ffffff", "role": "surface", "known_gap": true, "note": "mergeColor keeps one color per role — body white folds into the surface slot already held by --surface-muted #f4f4f4" }
+  ],
+  "fonts": [
+    { "family": "Source Sans Pro", "confidence": "medium" },
+    { "family": "Fraunces", "confidence": "medium" }
+  ],
+  "suggested_primary": null,
+  "chromatic_candidates_include": ["#0f62fe", "#6f2dbd", "#ff7f11"],
+  "logo": {
+    "inline_svg_found": true,
+    "chosen_type": "selector-svg",
+    "sanitized_must_contain": ["<svg", "Northwind"],
+    "sanitized_must_not_contain": ["<script", "onload"]
+  },
+  "clarifications": { "count": 0 },
+  "thresholds": {
+    "color_precision": 0.95,
+    "color_recall": 0.95,
+    "role_accuracy": 0.95,
+    "font_precision": 0.95,
+    "font_recall": 0.95
+  },
+  "known_gaps": [
+    "Single-slot-per-role merge: #ffffff (body background) is extracted but dropped because #f4f4f4 already occupies the surface role."
+  ]
+}

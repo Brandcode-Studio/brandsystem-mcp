@@ -1,0 +1,30 @@
+{
+  "description": "Logo variants: inline SVG logo in header plus img candidate, SVG favicon, og:image, apple-touch-icon — and decoy icon SVGs (hamburger, social) that must be filtered out.",
+  "colors": [
+    { "value": "#b45309", "role": "primary", "confidence": "high" },
+    { "value": "#57534e", "role": "neutral", "confidence": "high" },
+    { "value": "#fafaf9", "role": "surface", "confidence": "high" },
+    { "value": "#292524", "role": "text", "confidence": "medium" }
+  ],
+  "fonts": [
+    { "family": "Archivo", "confidence": "medium" }
+  ],
+  "suggested_primary": null,
+  "chromatic_candidates_include": ["#b45309"],
+  "logo": {
+    "inline_svg_found": true,
+    "chosen_type": "selector-svg",
+    "candidate_types_include": ["selector-svg", "svg-favicon", "selector-img", "og-image", "apple-touch-icon"],
+    "sanitized_must_contain": ["<svg", "Quarry Supply"],
+    "sanitized_must_not_contain": ["<script", "onload", "M2 5h16"]
+  },
+  "clarifications": { "count": 0 },
+  "thresholds": {
+    "color_precision": 0.95,
+    "color_recall": 0.95,
+    "role_accuracy": 0.95,
+    "font_precision": 0.95,
+    "font_recall": 0.95
+  },
+  "known_gaps": []
+}

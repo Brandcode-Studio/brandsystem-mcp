@@ -1,0 +1,34 @@
+{
+  "description": "Dual light/dark palette via :root and [data-theme=dark] custom properties sharing variable names — exercises theme-variant color capture.",
+  "colors": [
+    { "value": "#7c3aed", "role": "primary", "confidence": "high" },
+    { "value": "#22d3ee", "role": "accent", "confidence": "high" },
+    { "value": "#ffffff", "role": "surface", "confidence": "high" },
+    { "value": "#1a1a2e", "role": "text", "confidence": "high" },
+    { "value": "#0f0f1a", "role": "surface", "known_gap": true, "note": "dark-theme background: extracted from [data-theme=dark] --color-bg but dropped by the one-color-per-role merge (light surface wins)" },
+    { "value": "#e2e8f0", "role": "text", "known_gap": true, "note": "dark-theme text: same single-slot-per-role collapse" }
+  ],
+  "fonts": [
+    { "family": "Inter", "confidence": "medium" },
+    { "family": "Spectral", "confidence": "medium" }
+  ],
+  "suggested_primary": null,
+  "chromatic_candidates_include": ["#7c3aed", "#22d3ee"],
+  "logo": {
+    "inline_svg_found": true,
+    "chosen_type": "selector-svg",
+    "sanitized_must_contain": ["<svg", "Lumen"],
+    "sanitized_must_not_contain": ["<script", "onload"]
+  },
+  "clarifications": { "count": 0 },
+  "thresholds": {
+    "color_precision": 0.95,
+    "color_recall": 0.95,
+    "role_accuracy": 0.95,
+    "font_precision": 0.95,
+    "font_recall": 0.95
+  },
+  "known_gaps": [
+    "Dual-theme palettes collapse: the one-color-per-role merge keeps only the light-theme surface/text; #0f0f1a and #e2e8f0 (dark theme) are extracted upstream but never reach the merged identity."
+  ]
+}

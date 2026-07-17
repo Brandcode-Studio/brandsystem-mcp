@@ -13,3 +13,4 @@ specs/brand-extraction-*.md
 .env*.local
 .gstack/
 eval/results/
+eval/dogfood/*.jsonl

@@ -36,10 +36,16 @@ import { register as registerCheckCompliance } from "./tools/brand-check-complia
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 import { register as registerRuntime } from "./tools/brand-runtime.js";
 import { register as registerContext, CONTEXT_OUTPUT_SCHEMA } from "./tools/brand-context.js";
+import { STATUS_OUTPUT_SCHEMA } from "./tools/brand-status.js";
+import { RUNTIME_OUTPUT_SCHEMA } from "./tools/brand-runtime.js";
+import { CHECK_OUTPUT_SCHEMA } from "./tools/brand-check.js";
 
 /** Tools with stabilized per-tool output schemas (beyond the shared envelope). */
 const TOOL_OUTPUT_SCHEMAS: Record<string, unknown> = {
   brand_context: CONTEXT_OUTPUT_SCHEMA,
+  brand_status: STATUS_OUTPUT_SCHEMA,
+  brand_runtime: RUNTIME_OUTPUT_SCHEMA,
+  brand_check: CHECK_OUTPUT_SCHEMA,
 };
 
 /**
