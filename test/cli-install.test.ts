@@ -81,6 +81,12 @@ describe("resolveConfigPath", () => {
     );
   });
 
+  it("uses Cline's shared MCP settings path", () => {
+    expect(resolveConfigPath("cline", dir, home)).toBe(
+      join(home, ".cline", "data", "settings", "cline_mcp_settings.json"),
+    );
+  });
+
   it("reports the shared Codex config path", () => {
     expect(resolveConfigPath("codex", dir, home)).toBe(
       join(home, ".codex", "config.toml"),
@@ -336,6 +342,43 @@ describe("runInstall", () => {
       ),
     );
     expect(written.mcpServers.brandsystem).toEqual(buildServerEntry("core"));
+  });
+
+  it("writes Cline's shared MCP settings and preserves existing servers", async () => {
+    const fakeHome = join(dir, "home");
+    const target = join(
+      fakeHome,
+      ".cline",
+      "data",
+      "settings",
+      "cline_mcp_settings.json",
+    );
+    await mkdir(join(fakeHome, ".cline", "data", "settings"), {
+      recursive: true,
+    });
+    await writeFile(
+      target,
+      JSON.stringify({
+        mcpServers: { existing: { command: "existing", args: [] } },
+      }),
+    );
+
+    const code = await runInstall({
+      client: "cline",
+      write: true,
+      profile: "core",
+      cwd: dir,
+      home: fakeHome,
+    });
+
+    expect(code).toBe(0);
+    const written = JSON.parse(await readFile(target, "utf-8"));
+    expect(written.mcpServers.existing).toEqual({
+      command: "existing",
+      args: [],
+    });
+    expect(written.mcpServers.brandsystem).toEqual(buildServerEntry("core"));
+    expect(loggedOutput()).toContain("Start a new Cline task");
   });
 });
 

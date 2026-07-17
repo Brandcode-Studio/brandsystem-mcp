@@ -21,9 +21,12 @@ npx @brandsystem/mcp install --client codex --write
 
 # Claude Code, Cursor, Windsurf, or Claude Desktop
 npx @brandsystem/mcp install --client claude-code --write
+
+# Cline
+npx @brandsystem/mcp install --client cline --write
 ```
 
-`install` is a dry run unless you pass `--write`. Replace `claude-code` with `cursor`, `windsurf`, or `claude-desktop` as needed. The installer preserves existing JSON client settings; Codex setup delegates to the official `codex mcp add` command.
+`install` is a dry run unless you pass `--write`. Replace `claude-code` with `cline`, `cursor`, `windsurf`, or `claude-desktop` as needed. The installer preserves existing JSON client settings; Codex setup delegates to the official `codex mcp add` command. Agents can follow the compact [installation guide](llms-install.md) without reading this entire README.
 
 Already configured? Tell your agent:
 
@@ -266,6 +269,7 @@ The npm package ships a CLI entrypoint for setup, diagnostics, and the hosted-br
 ```bash
 npx @brandsystem/mcp doctor                      # local checkup: Node, profile, .brand/ state, credential permissions, client configs
 npx @brandsystem/mcp install --client claude-code # write MCP config (dry-run by default; add --write to apply, existing config backed up)
+npx @brandsystem/mcp install --client cline --write
 npx @brandsystem/mcp install --client cursor --profile full
 npx @brandsystem/mcp inspect                     # version, profile, tool list, .brand/ artifact inventory
 
@@ -337,6 +341,16 @@ npx @brandsystem/mcp install --client codex --write
 ```
 
 Start a new Codex task after installation. Codex CLI, the Codex app, and the IDE extension share the same MCP configuration.
+
+### Cline
+
+Use the package installer to merge Brandsystem into Cline's shared MCP settings without replacing other servers:
+
+```bash
+npx @brandsystem/mcp install --client cline --write
+```
+
+Start a new Cline task, then ask: **“How do I use my brand guidelines with AI?”** Cline CLI and the IDE extension share the same global configuration at `~/.cline/data/settings/cline_mcp_settings.json`.
 
 ### Claude Code
 

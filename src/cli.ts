@@ -3,7 +3,7 @@
  *
  * Usage:
  *   npx @brandsystem/mcp doctor
- *   npx @brandsystem/mcp install --client <claude-code|codex|cursor|windsurf|claude-desktop> [--write] [--profile core|full]
+ *   npx @brandsystem/mcp install --client <claude-code|cline|codex|cursor|windsurf|claude-desktop> [--write] [--profile core|full]
  *   npx @brandsystem/mcp inspect
  *   npx @brandsystem/mcp brandcode connect <url> [--share-token=TOKEN]
  *   npx @brandsystem/mcp brandcode sync [--share-token=TOKEN]
@@ -43,7 +43,7 @@ Commands:
   doctor                     Run a local environment checkup (Node version,
                              profile, .brand/ state, credentials, MCP configs)
   install --client <name>    Write the MCP client config for this package.
-                             Clients: claude-code, codex, cursor, windsurf,
+                             Clients: claude-code, cline, codex, cursor, windsurf,
                              claude-desktop.
                              Dry-run by default; pass --write to apply.
   inspect                    Print package version, resolved tool profile,

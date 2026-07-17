@@ -19,6 +19,7 @@ import type { ToolProfile } from "../lib/tool-profile.js";
 
 export const INSTALL_CLIENTS = [
   "claude-code",
+  "cline",
   "codex",
   "cursor",
   "windsurf",
@@ -78,6 +79,14 @@ export function resolveConfigPath(
   switch (client) {
     case "claude-code":
       return join(cwd, ".mcp.json");
+    case "cline":
+      return join(
+        home,
+        ".cline",
+        "data",
+        "settings",
+        "cline_mcp_settings.json",
+      );
     case "codex":
       return join(home, ".codex", "config.toml");
     case "cursor":
@@ -271,6 +280,8 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
   console.log(`Wrote "brandsystem" server entry to ${target}`);
   if (opts.client === "claude-desktop") {
     console.log(`Restart Claude Desktop to pick up the new server.`);
+  } else if (opts.client === "cline") {
+    console.log(`Start a new Cline task to pick up the new server.`);
   }
   return 0;
 }

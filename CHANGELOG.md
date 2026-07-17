@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.13.1 (2026-07-17)
+
+### Added
+
+- Cline-native installation via `npx @brandsystem/mcp install --client cline --write`, with safe merge and backup behavior for Cline's shared MCP settings.
+- `llms-install.md`, a compact agent-readable setup and verification contract, plus a dedicated 400 x 400 marketplace icon.
+
 ## 0.13.0 (2026-07-17)
 
 Second-agent benchmarks, extraction quality fixes, and the dependency majors — individually triaged.

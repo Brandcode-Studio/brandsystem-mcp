@@ -219,11 +219,12 @@ describe("checkAuthFile", () => {
 describe("checkClientConfigs", () => {
   it("suggests install when no configs exist", async () => {
     const checks = await checkClientConfigs(dir, dir);
-    expect(checks).toHaveLength(3);
+    expect(checks).toHaveLength(4);
     expect(checks.every((c) => c.status === "ok")).toBe(true);
     expect(checks[0].message).toContain("install --client claude-code");
     expect(checks[1].message).toContain("install --client codex");
-    expect(checks[2].message).toContain("install --client cursor");
+    expect(checks[2].message).toContain("install --client cline");
+    expect(checks[3].message).toContain("install --client cursor");
   });
 
   it("finds a brandsystem entry in .mcp.json", async () => {
@@ -269,6 +270,23 @@ describe("checkClientConfigs", () => {
     const codexCheck = checks.find((c) => c.message.includes("Codex"));
     expect(codexCheck?.status).toBe("ok");
     expect(codexCheck?.message).toContain('"brandsystem" server entry');
+  });
+
+  it("finds a brandsystem entry in Cline's shared MCP settings", async () => {
+    const settingsDir = join(dir, ".cline", "data", "settings");
+    await mkdir(settingsDir, { recursive: true });
+    await writeFile(
+      join(settingsDir, "cline_mcp_settings.json"),
+      JSON.stringify({
+        mcpServers: {
+          brandsystem: { command: "npx", args: ["-y", "@brandsystem/mcp"] },
+        },
+      }),
+    );
+    const checks = await checkClientConfigs(dir, dir);
+    const clineCheck = checks.find((c) => c.message.includes("Cline"));
+    expect(clineCheck?.status).toBe("ok");
+    expect(clineCheck?.message).toContain('"brandsystem" server entry');
   });
 });
 

@@ -15,6 +15,7 @@ const ALLOWLIST: RegExp[] = [
   /^README\.md$/i,
   /^LICENSE$/i,
   /^llms\.txt$/,
+  /^llms-install\.md$/,
 ];
 
 const DENYLIST: RegExp[] = [
