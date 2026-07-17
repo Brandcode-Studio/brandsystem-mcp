@@ -232,7 +232,13 @@ describe("checkClientConfigs", () => {
       join(dir, ".mcp.json"),
       JSON.stringify({
         mcpServers: {
-          brandsystem: { command: "npx", args: ["-y", "@brandsystem/mcp"] },
+          brandsystem: {
+            transport: {
+              type: "stdio",
+              command: "npx",
+              args: ["-y", "@brandsystem/mcp"],
+            },
+          },
         },
       }),
     );

@@ -2,11 +2,17 @@
 
 ## Unreleased
 
+## 0.13.2 (2026-07-17)
+
+### Fixed
+
+- Cline installation now delegates to `cline mcp install` so Cline owns its evolving MCP settings schema. The 0.13.1 direct entry used the legacy `{ command, args }` shape, which Cline CLI 3.0.44 did not attach.
+
 ## 0.13.1 (2026-07-17)
 
 ### Added
 
-- Cline-native installation via `npx @brandsystem/mcp install --client cline --write`, with safe merge and backup behavior for Cline's shared MCP settings.
+- Cline-native installation via `npx @brandsystem/mcp install --client cline --write`.
 - `llms-install.md`, a compact agent-readable setup and verification contract, plus a dedicated 400 x 400 marketplace icon.
 
 ## 0.13.0 (2026-07-17)
