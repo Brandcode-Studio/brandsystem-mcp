@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
@@ -341,6 +342,20 @@ async function handler() {
     },
   });
 }
+
+/** Per-tool output schema (0.12); covers both getting-started and status paths. */
+export const STATUS_OUTPUT_SCHEMA = z
+  .object({
+    _metadata: z
+      .object({ what_happened: z.string(), next_steps: z.array(z.string()) })
+      .passthrough(),
+    status: z.string().optional(),
+    recovery: z.object({ readiness: z.number() }).passthrough().optional(),
+    tool_sessions: z.array(z.object({ name: z.string(), tools: z.array(z.string()) })).optional(),
+    getting_started: z.record(z.unknown()).optional(),
+    error: z.string().optional(),
+  })
+  .passthrough();
 
 export function register(server: McpServer) {
   server.tool(

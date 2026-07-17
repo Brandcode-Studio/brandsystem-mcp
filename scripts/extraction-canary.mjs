@@ -1,18 +1,42 @@
 #!/usr/bin/env node
 /**
- * Lane I — Extraction Quality Audit
- * Runs brand_start auto mode against 10 real brands and captures structured results.
+ * Extraction canary — live-yield, NON-BLOCKING lane.
  *
- * Usage: node scripts/extraction-audit.mjs
- * Output: scripts/audit-results/ directory with per-brand JSON + summary report
+ * Runs brand_start auto mode against 10 real (drifting) public websites and
+ * captures yield metrics (colors/fonts/logo present). This measures YIELD, not
+ * correctness — the labeled, release-gating lane is the deterministic corpus in
+ * test/extraction-quality.test.ts + test/fixtures/extraction-corpus/.
+ *
+ * This script never exits non-zero: network failures and per-site errors are
+ * reported in the results, not thrown. It is intentionally excluded from
+ * `npm test`.
+ *
+ * Usage:
+ *   node scripts/extraction-canary.mjs                       # run all 10 sites
+ *   node scripts/extraction-canary.mjs --limit 2             # run first N sites
+ *   node scripts/extraction-canary.mjs --compare <baseline-summary.json> <current-summary.json>
+ *                                                            # print per-site yield deltas (markdown)
+ *
+ * Output: scripts/audit-results/ directory with per-brand JSON + summary.json
  */
 
-import { createServer } from "../dist/server.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { mkdtemp, rm, readFile, readdir, writeFile, mkdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+const LANE = "canary (live-yield, non-blocking)";
+
+function packageVersion() {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(import.meta.dirname, "..", "package.json"), "utf-8"),
+    );
+    return pkg.version ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
 
 // 10 brands spanning different CSS patterns, industries, and complexity
 const BRANDS = [
@@ -29,8 +53,13 @@ const BRANDS = [
 ];
 
 async function runExtraction(brand) {
+  // Lazy imports so `--compare` mode works without a built dist/
+  const { createServer } = await import("../dist/server.js");
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+
   // Create a temp directory for this brand
-  const tmpDir = await mkdtemp(join(tmpdir(), `audit-${brand.name.toLowerCase()}-`));
+  const tmpDir = await mkdtemp(join(tmpdir(), `canary-${brand.name.toLowerCase()}-`));
 
   // Monkey-patch process.cwd for this extraction
   const originalCwd = process.cwd;
@@ -38,7 +67,7 @@ async function runExtraction(brand) {
 
   const server = createServer();
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "audit", version: "1.0.0" });
+  const client = new Client({ name: "canary", version: "1.0.0" });
 
   await server.connect(serverTransport);
   await client.connect(clientTransport);
@@ -117,27 +146,137 @@ async function runExtraction(brand) {
   };
 }
 
+// ── Baseline comparison (--compare) ─────────────────────────────
+// Prints per-site yield deltas as markdown (for the GitHub job summary).
+// Regressions WARN — this never exits non-zero.
+
+function yieldRow(r) {
+  return {
+    colors: r?.colors?.length ?? 0,
+    fonts: r?.fonts?.length ?? 0,
+    logo: r?.logo_found ? 1 : 0,
+    quality: r?.extraction_quality?.points ?? 0,
+    error: r?.error ?? null,
+  };
+}
+
+function compareSummaries(baselinePath, currentPath) {
+  let baseline, current;
+  try {
+    baseline = JSON.parse(readFileSync(baselinePath, "utf-8"));
+  } catch (err) {
+    console.log(`No usable baseline at ${baselinePath} (${err.message}) — skipping comparison.`);
+    return;
+  }
+  try {
+    current = JSON.parse(readFileSync(currentPath, "utf-8"));
+  } catch (err) {
+    console.log(`No usable current summary at ${currentPath} (${err.message}) — skipping comparison.`);
+    return;
+  }
+
+  const baseByBrand = new Map((baseline.results ?? []).map((r) => [r.brand, r]));
+  const warnings = [];
+
+  console.log(`## Extraction canary — yield vs baseline`);
+  console.log("");
+  console.log(`Lane: ${LANE}. Regressions are warnings only — this job never fails on yield.`);
+  console.log("");
+  console.log(`Baseline: v${baseline.version ?? "?"} (${baseline.date ?? "unknown date"}) → Current: v${current.version ?? "?"} (${current.date ?? "unknown date"})`);
+  console.log("");
+  console.log("| Site | Colors | Fonts | Logo | Quality pts | Status |");
+  console.log("|------|--------|-------|------|-------------|--------|");
+
+  for (const r of current.results ?? []) {
+    const cur = yieldRow(r);
+    const base = baseByBrand.get(r.brand) ? yieldRow(baseByBrand.get(r.brand)) : null;
+
+    const fmt = (curV, baseV) => {
+      if (baseV === null || baseV === undefined) return `${curV}`;
+      const d = curV - baseV;
+      const delta = d === 0 ? "±0" : d > 0 ? `+${d}` : `${d}`;
+      return `${curV} (${delta})`;
+    };
+
+    let status = "OK";
+    if (cur.error) {
+      status = "ERROR";
+      warnings.push(`${r.brand}: extraction error — ${cur.error}`);
+    } else if (base) {
+      const regressions = [];
+      if (cur.colors < base.colors) regressions.push(`colors ${base.colors}→${cur.colors}`);
+      if (cur.fonts < base.fonts) regressions.push(`fonts ${base.fonts}→${cur.fonts}`);
+      if (cur.logo < base.logo) regressions.push("logo lost");
+      if (cur.quality < base.quality) regressions.push(`quality ${base.quality}→${cur.quality}`);
+      if (regressions.length > 0) {
+        status = "⚠️ WARN";
+        warnings.push(`${r.brand}: ${regressions.join(", ")}`);
+      }
+    } else {
+      status = "new";
+    }
+
+    console.log(
+      `| ${r.brand} | ${fmt(cur.colors, base?.colors ?? null)} | ${fmt(cur.fonts, base?.fonts ?? null)} | ${cur.logo ? "✓" : "✗"} | ${fmt(cur.quality, base?.quality ?? null)} | ${status} |`
+    );
+  }
+
+  console.log("");
+  if (warnings.length > 0) {
+    console.log(`### ⚠️ ${warnings.length} yield regression(s)/error(s) — non-blocking`);
+    for (const w of warnings) console.log(`- ${w}`);
+    console.log("");
+    console.log("Live sites drift; a WARN here means \"look\", not \"the release is broken\". The release gate is the deterministic corpus in test/extraction-quality.test.ts.");
+  } else {
+    console.log("No yield regressions vs baseline.");
+  }
+}
+
 async function main() {
+  const args = process.argv.slice(2);
+
+  const compareIdx = args.indexOf("--compare");
+  if (compareIdx !== -1) {
+    const baselinePath = args[compareIdx + 1];
+    const currentPath = args[compareIdx + 2];
+    if (!baselinePath || !currentPath) {
+      console.log("Usage: node scripts/extraction-canary.mjs --compare <baseline-summary.json> <current-summary.json>");
+      return;
+    }
+    compareSummaries(baselinePath, currentPath);
+    return;
+  }
+
+  const limitIdx = args.indexOf("--limit");
+  const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : BRANDS.length;
+  const brands = BRANDS.slice(0, Number.isFinite(limit) && limit > 0 ? limit : BRANDS.length);
+
+  const version = packageVersion();
   const outputDir = join(import.meta.dirname, "audit-results");
   await mkdir(outputDir, { recursive: true });
 
-  console.log("Lane I — Extraction Quality Audit");
-  console.log(`Testing ${BRANDS.length} brands against @brandsystem/mcp v0.3.12\n`);
+  console.log(`Extraction Canary — ${LANE}`);
+  console.log(`Testing ${brands.length} live sites against @brandsystem/mcp v${version}`);
+  console.log("NOTE: this lane measures live-site YIELD and never fails the build.");
+  console.log("The labeled, release-gating lane is test/extraction-quality.test.ts.\n");
 
   const results = [];
 
-  for (const brand of BRANDS) {
+  for (const brand of brands) {
     process.stdout.write(`  ${brand.name} (${brand.url})... `);
     try {
       const result = await runExtraction(brand);
       results.push(result);
 
-      const colorCount = result.colors.length;
-      const fontCount = result.fonts.length;
-      const quality = result.extraction_quality?.score ?? "?";
-      const logo = result.logo_found ? "✓" : "✗";
-
-      console.log(`${colorCount} colors, ${fontCount} fonts, logo ${logo}, quality ${quality}, ${result.duration_ms}ms`);
+      if (result.error) {
+        console.log(`ERROR (recorded, non-blocking): ${result.error.slice(0, 80)}`);
+      } else {
+        const colorCount = result.colors.length;
+        const fontCount = result.fonts.length;
+        const quality = result.extraction_quality?.score ?? "?";
+        const logo = result.logo_found ? "✓" : "✗";
+        console.log(`${colorCount} colors, ${fontCount} fonts, logo ${logo}, quality ${quality}, ${result.duration_ms}ms`);
+      }
 
       // Save individual result
       await writeFile(
@@ -145,7 +284,7 @@ async function main() {
         JSON.stringify(result, null, 2),
       );
     } catch (err) {
-      console.log(`ERROR: ${err.message}`);
+      console.log(`ERROR (recorded, non-blocking): ${err.message}`);
       results.push({
         brand: brand.name,
         url: brand.url,
@@ -157,7 +296,7 @@ async function main() {
 
   // Generate summary report
   console.log("\n" + "=".repeat(80));
-  console.log("EXTRACTION QUALITY AUDIT — SUMMARY");
+  console.log("EXTRACTION CANARY — LIVE-YIELD SUMMARY (non-blocking)");
   console.log("=".repeat(80) + "\n");
 
   console.log("Brand            Colors  Fonts  Logo  Quality  Runtime  Duration  Issues");
@@ -210,11 +349,11 @@ async function main() {
   const avgQuality = qualityScores.length > 0 ? (qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length).toFixed(1) : "N/A";
   console.log(`\nTotals: ${totalColors} colors, ${totalFonts} fonts, ${totalLogos}/${results.length} logos`);
   console.log(`Average quality: ${avgQuality}/10`);
-  console.log(`Average duration: ${Math.round(totalDuration / results.length)}ms`);
-  console.log(`Logo detection rate: ${Math.round(totalLogos / results.length * 100)}%`);
+  console.log(`Average duration: ${Math.round(totalDuration / Math.max(results.length, 1))}ms`);
+  console.log(`Logo detection rate: ${Math.round(totalLogos / Math.max(results.length, 1) * 100)}%`);
 
   if (issues.length > 0) {
-    console.log(`\nISSUES (${issues.length}):`);
+    console.log(`\nISSUES (${issues.length}) — informational, non-blocking:`);
     for (const i of issues) {
       console.log(`  [${i.brand}] ${i.issue}`);
     }
@@ -222,13 +361,14 @@ async function main() {
 
   // Save full summary
   const summary = {
-    version: "0.3.12",
+    lane: LANE,
+    version,
     date: new Date().toISOString(),
     brands_tested: results.length,
     totals: { colors: totalColors, fonts: totalFonts, logos: totalLogos },
     avg_quality: avgQuality,
-    avg_duration_ms: Math.round(totalDuration / results.length),
-    logo_detection_rate: Math.round(totalLogos / results.length * 100),
+    avg_duration_ms: Math.round(totalDuration / Math.max(results.length, 1)),
+    logo_detection_rate: Math.round(totalLogos / Math.max(results.length, 1) * 100),
     issues,
     results,
   };
@@ -241,4 +381,8 @@ async function main() {
   console.log(`\nFull results saved to scripts/audit-results/`);
 }
 
-main().catch(console.error);
+// Canary lane: never exit non-zero — even a crash degrades to a report.
+main().catch((err) => {
+  console.error("Canary crashed (recorded, non-blocking):", err);
+  process.exitCode = 0;
+});

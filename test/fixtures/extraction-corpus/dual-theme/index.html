@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lumen — Reading, day and night</title>
+  <style>
+    :root {
+      --brand-primary: #7c3aed;
+      --color-bg: #ffffff;
+      --color-text: #1a1a2e;
+      --color-accent: #22d3ee;
+    }
+    [data-theme="dark"] {
+      --brand-primary: #7c3aed;
+      --color-bg: #0f0f1a;
+      --color-text: #e2e8f0;
+      --color-accent: #22d3ee;
+    }
+    body { font-family: "Inter", sans-serif; background-color: var(--color-bg); color: var(--color-text); }
+    p { font-family: "Inter", sans-serif; }
+    h1 { font-family: "Spectral", serif; }
+    h2 { font-family: "Spectral", serif; }
+    a { color: #7c3aed; }
+    .btn { background-color: #7c3aed; color: #ffffff; }
+  </style>
+</head>
+<body>
+  <header>
+    <svg class="logo" width="120" height="36" viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg" aria-label="Lumen logo">
+      <circle cx="18" cy="18" r="12" fill="#7c3aed"/>
+      <path d="M18 8 A10 10 0 0 1 18 28 A14 14 0 0 0 18 8 Z" fill="#22d3ee"/>
+      <text x="38" y="24" font-family="Spectral" font-size="16" fill="#1a1a2e">Lumen</text>
+    </svg>
+    <button class="theme-toggle">Toggle theme</button>
+  </header>
+  <main>
+    <h1>Reading, day and night</h1>
+    <p>One library, two moods. Lumen adapts to your light.</p>
+    <a class="btn" href="/start">Start reading</a>
+  </main>
+</body>
+</html>

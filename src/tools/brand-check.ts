@@ -132,6 +132,33 @@ async function handler(input: Params) {
   });
 }
 
+/**
+ * Per-tool output schema (0.12). All success fields optional: error responses
+ * carry only the envelope + error code. passthrough keeps forward compat.
+ */
+export const CHECK_OUTPUT_SCHEMA = z
+  .object({
+    _metadata: z
+      .object({ what_happened: z.string(), next_steps: z.array(z.string()) })
+      .passthrough(),
+    pass: z.boolean().optional(),
+    checked: z.array(z.string()).optional(),
+    flags: z
+      .array(
+        z
+          .object({
+            severity: z.string().optional(),
+            message: z.string().optional(),
+            fix: z.string().optional(),
+          })
+          .passthrough()
+      )
+      .optional(),
+    brand_palette: z.array(z.object({ name: z.string(), hex: z.string() })).optional(),
+    error: z.string().optional(),
+  })
+  .passthrough();
+
 export function register(server: McpServer) {
   server.tool(
     "brand_check",

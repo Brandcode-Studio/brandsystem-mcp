@@ -1,5 +1,12 @@
 name: Extraction Benchmark
 
+# Live-yield extraction canary — NON-BLOCKING.
+# Runs the ten-site canary (scripts/extraction-canary.mjs) on demand and on
+# release, uploads results, and prints per-site yield deltas vs the previous
+# successful run in the job summary. Regressions WARN in the summary; they
+# never fail this job. The release-gating extraction lane is the deterministic
+# corpus in test/extraction-quality.test.ts, which runs in the CI test matrix.
+
 on:
   workflow_dispatch:
   release:
@@ -7,9 +14,10 @@ on:
 
 permissions:
   contents: read
+  actions: read # needed to download the previous run's baseline artifact
 
 jobs:
-  benchmark:
+  canary:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -19,9 +27,32 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx playwright install chromium
-      - name: Run extraction benchmark
-        run: node scripts/extraction-audit.mjs
+      - name: Download baseline (previous successful run)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev_run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Extraction Benchmark" --status success --limit 1 --json databaseId --jq '.[0].databaseId' || true)
+          if [ -n "$prev_run" ] && [ "$prev_run" != "null" ]; then
+            echo "Baseline run: $prev_run"
+            gh run download "$prev_run" --repo "$GITHUB_REPOSITORY" -n benchmark-results -D baseline || echo "No baseline artifact on run $prev_run"
+          else
+            echo "No previous successful run — skipping baseline download"
+          fi
+      - name: Run extraction canary (live-yield, non-blocking)
+        continue-on-error: true
+        run: node scripts/extraction-canary.mjs
         timeout-minutes: 10
+      - name: Compare yield vs baseline (warn-only, never fails)
+        continue-on-error: true
+        run: |
+          if [ -f baseline/summary.json ] && [ -f scripts/audit-results/summary.json ]; then
+            node scripts/extraction-canary.mjs --compare baseline/summary.json scripts/audit-results/summary.json | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Extraction canary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No baseline available (first run or download failed) — deltas skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

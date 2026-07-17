@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.12.0 (2026-07-17)
+
+Evidence release: unbiased evaluation infrastructure, real-transport testing, labeled extraction quality, and the end-to-end job scenario. No tool-surface changes.
+
+### Added
+
+- **Holdout evaluation protocol.** The 12 routing prompts are now explicitly the public *development* set; holdout sets live outside the repo, frozen with canonical serialization, and committed publicly by SHA-256 + case count + category distribution in `eval/HOLDOUT-COMMITMENTS.md` **before** testing (protocol: source-split, description authors see the dev set only, separate evaluator holds the prompts, reveal-and-rotate optional). Harness accepts `BRANDSYSTEM_EVAL_HOLDOUT=<path>`; holdout results print separately, stamped with the commitment hash.
+- **Negative routing cases + false-positive invocation metric.** 7 dev-set cases where the correct answer is invoking NO brandsystem tool (with deliberate vocabulary bait: "design team", "logo", "PDF contract"). False-positive invocation rate reports as its own headline metric — over-triggering is the fastest way for an MCP server to feel intrusive.
+- **Deterministic end-to-end job scenario** in the eval harness: adopt → compile (engineered low-confidence value) → clarify every item with answers scripted from fixture ground truth → verify promotion to `human_confirmed_local` → recompile → `brand_context` → `brand_check` passes an on-brand snippet. Six steps, all gating the deterministic exit code. This measures a *completed job*, not just first-tool choice.
+- **Provider/model adapters** for the LLM tier: anthropic, openai, and openai-compatible base-URL override; model via `--model`/`BRANDSYSTEM_EVAL_MODEL`; results stamp provider + model + set.
+- **Real stdio-transport test** (`test/stdio-transport.test.ts`): spawns `dist/index.js` as a child process via `StdioClientTransport` — exact core tool set over the wire, structuredContent envelope on a real call, clean process exit.
+- **Deterministic extraction quality corpus** (`test/fixtures/extraction-corpus/`, 76 release-gating tests): six frozen labeled fixtures (clean semantic, messy inline, ambiguous palette, dual theme, logo variants, hostile) scored for precision/recall against expected identity, roles, confidence tiers, logo choice, SVG sanitization, and clarification outcomes. Four real extractor gaps are labeled `known_gap` in the fixtures rather than hidden behind loose thresholds — tracked in #35.
+- **Dogfood prompt capture** (`eval/dogfood/`, `scripts/dogfood-capture.mjs`): privacy-safe JSONL capture to a private file outside the repo (intent, redacted prompt, source key, tools, outcome, friction, repair — never brand content), with a local denylist that refuses unredacted brand names. Real captured prompts are the source for the 0.12+ holdout.
+- **Per-tool output schemas** for `brand_status`, `brand_runtime`, and `brand_check` (joining `brand_context`) — four of twelve core tools now typed beyond the shared envelope.
+
+### Changed
+
+- **Extraction audit split into two lanes.** `scripts/extraction-audit.mjs` → `scripts/extraction-canary.mjs`: explicitly a non-blocking live-yield canary (ten sites, per-site errors reported not thrown, real package version in metadata instead of hardcoded 0.3.12, `--limit`/`--compare` modes). benchmark.yml now downloads the previous run's artifact and prints per-site yield deltas in the job summary — warn-only, never failing. Release gating moved to the deterministic corpus in `npm test`.
+- yaml 2.8.3 → 2.9.0 (minor). Majors (TypeScript 7, PDF.js 6, Puppeteer 25, Vitest 4, Actions v7s) deliberately not bundled — individual triage per the 0.12 plan, TS 7 as its own migration investigation.
+
 ## 0.11.3 (2026-07-17)
 
 ### Fixed

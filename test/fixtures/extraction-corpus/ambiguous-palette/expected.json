@@ -1,0 +1,31 @@
+{
+  "description": "Ambiguous palette: two candidate brand colors with different frequencies (#d90429 x5 vs #1d3557 x3), no role-named variables — exercises frequency-based primary promotion.",
+  "colors": [
+    { "value": "#d90429", "role": "primary", "confidence": "medium", "note": "promoted to primary: most frequent chromatic color" },
+    { "value": "#ffffff", "role": "surface", "confidence": "high" },
+    { "value": "#212529", "role": "text", "confidence": "medium" },
+    { "value": "#1d3557", "role": ["secondary", "text"], "known_gap": true, "note": "dark navy falls below the chromatic threshold (near-black), so it is never a primary candidate and loses the text role slot to #212529" }
+  ],
+  "fonts": [
+    { "family": "Lora", "confidence": "medium" }
+  ],
+  "suggested_primary": "#d90429",
+  "chromatic_candidates_include": ["#d90429"],
+  "logo": {
+    "inline_svg_found": false
+  },
+  "clarifications": {
+    "count": 1,
+    "question_substrings": ["No logo detected"]
+  },
+  "thresholds": {
+    "color_precision": 0.95,
+    "color_recall": 0.95,
+    "role_accuracy": 0.95,
+    "font_precision": 0.95,
+    "font_recall": 0.95
+  },
+  "known_gaps": [
+    "Second brand candidate #1d3557 is invisible to the ambiguity flow: isChromatic() classifies dark navy as near-black, so only #d90429 appears in chromatic_candidates and #1d3557 is dropped by the role merge."
+  ]
+}
