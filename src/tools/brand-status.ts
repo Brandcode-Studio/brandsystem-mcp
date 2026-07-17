@@ -117,42 +117,13 @@ async function handler() {
           quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, escalates to deeper visual/site extraction for JS-rendered or weak-signal sites when Chrome is available, compiles DTCG tokens + brand runtime + interaction policy, generates design-synthesis.json + DESIGN.md, and generates a portable brand report — all in one call. brand_start also accepts guideline_pdf, figma_file_key, or brandcode_url to adopt from those sources. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
           tool_profiles: "By default the server registers the Core profile (12 tools — the complete adopt → context → create → check loop). Authoring tools (sessions 2-4 interviews, deep extraction control, drift analytics) require the full profile: set BRANDSYSTEM_PROFILE=full or pass --profile=full in the MCP config args.",
           session_overview: {
-            "Session 1 — Core Identity": "brand_start → brand_extract_web or brand_extract_visual or brand_extract_site → brand_generate_designmd → brand_compile → brand_report. Extracts colors, fonts, logo from static CSS, a rendered page, or a deeper multi-page rendered crawl. Produces tokens.json, brand-runtime.json, interaction-policy.json, design-synthesis.json, DESIGN.md, brand-report.html, and optional extraction-evidence.json.",
-            "Session 2 — Visual Identity": "brand_deepen_identity (interview). Captures composition rules, patterns, illustration style, anti-patterns. Produces visual-identity-manifest.md.",
-            "Session 3 — Messaging": "brand_extract_messaging → brand_compile_messaging (interview). Defines perspective, voice codex, brand story. Produces messaging.yaml and brand-story.md.",
-            "Session 4 — Content Strategy": "brand_build_personas → brand_build_journey → brand_build_themes → brand_build_matrix. Creates audience personas, journey stages, editorial themes, and a messaging matrix.",
+            "Session 1 — Core Identity": "brand_start → extract → brand_compile → brand_report. Produces tokens, runtime, policy, DESIGN.md, report.",
+            "Session 2 — Visual Identity": "brand_deepen_identity interview → visual-identity-manifest.md.",
+            "Session 3 — Messaging": "brand_extract_messaging → brand_compile_messaging → messaging.yaml, brand-story.md.",
+            "Session 4 — Content Strategy": "personas → journey → themes → matrix.",
           },
-          available_tools: [
-            "brand_start — Entry point. Adopts a brand from a website URL, PDF guidelines, Figma file, or Brandcode Studio brand — and discovers local sources",
-            "brand_status — Shows current progress (you are here)",
-            "brand_context — Task-scoped brand context (deterministic section selection by task_type/audience/budget)",
-            "brand_extract_web — Extract colors, fonts, logo from any website",
-            "brand_extract_visual — Screenshot the rendered page and extract computed colors/fonts for JS-heavy sites",
-            "brand_extract_site — Discover representative pages, sample multiple viewports/components, and persist extraction-evidence.json",
-            "brand_generate_designmd — Generate design-synthesis.json and DESIGN.md from extracted evidence or current brand state",
-            "brand_extract_figma — Extract from Figma files (higher accuracy)",
-            "brand_compile — Generate DTCG tokens and VIM from extracted data",
-            "brand_report — Generate portable HTML brand report",
-            "brand_clarify — Resolve ambiguous brand data interactively",
-            "brand_audit — Validate .brand/ directory against schema",
-            "brand_set_logo — Add/replace logo via SVG, URL, or data URI",
-            "brand_deepen_identity — Session 2: visual identity interview",
-            "brand_ingest_assets — Catalog brand assets with manifests",
-            "brand_preflight — Check HTML/CSS against brand compliance rules",
-            "brand_extract_messaging — Audit existing website voice",
-            "brand_compile_messaging — Session 3: perspective + voice interview",
-            "brand_write — Load full brand context for content generation",
-            "brand_export — Generate portable brand files for any environment",
-            "brand_build_personas — Define buyer personas",
-            "brand_build_journey — Define buyer journey stages",
-            "brand_build_themes — Define editorial content themes",
-            "brand_build_matrix — Generate persona x stage messaging variants",
-            "brand_feedback — Report bugs, friction, or feature ideas",
-            "brand_brandcode_connect — Connect to a hosted brand on Brandcode Studio",
-            "brand_brandcode_sync — Sync local .brand/ with hosted brand",
-            "brand_brandcode_status — Check Brandcode Studio connection status",
-            "brand_brandcode_live — Toggle Live Mode (read-only tools refresh from hosted runtime)",
-          ],
+          // Tool-by-tool descriptions intentionally omitted: agents already
+          // have them from listTools, and tool_sessions carries the taxonomy.
         },
       },
     });
@@ -360,11 +331,12 @@ async function handler() {
     next_steps: nextSteps.length > 0 ? nextSteps : ["Brand system is up to date"],
     data: {
       status: lines.join("\n"),
-      tool_sessions: TOOL_SESSIONS,
-      recovery: recovery ? {
-        readiness: recovery.currentReadiness,
-        actions: recovery.actions,
-      } : undefined,
+      // Budget discipline (0.11): tool_sessions ships on the getting-started
+      // (no-.brand/) response where discovery happens; recurring status calls
+      // answer "where am I, what next?" without re-sending the taxonomy.
+      // The formatted guidance lives in `status` and the top actions in
+      // next_steps — structured data carries readiness only.
+      recovery: recovery ? { readiness: recovery.currentReadiness } : undefined,
       ...(liveIndicator ? { live: liveIndicator } : {}),
     },
   });

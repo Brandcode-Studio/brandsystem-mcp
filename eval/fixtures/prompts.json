@@ -1,0 +1,89 @@
+{
+  "description": "First-tool-selection fixtures. Each case is a realistic user ask; expected_tools lists every acceptable FIRST tool call. profile selects which tool surface ('core' = 12-tool default, 'full' = complete authoring surface) the selecting model sees. Used only by the model-dependent tier of scripts/agent-eval.mjs (--with-llm).",
+  "cases": [
+    {
+      "id": "adopt-existing-guidelines",
+      "prompt": "How do I use my existing brand guidelines with AI?",
+      "expected_tools": ["brand_start"],
+      "profile": "core",
+      "notes": "Adoption entry point. brand_start routes to the right extractor regardless of source."
+    },
+    {
+      "id": "adopt-pdf-guide",
+      "prompt": "I have a PDF brand guide.",
+      "expected_tools": ["brand_start"],
+      "profile": "core",
+      "notes": "In the core profile brand_extract_pdf is not registered; brand_start accepts guideline_pdf and routes."
+    },
+    {
+      "id": "adopt-figma-library",
+      "prompt": "Use our Figma library for our brand.",
+      "expected_tools": ["brand_start"],
+      "profile": "core",
+      "notes": "brand_start accepts figma_file_key; the dedicated Figma extractor only exists in the full profile."
+    },
+    {
+      "id": "write-linkedin-in-voice",
+      "prompt": "Write this LinkedIn post in our voice.",
+      "expected_tools": ["brand_context", "brand_write"],
+      "profile": "full",
+      "notes": "Either loading task-scoped context or the content-generation loader is a correct first step. brand_write exists only in the full profile."
+    },
+    {
+      "id": "check-social-post",
+      "prompt": "Check whether this social post follows our guidelines.",
+      "expected_tools": ["brand_check", "brand_check_compliance", "brand_audit_content"],
+      "profile": "full",
+      "notes": "Fast inline gate, binary publish gate, or scored audit are all defensible first calls."
+    },
+    {
+      "id": "share-with-team",
+      "prompt": "Make our brand available to my whole team.",
+      "expected_tools": ["brand_brandcode_connect", "brand_brandcode_auth"],
+      "profile": "core",
+      "notes": "Team distribution goes through the hosted connector; auth-first is also acceptable since save requires it."
+    },
+    {
+      "id": "brand-system-state",
+      "prompt": "What's the state of my brand system?",
+      "expected_tools": ["brand_status"],
+      "profile": "core",
+      "notes": "Direct status ask."
+    },
+    {
+      "id": "subagent-colors-fonts",
+      "prompt": "Give me just the colors and fonts for a sub-agent.",
+      "expected_tools": ["brand_runtime", "brand_context"],
+      "profile": "core",
+      "notes": "brand_runtime with a visual/minimal slice is the canonical answer; brand_context compact is also correct."
+    },
+    {
+      "id": "resume-where-left-off",
+      "prompt": "I set this brand up last week — where did we leave off and what should I do next?",
+      "expected_tools": ["brand_status"],
+      "profile": "core",
+      "notes": "brand_status is the documented resume point."
+    },
+    {
+      "id": "export-to-cursor",
+      "prompt": "Export our brand so I can paste it into my Cursor rules file.",
+      "expected_tools": ["brand_export"],
+      "profile": "core",
+      "notes": "brand_export target=code is the portable-file path for other AI tools."
+    },
+    {
+      "id": "audit-drafts-folder",
+      "prompt": "Audit this folder of blog drafts and tell me which ones have drifted off brand.",
+      "expected_tools": ["brand_audit_drift", "brand_audit_content"],
+      "profile": "full",
+      "notes": "Batch drift detection is the purpose-built tool; per-file scored audit is an acceptable alternative."
+    },
+    {
+      "id": "fix-wrong-color",
+      "prompt": "The accent color you extracted is wrong — it should be a different hex. Fix it.",
+      "expected_tools": ["brand_clarify"],
+      "profile": "core",
+      "notes": "brand_clarify is the human-in-the-loop correction path for extracted values."
+    }
+  ]
+}

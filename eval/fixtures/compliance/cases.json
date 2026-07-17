@@ -1,0 +1,78 @@
+{
+  "description": "Labeled content for deterministic compliance-accuracy measurement. Every case is scored with brand_check_compliance against a copy of test/fixtures/brand-complete, whose governed values are: colors #2a4494 (primary), #e8523f (secondary), #f5a623 (accent); typography Inter; hard visual anti-pattern 'No drop shadows'. That fixture has no messaging layer, so never-say vocabulary rules are not exercised here (see eval/README.md). Each case was verified to reproduce its expected verdict before being committed.",
+  "brand_fixture": "test/fixtures/brand-complete",
+  "cases": [
+    {
+      "id": "pass-onbrand-style-block",
+      "content": "<div><style>.hero{background:#2a4494;color:#ffffff;font-family:Inter, sans-serif}.cta{background:#e8523f;color:#ffffff}</style><h1>Launch day</h1><a class=\"cta\">Get started</a></div>",
+      "expected": "pass",
+      "reason": "Uses only governed palette colors (#2a4494, #e8523f) plus neutral white, and the brand font Inter."
+    },
+    {
+      "id": "pass-onbrand-inline-styles",
+      "content": "<section><p style=\"color:#2a4494;font-family:'Inter', sans-serif;\">Welcome to the platform.</p><span style=\"background:#f5a623;color:#111111\">New</span></section>",
+      "expected": "pass",
+      "reason": "Inline styles stay on-palette (primary + accent + neutrals) with the brand font."
+    },
+    {
+      "id": "pass-onbrand-rgb-notation",
+      "content": "<div style=\"background: rgb(42, 68, 148); color: rgb(255, 255, 255); font-family: Inter, sans-serif;\">Quarterly report</div>",
+      "expected": "pass",
+      "reason": "rgb(42, 68, 148) normalizes to the governed primary #2a4494; white is neutral."
+    },
+    {
+      "id": "pass-ungoverned-radius",
+      "content": "<div><style>.card{background:#e8523f;color:#ffffff;font-family:Inter,sans-serif;border-radius:8px}</style><div class=\"card\">Card</div></div>",
+      "expected": "pass",
+      "reason": "border-radius is not a governed anti-pattern for this brand (only drop shadows are), so on-palette content with rounded corners passes."
+    },
+    {
+      "id": "pass-plain-text-copy",
+      "content": "Fixture Brand builds structured, clear tools for modern teams. Start a project in minutes and keep every surface consistent.",
+      "expected": "pass",
+      "reason": "Plain text has no visual surface to violate, and this brand governs no vocabulary rules; the tool checks zero rules and passes. Documents the tool's text-input behavior."
+    },
+    {
+      "id": "fail-offpalette-hex",
+      "content": "<div><style>.banner{background:#7b2ff7;color:#ffffff;font-family:Inter,sans-serif}</style><div class=\"banner\">Sale</div></div>",
+      "expected": "fail",
+      "reason": "#7b2ff7 (purple) is not in the governed palette and is not a whitelisted neutral — CRT-COLOR fails."
+    },
+    {
+      "id": "fail-offpalette-short-hex",
+      "content": "<p style=\"color:#f00;font-family:Inter,sans-serif\">Urgent update</p>",
+      "expected": "fail",
+      "reason": "Shorthand #f00 normalizes to #ff0000, which is off-palette — CRT-COLOR fails."
+    },
+    {
+      "id": "fail-offpalette-rgb",
+      "content": "<div style=\"background: rgb(0, 128, 0); color: #ffffff; font-family: Inter, sans-serif;\">Success</div>",
+      "expected": "fail",
+      "reason": "rgb(0, 128, 0) normalizes to #008000, an off-palette green — CRT-COLOR fails."
+    },
+    {
+      "id": "fail-nonbrand-font",
+      "content": "<div><style>h1{font-family:'Playfair Display', serif;color:#2a4494}</style><h1>Our story</h1></div>",
+      "expected": "fail",
+      "reason": "Playfair Display is not a governed brand font (and not a generic system font) — CRT-FONT fails."
+    },
+    {
+      "id": "fail-box-shadow",
+      "content": "<div><style>.card{background:#2a4494;color:#ffffff;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.4)}</style><div class=\"card\">Feature</div></div>",
+      "expected": "fail",
+      "reason": "box-shadow violates the hard anti-pattern 'No drop shadows' even though colors and font are on-brand (rgba black normalizes to neutral #000000)."
+    },
+    {
+      "id": "fail-text-shadow",
+      "content": "<div><style>h2{color:#e8523f;font-family:Inter,sans-serif;text-shadow:1px 1px 2px #000000}</style><h2>Headline</h2></div>",
+      "expected": "fail",
+      "reason": "text-shadow also violates the hard 'No drop shadows' anti-pattern."
+    },
+    {
+      "id": "fail-multiple-violations",
+      "content": "<div><style>.promo{background:#ff0066;color:#ffffff;font-family:'Comic Sans MS', cursive;box-shadow:0 4px 12px rgba(0,0,0,0.5)}</style><div class=\"promo\">Big promo</div></div>",
+      "expected": "fail",
+      "reason": "Off-palette #ff0066, non-brand font Comic Sans MS, and a drop shadow — all three critical checks fail."
+    }
+  ]
+}

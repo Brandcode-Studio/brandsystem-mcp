@@ -12,3 +12,4 @@ specs/brand-extraction-*.md
 .vercel
 .env*.local
 .gstack/
+eval/results/

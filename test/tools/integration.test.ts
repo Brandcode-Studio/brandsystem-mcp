@@ -82,8 +82,10 @@ describe("brand_status", () => {
 // ---------------------------------------------------------------------------
 
 describe("brand_status tool_sessions", () => {
-  it("includes non-empty, tool-covering groups when .brand/ exists", async () => {
-    const tmpDir = await copyFixture("brand-complete");
+  it("includes non-empty, tool-covering groups in the getting-started response", async () => {
+    // 0.11 budget discipline: the taxonomy ships on the no-.brand/ response
+    // (where discovery happens), not on recurring with-brand status calls.
+    const tmpDir = await mkdtemp(join(tmpdir(), "brand-integ-taxonomy-"));
     const conn = await connectWithCwd(tmpDir);
     try {
       const result = await callTool(conn.client, "brand_status");

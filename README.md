@@ -691,6 +691,10 @@ test/
 
 ---
 
+## Agent Evaluation Suite
+
+The `eval/` directory ships fixtures, methodology, and a runnable harness measuring what matters to agents: first-tool selection on real prompts, response token budgets, envelope conformance, compliance-check accuracy against labeled cases, and whether a second agent can use a generated runtime with no explanation. Run the deterministic tier with `npm run eval`; the model-dependent tier (first-tool selection) is opt-in via `ANTHROPIC_API_KEY`. Results are published only from actual runs with stated model versions and dates — the repo ships evidence machinery, not claims. See [eval/README.md](eval/README.md).
+
 ## Security
 
 - **Report vulnerabilities privately** via the repository's Security page → Advisories → "Report a vulnerability". See [SECURITY.md](SECURITY.md). Please don't open public issues for suspected vulnerabilities.

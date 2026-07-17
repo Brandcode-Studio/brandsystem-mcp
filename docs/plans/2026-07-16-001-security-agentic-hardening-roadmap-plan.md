@@ -69,7 +69,9 @@
 7. **Runtime schema-version migration** (the field exists — `runtime-compiler.ts` emits `version: config.schema_version`, ambiguously named): add explicit `schema_version` alongside `version` without removing it; define what `version` means going forward (schema vs. runtime/package version); update runtime schemas, MCP resources, connector fixtures, hosted consumers, exports, and tests; deprecate the ambiguous field only after a compatibility window.
 8. **Compatibility docs distinguish three claims:** direct local stdio connection; remote hosted connection; copying a generated runtime into an AI tool. (ChatGPT connects to remote MCP servers, with a documented tunnel option for local.) The NOW-bucket metadata scrub (package.json/server.json) aligns to this same distinction.
 
-## 0.11 — Reliable agent interoperability
+## 0.11 — Reliable agent interoperability — SHIPPED 2026-07-16
+
+(All items landed: structuredContent + envelope outputSchema on every tool (per-tool schemas specialize over time, brand_context is the exemplar), token budgets enforced by failing tests, structured overflow instead of truncation, compact serialization, taint carryovers closed, and the eval suite ships fixtures + methodology + a two-tier harness — deterministic results in CI, model-dependent first-tool selection opt-in. Cross-client eval RESULTS remain to be produced by real runs and published deliberately.)
 
 1. **Structured outputs:** common response-envelope `outputSchema` first (cheap — envelope already uniform via `buildResponse`), then deliberate per-tool `data` schemas + tests (not free — 43 heterogeneous shapes). `structuredContent` with human-readable text fallback.
 2. **Token-estimated response budgets:** budgets in tokens (~chars/4), `compact`/`standard`/`detailed` modes, hard compact target for entry tools, tests that fail on budget breach. **Never truncate JSON mid-object** — paginate or spill to an MCP resource. `brand_status` answers "where am I, what next?" in a few hundred tokens.
