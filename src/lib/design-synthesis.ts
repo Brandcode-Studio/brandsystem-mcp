@@ -1,4 +1,5 @@
 import { BrandDir } from "./brand-dir.js";
+import { cleanColorName as cleanColorNameShared } from "./color-namer.js";
 import { isTokenWorthy } from "./confidence.js";
 import type { BrandConfigData, CoreIdentityData, TokensFileData } from "../schemas/index.js";
 import type { Confidence } from "../types/index.js";
@@ -426,7 +427,9 @@ function buildColorGroups(identity: CoreIdentityData) {
 
   const toSignal = (color: CoreIdentityData["colors"][number]) => ({
     role: color.role,
-    name: color.name,
+    // Sanitized display name: raw extracted names can carry hostile content
+    // and stay quarantined in core-identity.yaml evidence only.
+    name: cleanColorNameShared(color),
     value: color.value,
     confidence: mapConfidence(color.confidence),
     provenance: [`${color.source}${color.css_property ? `:${color.css_property}` : ""}`],

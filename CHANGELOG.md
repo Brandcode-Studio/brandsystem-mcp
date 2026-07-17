@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.13.3 (2026-07-17)
+
+Benchmark truth + taint closure repair (Codex review findings, all verified).
+
+### Fixed
+
+- **Second-agent "job completion" redefined honestly.** Completion now requires: output contract satisfied (required CSS/color inputs actually present in the reply) + `brand_check` pass + compliance pass + `rules_checked > 0`. Missing required inputs → `incomplete`; zero rules → `unscored` (never PASS). Checker acceptance reports separately. **Corrected result: 20% (1/5), down from the previously published 5/5** — the old number counted an empty-checker acceptance as completion. Correction published in eval/RESULTS.md with the original claim annotated, not erased.
+- **Vacuous compliance passes closed:** the benchmark fixture now carries a governed-voice overlay (never-say, anchors, tone, AI-ism patterns), so text tasks measure brand transfer instead of checker emptiness.
+- **Hostile color names sanitized at every agent-facing compile sink** (taint closure): runtime color keys for `role: unknown` (`runtime-compiler.ts` — served directly by `brand_context`), design-synthesis color signals, and `brand_write` visual briefs now route through `cleanColorName` (instruction-shape replacement included). Raw extracted names remain only in quarantined `core-identity.yaml` evidence. New adversarial test proves a hostile unknown-role name cannot become a runtime key.
+
+### Added
+
+- **Committed machine-readable run receipts** (`eval/receipts/`): commit hash, package version, provider/model, per-task output-contract status, rule coverage, verdicts, and token estimates for every published LLM run — independently inspectable evidence.
+
 ## 0.13.2 (2026-07-17)
 
 ### Fixed

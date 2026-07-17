@@ -1,0 +1,38 @@
+"schema_version": "0.1.0"
+session: 3
+perspective: null
+brand_story: null
+voice:
+  tone:
+    descriptors: [confident, precise, warm]
+    register: professional-direct
+    never_sounds_like: hype-driven marketing copy or corporate jargon
+    sentence_patterns:
+      prefer: [short declarative sentences, active voice]
+      avoid: [passive constructions, filler openers]
+    conventions:
+      person: first-person plural
+      founder_voice: third-person
+      reader_address: second-person
+      oxford_comma: true
+      sentence_length: 20
+      paragraph_length: 3
+  vocabulary:
+    anchor:
+      - { use: platform, not: tool, reason: More than a point solution }
+      - { use: customers, not: users, reason: People, not accounts }
+    never_say:
+      - { word: synergy, reason: Corporate buzzword }
+      - { word: game-changer, reason: Hype vocabulary }
+      - { word: revolutionary, reason: Hype vocabulary }
+      - { word: leverage, reason: Jargon; say "use" }
+      - { word: cutting-edge, reason: Hype vocabulary }
+    jargon_policy: Define on first use; prefer the simpler word
+    placeholder_defaults:
+      headline: Your headline here
+      subhead: Supporting context
+      cta: Get started
+      body_paragraph: Describe the value
+  ai_ism_detection:
+    patterns: ["in today's .* landscape", "game-?chang", "revolutioniz", "unlock the power"]
+    instruction: Flag and rewrite any match

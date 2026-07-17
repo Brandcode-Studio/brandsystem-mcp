@@ -122,3 +122,42 @@ synthetic and few; compliance is checker-approximate (rule-based), not human
 judgment. The claim this run supports: *a fresh model given only governed
 context produced content the deterministic checker accepts, at ~325 context
 tokens per task* — the runtime-transfer promise, measured.
+
+---
+
+## CORRECTION + Run: 2026-07-17 (0.13.1 — benchmark truth repair)
+
+**The "5/5 job completion" published above is corrected.** A Codex review found
+two defects in the claim (verified against the harness source):
+
+1. "Completion" counted only `brand_check_compliance` acceptance — not the
+   task's output contract (the hero task required fenced CSS, produced none,
+   and was still counted) and not `brand_check`.
+2. The benchmark fixture had no messaging layer, so text tasks were scored
+   against **zero voice rules** — `rules_checked: 0` passes vacuously.
+
+The honest label for that run is: *5/5 artifacts accepted by an
+effectively-empty compliance checker.* Not job completion.
+
+### Corrected run (same model, governed-voice overlay, honest definition)
+
+Completion now requires: output contract satisfied + `brand_check` pass +
+compliance pass + `rules_checked > 0`. The fixture now carries a governed
+voice (never-say list, anchors, tone, AI-ism patterns).
+
+| Metric | Value |
+|---|---|
+| **Job completion (honest definition)** | **20% (1/5) — 2 incomplete (missing fenced CSS), 3 with voice flags** |
+| Checker acceptance (previous metric, reported separately) | 80% (4/5) |
+| Mean brand_check flags per artifact | 0.60 |
+| Token cost per artifact (output / context) | 143 / 417 |
+
+**What the honest number teaches:** the model ignores "return only CSS in a
+fenced block" (2/2 markup tasks), and under real voice rules produces
+warning-level violations in 3/5 artifacts. These are the actual gaps between
+"runtime served" and "job done" — invisible under the old definition.
+
+Machine-readable per-task receipt: `eval/receipts/2026-07-17-llm-receipt.json`
+(commit, package, provider/model, per-task contract status, rule coverage,
+verdicts, token estimates). Receipts are committed for every published run
+from now on.

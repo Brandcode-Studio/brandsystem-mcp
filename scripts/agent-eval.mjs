@@ -1107,6 +1107,14 @@ async function main() {
     );
     const tasks = validateSecondAgentTasks(doc);
     const dir = await copyBrandFixture();
+    // Governed-voice overlay: brand-complete ships no messaging layer, and a
+    // compliance check with zero voice rules passes vacuously. The overlay
+    // gives the checker real rules (never-say, anchors, tone) so text tasks
+    // measure brand transfer, not checker emptiness.
+    const overlay = join(EVAL_DIR, "fixtures", "second-agent", "messaging.yaml");
+    if (existsSync(overlay)) {
+      await writeFile(join(dir, ".brand", "messaging.yaml"), readFileSync(overlay, "utf-8"));
+    }
 
     const taskResults = [];
     let runtimeStamp = null;
@@ -1192,6 +1200,24 @@ async function main() {
             arguments: { content: reply },
           });
           rec.compliance = compliance.structuredContent?.result ?? "error";
+          rec.rules_checked = compliance.structuredContent?.rules_checked ?? 0;
+
+          // Output contract: every required input must actually exist in the
+          // reply. A markup task with no fenced CSS is NOT a completed job.
+          const missing = [];
+          if (wantsCss && !(extraction.fenced && extraction.css)) missing.push("css");
+          if (task.check_inputs.includes("color") && !rec.color_checked) missing.push("color");
+          rec.output_contract = missing.length === 0 ? "satisfied" : `missing: ${missing.join(", ")}`;
+
+          // Honest completion: contract + brand_check + compliance + non-vacuous rules.
+          rec.status =
+            missing.length > 0
+              ? "incomplete"
+              : rec.rules_checked === 0
+                ? "unscored"
+                : rec.check_pass && rec.compliance === "pass"
+                  ? "completed"
+                  : "failed";
         } catch (err) {
           rec.error = String(err).slice(0, 200);
           rec.check_pass = rec.check_pass ?? false;
@@ -1204,8 +1230,14 @@ async function main() {
 
     const total = taskResults.length;
     const compliancePass = taskResults.filter((r) => r.compliance === "pass").length;
+    const completed = taskResults.filter((r) => r.status === "completed").length;
+    const incomplete = taskResults.filter((r) => r.status === "incomplete").length;
+    const unscored = taskResults.filter((r) => r.status === "unscored").length;
     const sum = (fn) => taskResults.reduce((s, r) => s + (fn(r) ?? 0), 0);
-    const jobCompletion = total === 0 ? null : (compliancePass / total) * 100;
+    // Job completion requires: output contract satisfied + brand_check pass +
+    // compliance pass + rules_checked > 0. Checker acceptance alone is
+    // reported separately and is NOT completion.
+    const jobCompletion = total === 0 ? null : (completed / total) * 100;
 
     return {
       provider: adapter.provider,
@@ -1216,7 +1248,8 @@ async function main() {
       totals: {
         tasks: total,
         job_completion_rate: jobCompletion,
-        job_completion_value: `${(jobCompletion ?? 0).toFixed(1)}% (${compliancePass}/${total})`,
+        job_completion_value: `${(jobCompletion ?? 0).toFixed(1)}% (${completed}/${total} completed; ${incomplete} incomplete, ${unscored} unscored)`,
+        checker_acceptance_value: `${total === 0 ? 0 : ((compliancePass / total) * 100).toFixed(1)}% (${compliancePass}/${total})`,
         mean_flags_per_task: total === 0 ? null : sum((r) => r.flags?.total) / total,
         mean_output_tokens: total === 0 ? null : Math.round(sum((r) => r.output_tokens) / total),
         mean_context_tokens: total === 0 ? null : Math.round(sum((r) => r.context_tokens) / total),
@@ -1299,6 +1332,28 @@ async function main() {
     const outPath = join(RESULTS_DIR, `${runStamp.date.slice(0, 10)}-${mode}.json`);
     writeFileSync(outPath, JSON.stringify(results, null, 2) + "\n");
 
+    // Committed machine-readable receipt for published runs: commit, package,
+    // provider/model, and per-task detail — independently inspectable evidence.
+    if (results.model_dependent) {
+      try {
+        const { execSync } = await import("node:child_process");
+        const commit = execSync("git rev-parse HEAD", { cwd: ROOT, encoding: "utf-8" }).trim();
+        const receiptDir = join(EVAL_DIR, "receipts");
+        mkdirSync(receiptDir, { recursive: true });
+        const receipt = {
+          commit,
+          package_version: `${pkg.name}@${pkg.version}`,
+          generated: runStamp.date,
+          model_dependent: results.model_dependent,
+        };
+        const rPath = join(receiptDir, `${runStamp.date.slice(0, 10)}-llm-receipt.json`);
+        writeFileSync(rPath, JSON.stringify(receipt, null, 2) + "\n");
+        console.log(`Receipt written to ${rPath}`);
+      } catch (err) {
+        console.error(`receipt write failed (non-fatal): ${err}`);
+      }
+    }
+
     // Markdown summary
     const lines = [];
     lines.push(`## brandsystem-mcp agent eval — ${runStamp.date}`);
@@ -1355,7 +1410,8 @@ async function main() {
       lines.push("| Metric | Value |");
       lines.push("|---|---|");
       lines.push(
-        `| **second-agent job completion (compliance PASS / tasks)** | **${secondAgent.totals.job_completion_value}** |`
+        `| **second-agent job completion (contract + check + compliance + rules>0)** | **${secondAgent.totals.job_completion_value}** |`,
+        `| checker acceptance (compliance PASS / tasks — NOT completion) | ${secondAgent.totals.checker_acceptance_value} |`
       );
       lines.push(
         `| mean brand_check flags per task | ${(secondAgent.totals.mean_flags_per_task ?? 0).toFixed(2)} |`
