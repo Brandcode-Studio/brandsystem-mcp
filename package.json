@@ -35,7 +35,7 @@
     "css-tree": "^3.1.0",
     "pdfjs-dist": "^5.6.205",
     "puppeteer-core": "^24.40.0",
-    "yaml": "^2.7.0",
+    "yaml": "^2.9.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
