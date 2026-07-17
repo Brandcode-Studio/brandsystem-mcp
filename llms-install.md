@@ -14,7 +14,7 @@ Install the published npm package as a stdio MCP server named `brandsystem`, pre
 
 ## Preferred setup
 
-Use the package's safe installer. It is a dry run unless `--write` is present, backs up an existing JSON config, and only adds or replaces `mcpServers.brandsystem`.
+Use the package's safe installer. It is a dry run unless `--write` is present. Cline and Codex delegate to their official MCP commands; direct JSON targets back up the existing config and only add or replace `mcpServers.brandsystem`.
 
 ```bash
 # Cline

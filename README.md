@@ -26,7 +26,7 @@ npx @brandsystem/mcp install --client claude-code --write
 npx @brandsystem/mcp install --client cline --write
 ```
 
-`install` is a dry run unless you pass `--write`. Replace `claude-code` with `cline`, `cursor`, `windsurf`, or `claude-desktop` as needed. The installer preserves existing JSON client settings; Codex setup delegates to the official `codex mcp add` command. Agents can follow the compact [installation guide](llms-install.md) without reading this entire README.
+`install` is a dry run unless you pass `--write`. Replace `claude-code` with `cline`, `cursor`, `windsurf`, or `claude-desktop` as needed. JSON-file targets preserve existing settings; Cline and Codex setup delegate to their official MCP commands so their current schemas remain authoritative. Agents can follow the compact [installation guide](llms-install.md) without reading this entire README.
 
 Already configured? Tell your agent:
 
@@ -344,7 +344,7 @@ Start a new Codex task after installation. Codex CLI, the Codex app, and the IDE
 
 ### Cline
 
-Use the package installer to merge Brandsystem into Cline's shared MCP settings without replacing other servers:
+Use the package installer, which delegates to Cline's official non-interactive MCP command:
 
 ```bash
 npx @brandsystem/mcp install --client cline --write

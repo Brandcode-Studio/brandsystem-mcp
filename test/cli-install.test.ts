@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   buildServerEntry,
   buildCodexAddArgs,
+  buildClineInstallArgs,
   resolveConfigPath,
   mergeMcpConfig,
   runInstall,
@@ -66,6 +67,25 @@ describe("buildCodexAddArgs", () => {
 
   it("passes the full profile through to the MCP server", () => {
     expect(buildCodexAddArgs("full")).toContain("--profile=full");
+  });
+});
+
+describe("buildClineInstallArgs", () => {
+  it("builds the official non-interactive Cline CLI command", () => {
+    expect(buildClineInstallArgs("core")).toEqual([
+      "mcp",
+      "install",
+      "brandsystem",
+      "--yes",
+      "--",
+      "npx",
+      "-y",
+      "@brandsystem/mcp",
+    ]);
+  });
+
+  it("passes the full profile through to the MCP server", () => {
+    expect(buildClineInstallArgs("full")).toContain("--profile=full");
   });
 });
 
@@ -344,41 +364,28 @@ describe("runInstall", () => {
     expect(written.mcpServers.brandsystem).toEqual(buildServerEntry("core"));
   });
 
-  it("writes Cline's shared MCP settings and preserves existing servers", async () => {
-    const fakeHome = join(dir, "home");
-    const target = join(
-      fakeHome,
-      ".cline",
-      "data",
-      "settings",
-      "cline_mcp_settings.json",
-    );
-    await mkdir(join(fakeHome, ".cline", "data", "settings"), {
-      recursive: true,
-    });
-    await writeFile(
-      target,
-      JSON.stringify({
-        mcpServers: { existing: { command: "existing", args: [] } },
-      }),
-    );
-
+  it("uses the official Cline CLI when --write is explicit", async () => {
+    const commandRunner = vi.fn(async () => 0);
     const code = await runInstall({
       client: "cline",
       write: true,
-      profile: "core",
+      profile: "full",
       cwd: dir,
-      home: fakeHome,
+      commandRunner,
     });
-
     expect(code).toBe(0);
-    const written = JSON.parse(await readFile(target, "utf-8"));
-    expect(written.mcpServers.existing).toEqual({
-      command: "existing",
-      args: [],
-    });
-    expect(written.mcpServers.brandsystem).toEqual(buildServerEntry("core"));
-    expect(loggedOutput()).toContain("Start a new Cline task");
+    expect(commandRunner).toHaveBeenCalledWith("cline", [
+      "mcp",
+      "install",
+      "brandsystem",
+      "--yes",
+      "--",
+      "npx",
+      "-y",
+      "@brandsystem/mcp",
+      "--profile=full",
+    ]);
+    expect(loggedOutput()).toContain("official Cline CLI");
   });
 });
 

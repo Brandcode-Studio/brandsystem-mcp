@@ -69,6 +69,13 @@ export function buildCodexAddArgs(profile: ToolProfile): string[] {
   return ["mcp", "add", "brandsystem", "--", ...serverArgs];
 }
 
+/** Build the official `cline mcp install` invocation for this package. */
+export function buildClineInstallArgs(profile: ToolProfile): string[] {
+  const serverArgs = ["npx", "-y", "@brandsystem/mcp"];
+  if (profile === "full") serverArgs.push("--profile=full");
+  return ["mcp", "install", "brandsystem", "--yes", "--", ...serverArgs];
+}
+
 /** Resolve where the MCP config lives for each supported client. */
 export function resolveConfigPath(
   client: InstallClient,
@@ -193,18 +200,23 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
     return 1;
   }
 
-  if (opts.client === "codex") {
-    const target = resolveConfigPath("codex", opts.cwd, opts.home, opts.platform);
-    const args = buildCodexAddArgs(opts.profile);
-    const renderedCommand = ["codex", ...args].join(" ");
+  if (opts.client === "codex" || opts.client === "cline") {
+    const client = opts.client;
+    const command = client;
+    const target = resolveConfigPath(client, opts.cwd, opts.home, opts.platform);
+    const args = client === "codex"
+      ? buildCodexAddArgs(opts.profile)
+      : buildClineInstallArgs(opts.profile);
+    const renderedCommand = [command, ...args].join(" ");
+    const displayName = client === "codex" ? "Codex" : "Cline";
 
     if (!opts.write) {
       console.log(`Dry run — nothing was written.`);
       console.log(``);
-      console.log(`Codex stores MCP configuration in:`);
+      console.log(`${displayName} stores MCP configuration in:`);
       console.log(`  ${target}`);
       console.log(``);
-      console.log(`The official Codex CLI would run:`);
+      console.log(`The official ${displayName} CLI would run:`);
       console.log(`  ${renderedCommand}`);
       console.log(``);
       console.log(`Re-run with --write to apply.`);
@@ -212,23 +224,23 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
     }
 
     try {
-      const exitCode = await (opts.commandRunner ?? runCommand)("codex", args);
+      const exitCode = await (opts.commandRunner ?? runCommand)(command, args);
       if (exitCode !== 0) {
         console.error(
-          `Error: Codex CLI exited with code ${exitCode}. No brandsystem configuration was confirmed.`,
+          `Error: ${displayName} CLI exited with code ${exitCode}. No brandsystem configuration was confirmed.`,
         );
         return 1;
       }
     } catch (err) {
       const message = (err as NodeJS.ErrnoException).code === "ENOENT"
-        ? "Codex CLI was not found. Install Codex, then retry this command."
+        ? `${displayName} CLI was not found. Install ${displayName}, then retry this command.`
         : (err as Error).message;
       console.error(`Error: ${message}`);
       return 1;
     }
 
-    console.log(`Added "brandsystem" to Codex through the official Codex CLI.`);
-    console.log(`Start a new Codex task, then ask: "How do I use my brand guidelines with AI?"`);
+    console.log(`Added "brandsystem" to ${displayName} through the official ${displayName} CLI.`);
+    console.log(`Start a new ${displayName} task, then ask: "How do I use my brand guidelines with AI?"`);
     return 0;
   }
 
@@ -280,8 +292,6 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
   console.log(`Wrote "brandsystem" server entry to ${target}`);
   if (opts.client === "claude-desktop") {
     console.log(`Restart Claude Desktop to pick up the new server.`);
-  } else if (opts.client === "cline") {
-    console.log(`Start a new Cline task to pick up the new server.`);
   }
   return 0;
 }
