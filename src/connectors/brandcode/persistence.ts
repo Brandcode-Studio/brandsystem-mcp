@@ -122,4 +122,21 @@ export async function writePackagePayload(
     JSON.stringify(payload, null, 2) + "\n",
     "utf-8",
   );
+
+  // Promotion gate: production_approved is conferred only by Brandcode
+  // Studio. If the hosted package declares it, record the approval bound to
+  // the post-pull source fingerprint; local edits after this pull demote the
+  // effective level back to provisional at the next compile.
+  const declared = (payload as { approval?: unknown }).approval;
+  if (declared === "production_approved") {
+    const { writeApprovalState, computeBrandFingerprint } = await import(
+      "../../lib/approval-state.js"
+    );
+    await writeApprovalState(cwd, {
+      level: "production_approved",
+      confirmed_at: new Date().toISOString(),
+      fingerprint: await computeBrandFingerprint(cwd),
+      authority: "brandcode_studio",
+    });
+  }
 }

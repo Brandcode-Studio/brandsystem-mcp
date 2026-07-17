@@ -71,7 +71,7 @@ describe("brand_brandcode_live tool", () => {
     process.chdir(tmpDir);
     invalidateLiveCache();
 
-    const server = createServer();
+    const server = createServer({ profile: "full" });
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
     client = new Client({ name: "live-tool-test", version: "1.0.0" });

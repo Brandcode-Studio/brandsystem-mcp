@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
+import { CORE_TOOL_NAMES, resolveProfile, type ToolProfile } from "./lib/tool-profile.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
@@ -33,6 +34,7 @@ import { register as registerAuditContent } from "./tools/brand-audit-content.js
 import { register as registerCheckCompliance } from "./tools/brand-check-compliance.js";
 import { register as registerAuditDrift } from "./tools/brand-audit-drift.js";
 import { register as registerRuntime } from "./tools/brand-runtime.js";
+import { register as registerContext } from "./tools/brand-context.js";
 import { register as registerCheck } from "./tools/brand-check.js";
 import { register as registerPreview } from "./tools/brand-preview.js";
 import { register as registerExtractVisual } from "./tools/brand-extract-visual.js";
@@ -47,11 +49,26 @@ import { register as registerRepoConnect } from "./tools/brand-repo-connect.js";
 import { register as registerRepoStatus } from "./tools/brand-repo-status.js";
 import { register as registerEnrichSkill } from "./tools/brand-enrich-skill.js";
 
-export function createServer(): McpServer {
+export function createServer(options?: { profile?: ToolProfile }): McpServer {
+  const profile = options?.profile ?? resolveProfile();
   const server = new McpServer({
     name: "brandsystem",
     version: getVersion(),
   });
+
+  // Core profile: intercept registration so only core tools register.
+  // register() functions are unchanged — filtering happens at the choke
+  // point, and the full profile is a pure superset (verified by test).
+  if (profile === "core") {
+    const originalTool = server.tool.bind(server) as (...args: unknown[]) => unknown;
+    (server as unknown as { tool: (...args: unknown[]) => unknown }).tool = (
+      ...args: unknown[]
+    ) => {
+      const name = args[0] as string;
+      if (!CORE_TOOL_NAMES.has(name)) return undefined;
+      return originalTool(...args);
+    };
+  }
 
   // ── Entry points (register first — agents see these first) ──
   registerStart(server);       // #1: Entry point for new brands
@@ -94,6 +111,7 @@ export function createServer(): McpServer {
 
   // ── Runtime ──
   registerRuntime(server);     // Read compiled brand runtime contract
+  registerContext(server);     // Task-scoped deterministic context selection
   registerCheck(server);       // Fast inline brand gate
   registerPreview(server);     // Visual proof page
 

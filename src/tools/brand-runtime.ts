@@ -183,6 +183,7 @@ export function register(server: McpServer) {
     "brand_runtime",
     "Read the compiled brand runtime contract (brand-runtime.json). Returns the brand system that AI agents load as context for on-brand output. Supports slicing: 'full' (~1200 tokens, everything), 'visual' (~200 tokens, colors + fonts + anti-patterns), 'voice' (~400 tokens, tone + vocabulary + perspective), 'minimal' (~100 tokens, primary color + heading font). Use slices when passing brand context to sub-agents — smaller context reduces token cost and agent satisficing. Live Mode aware: when enabled via brand_brandcode_live, the runtime refreshes from the hosted Brandcode runtime on each call (subject to cache TTL). Falls back silently to the local mirror on network error. Read-only. Run brand_compile to refresh.",
     paramsShape,
+    { title: "Read brand runtime", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

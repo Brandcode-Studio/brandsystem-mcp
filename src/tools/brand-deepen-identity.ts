@@ -567,6 +567,7 @@ export function register(server: McpServer) {
     "brand_deepen_identity",
     "Define visual identity rules beyond colors and fonts — composition energy, pattern language, illustration style, photography direction, signature moves, and anti-patterns (hard compliance rules). Session 2 interview with 6 sections. Mode 'interview' returns structured questions for missing sections. Mode 'record' saves answers. Use after Session 1 (core identity extracted). Anti-patterns become enforceable rules in brand_preflight. Returns section completion status.",
     paramsShape,
+    { title: "Deepen visual identity", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

@@ -140,6 +140,7 @@ export function register(server: McpServer) {
     "brand_extract_site",
     "Deeply extract brand evidence from a website by discovering representative pages, rendering them in headless Chrome across desktop and mobile, capturing screenshots, and sampling computed styles from multiple components. Use when a homepage scan is not enough or when you want richer evidence before compiling tokens. NOT for a fast single-page scan — use brand_extract_web for quick static CSS parsing with no browser required.",
     paramsShape,
+    { title: "Extract brand from site pages", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async (args) => {
       const parsed = ParamsSchema.safeParse(args);
       if (!parsed.success) {

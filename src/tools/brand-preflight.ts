@@ -713,6 +713,7 @@ export function register(server: McpServer) {
     "brand_preflight",
     "Check HTML/CSS against brand rules — catches off-brand colors, wrong fonts, missing logo, and anti-pattern violations (drop shadows, gradients, etc.). Pass an HTML string or file path. Mode 'check' (default) runs all compliance checks and returns pass/warn/fail per rule. Mode 'rules' lists all active preflight rules without checking content. Use after generating any visual content to validate brand compliance. Returns overall status and per-check details. NOT for scoring content copy — use brand_audit_content. NOT for brand directory validation — use brand_audit.",
     paramsShape,
+    { title: "Preflight brand check", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

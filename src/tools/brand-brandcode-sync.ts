@@ -340,6 +340,7 @@ export function register(server: McpServer) {
     "brand_brandcode_sync",
     'Sync local .brand/ with a connected Brandcode Studio brand. Two directions: "pull" (default) fetches the latest from Studio, delta-aware via syncToken. "push" uploads local changes to Studio (requires auth via brand_brandcode_auth). Requires a prior brand_brandcode_connect. Use when the user says "sync brand", "push to Studio", "pull latest brand", or "update Studio". Returns sync mode, changed areas, and sync token. NOT for initial connection — use brand_brandcode_connect. NOT for checking status — use brand_brandcode_status.',
     paramsShape,
+    { title: "Sync with Brandcode Studio", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

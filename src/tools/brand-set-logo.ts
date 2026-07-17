@@ -178,6 +178,7 @@ export function register(server: McpServer) {
     "brand_set_logo",
     "Add or replace a logo in the brand system. Accepts raw SVG markup, a URL to a logo file (SVG/PNG), or a base64 data URI. Use when brand_extract_web missed the logo, extracted the wrong image, or the user provides a logo directly. Sanitizes SVG, saves to .brand/assets/logo/, and updates core-identity.yaml with inline_svg and data_uri for portable embedding. Returns logo preview data.",
     paramsShape,
+    { title: "Set brand logo", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

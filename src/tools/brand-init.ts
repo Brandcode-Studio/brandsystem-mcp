@@ -97,6 +97,7 @@ export function register(server: McpServer) {
     "brand_init",
     "Initialize a .brand/ directory with empty config scaffold. Low-level tool — prefer brand_start instead, which calls this automatically and also presents extraction options. Only use brand_init directly if you need to set up the directory without running extraction. Returns list of created files.",
     paramsShape,
+    { title: "Initialize .brand/ directory", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

@@ -251,6 +251,7 @@ export function register(server: McpServer) {
     "brand_extract_figma",
     "Extract brand identity from a Figma design file. Accepts multiple input formats: variable_map (simple { name: hex } from get_variable_defs), design_context (raw get_design_context output with colors/fonts parsed from code), variables (structured array), styles (text styles), and logo_svg. Two phases: mode='plan' returns which Figma MCP tools to call. Mode='ingest' processes all collected data. Figma values override web extraction based on source_priority. Also accepts figma_url for automatic file key extraction. NOT for web extraction (use brand_extract_web).",
     paramsShape,
+    { title: "Extract brand from Figma", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const result = safeParseParams(ParamsSchema, args);
       if (!result.success) return result.response;

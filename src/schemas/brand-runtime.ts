@@ -48,6 +48,9 @@ const RuntimeStrategySchema = z.object({
 
 export const BrandRuntimeSchema = z.object({
   version: z.string(),
+  // Explicit schema version (0.10+); `version` remains as a deprecated alias
+  // through a compatibility window. Optional so older runtimes still validate.
+  schema_version: z.string().optional(),
   client_name: z.string(),
   compiled_at: z.string(),
   sessions_completed: z.number(),

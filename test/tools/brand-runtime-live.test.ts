@@ -102,7 +102,7 @@ describe("brand_runtime live routing", () => {
 
     await setupBrandDir(tmpDir);
 
-    const server = createServer();
+    const server = createServer({ profile: "full" });
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
     client = new Client({ name: "runtime-live-test", version: "1.0.0" });

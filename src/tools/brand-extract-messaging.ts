@@ -728,6 +728,7 @@ export function register(server: McpServer) {
     "brand_extract_messaging",
     "Audit how a brand currently sounds on its website — the first step in Session 3 (brand voice and messaging). Use when the user says 'analyze my voice', 'brand voice audit', 'how does my brand sound?', or 'start Session 3'. Analyzes voice fingerprint (formality, jargon density, active voice %, hedging), vocabulary frequency, claims quality, AI-ism detection, and messaging gaps. Writes .brand/messaging-audit.md. After this, run brand_compile_messaging to define how the brand *should* sound. Returns structured analysis with scores.",
     paramsShape,
+    { title: "Audit website messaging", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

@@ -25,7 +25,7 @@ export async function connectWithCwd(
   cwd: string,
 ): Promise<{ client: Client; cleanup: () => Promise<void> }> {
   vi.spyOn(process, "cwd").mockReturnValue(cwd);
-  const server = createServer();
+  const server = createServer({ profile: "full" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "integration-test", version: "1.0.0" });

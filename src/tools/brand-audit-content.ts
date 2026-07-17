@@ -148,6 +148,7 @@ export function register(server: McpServer) {
     "brand_audit_content",
     "Check if content is on-brand — score any text or markup 0-100 for brand compliance. Checks color/font usage, voice alignment, anti-pattern violations, and message coverage. Use when asked 'is this on-brand?', 'brand compliance score', 'check brand alignment', or after generating any content. Works progressively: Session 1 scores tokens, Session 2 adds visual compliance, Session 3 adds voice and messaging. Returns 0-100 score with per-dimension breakdown and specific issues. NOT for .brand/ directory validation (use brand_audit) or HTML/CSS rule checking (use brand_preflight).",
     paramsShape,
+    { title: "Score content against brand", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

@@ -65,7 +65,7 @@ export const TOOL_SESSIONS: ReadonlyArray<{ name: string; tools: readonly string
   },
   {
     name: "Runtime",
-    tools: ["brand_runtime", "brand_check", "brand_preview"],
+    tools: ["brand_runtime", "brand_context", "brand_check", "brand_preview"],
   },
   {
     name: "Brandcode Studio connector",
@@ -114,7 +114,8 @@ async function handler() {
         tool_sessions: TOOL_SESSIONS,
         getting_started: {
           what_is_brandsystem: "brandsystem extracts and manages brand identity (logo, colors, fonts, voice, visual rules) so AI tools produce on-brand output. It creates a .brand/ directory with structured YAML, DTCG tokens, and a portable HTML report.",
-          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, escalates to deeper visual/site extraction for JS-rendered or weak-signal sites when Chrome is available, compiles DTCG tokens + brand runtime + interaction policy, generates design-synthesis.json + DESIGN.md, and generates a portable brand report — all in one call. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
+          quickstart: "Run brand_start with client_name='Your Brand' and website_url='https://yourbrand.com' and mode='auto'. This extracts colors, fonts, and logo from the website, escalates to deeper visual/site extraction for JS-rendered or weak-signal sites when Chrome is available, compiles DTCG tokens + brand runtime + interaction policy, generates design-synthesis.json + DESIGN.md, and generates a portable brand report — all in one call. brand_start also accepts guideline_pdf, figma_file_key, or brandcode_url to adopt from those sources. To connect to an existing hosted brand instead, run brand_brandcode_connect.",
+          tool_profiles: "By default the server registers the Core profile (12 tools — the complete adopt → context → create → check loop). Authoring tools (sessions 2-4 interviews, deep extraction control, drift analytics) require the full profile: set BRANDSYSTEM_PROFILE=full or pass --profile=full in the MCP config args.",
           session_overview: {
             "Session 1 — Core Identity": "brand_start → brand_extract_web or brand_extract_visual or brand_extract_site → brand_generate_designmd → brand_compile → brand_report. Extracts colors, fonts, logo from static CSS, a rendered page, or a deeper multi-page rendered crawl. Produces tokens.json, brand-runtime.json, interaction-policy.json, design-synthesis.json, DESIGN.md, brand-report.html, and optional extraction-evidence.json.",
             "Session 2 — Visual Identity": "brand_deepen_identity (interview). Captures composition rules, patterns, illustration style, anti-patterns. Produces visual-identity-manifest.md.",
@@ -122,8 +123,9 @@ async function handler() {
             "Session 4 — Content Strategy": "brand_build_personas → brand_build_journey → brand_build_themes → brand_build_matrix. Creates audience personas, journey stages, editorial themes, and a messaging matrix.",
           },
           available_tools: [
-            "brand_start — Entry point. Creates brand system from a website URL",
+            "brand_start — Entry point. Adopts a brand from a website URL, PDF guidelines, Figma file, or Brandcode Studio brand — and discovers local sources",
             "brand_status — Shows current progress (you are here)",
+            "brand_context — Task-scoped brand context (deterministic section selection by task_type/audience/budget)",
             "brand_extract_web — Extract colors, fonts, logo from any website",
             "brand_extract_visual — Screenshot the rendered page and extract computed colors/fonts for JS-heavy sites",
             "brand_extract_site — Discover representative pages, sample multiple viewports/components, and persist extraction-evidence.json",
@@ -372,6 +374,7 @@ export function register(server: McpServer) {
   server.tool(
     "brand_status",
     "Check brand system progress and get next steps. Shows what has been extracted (colors, fonts, logo), confidence levels, session completion status, and what to do next. Use when resuming a previous session, checking readiness, or when the user asks 'what's the state of my brand?' If no .brand/ exists, returns a full getting-started guide with all available tools. Returns structured status data.",
+    { title: "Brand status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async () => handler()
   );
 }

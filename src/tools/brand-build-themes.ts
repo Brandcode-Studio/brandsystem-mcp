@@ -584,6 +584,7 @@ export function register(server: McpServer) {
     "brand_build_themes",
     "Define editorial content themes — the strategic pillars that organize what to write about. Each theme has a content intent (Brand Heat for awareness, Momentum for engagement, Conversion for pipeline), target personas, and proof points. Mode 'interview' guides through 5 questions per theme. Mode 'record' saves (auto-generates ID like THM-001). Mode 'list' shows all themes with intent distribution. Most brands need 3-5 themes balanced across all three intents. Returns theme data and balance analysis.",
     paramsShape,
+    { title: "Define content themes", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

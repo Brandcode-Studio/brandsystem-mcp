@@ -11,6 +11,7 @@ import { ERROR_CODES, type ClarificationItem } from "../types/index.js";
 import { invalidateCheckCache } from "../lib/brand-check-engine.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import { fenceUntrusted } from "../lib/untrusted-text.js";
+import { resolveEffectiveApproval } from "../lib/approval-state.js";
 
 async function handler(server: McpServer) {
   const brandDir = new BrandDir(process.cwd());
@@ -230,7 +231,10 @@ async function handler(server: McpServer) {
   }
 
   // --- Runtime + Interaction Policy compilation ---
-  const runtime = compileRuntime(config, identity, visual, messaging, strategy);
+  // Approval carries over only while the source-file fingerprint still
+  // matches the stored confirmation; any source change demotes to provisional.
+  const effectiveApproval = await resolveEffectiveApproval(process.cwd());
+  const runtime = compileRuntime(config, identity, visual, messaging, strategy, effectiveApproval);
   await brandDir.writeRuntime(runtime);
   filesWritten.push("brand-runtime.json");
 
@@ -311,6 +315,7 @@ export function register(server: McpServer) {
   server.tool(
     "brand_compile",
     "Generate DTCG design tokens, design-synthesis.json, DESIGN.md, brand runtime, and interaction policy from extracted brand data. Transforms core-identity.yaml into tokens.json, brand-runtime.json (single-document brand contract for AI agents), and interaction-policy.json (enforceable rules). When Session 2+ data exists, also generates visual-identity-manifest.md and system-integration.md. Use after brand_extract_web, brand_extract_site, brand_extract_visual, or brand_extract_figma. Returns token counts, clarification items, and file list.",
+    { title: "Compile brand tokens", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async () => handler(server)
   );
 }

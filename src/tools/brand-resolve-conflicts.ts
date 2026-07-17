@@ -112,6 +112,7 @@ export function register(server: McpServer) {
     "brand_resolve_conflicts",
     "Inspect and resolve disagreements between brand sources — when web extraction says one primary color, Figma says another, and the PDF guidelines say a third. Mode 'show' lists every conflicting field across web/visual/figma/guidelines/manual sources with each source's value, confidence, and the recommended winner per brand.config.yaml source_priority. Mode 'resolve' commits one source as the winner for a specific field (requires field + source). Use when brand_audit reports conflicts, after ingesting multiple sources, or when colors/fonts/logos look inconsistent in compiled outputs. Returns the conflict list in show mode, or the updated field value in resolve mode. Run brand_compile after resolving to refresh tokens and runtime artifacts. NOT for validating .brand/ structure (use brand_audit) or scoring content (use brand_audit_content).",
     paramsShape,
+    { title: "Resolve extraction conflicts", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async (args) => {
       const result = safeParseParams(ParamsSchema, args);
       if (!result.success) return result.response;

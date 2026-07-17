@@ -148,6 +148,7 @@ export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_status",
     'Inspect the Brandcode Studio connection for the current project. Read-only — reads .brand/brandcode-connector.json and .brand/brandcode-sync-history.json without making network requests. Shows connected brand slug, remote URL, sync token, last sync time, sync history, local package contents, and Phase 0 Brandcode MCP URL/status. Use when the user says "brandcode status", "check connection", "am I synced?", or "show brand connection". Returns structured connection data or a clear "not connected" message with instructions to run brand_brandcode_connect. NOT for syncing — use brand_brandcode_sync to pull updates.',
+    { title: "Brandcode connection status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async () => handler(),
   );
 }

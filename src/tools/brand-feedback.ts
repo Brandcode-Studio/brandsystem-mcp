@@ -549,6 +549,7 @@ export function register(server: McpServer) {
     "brand_feedback",
     "Send a feedback signal to the brandsystem team about a tool or workflow. Use when a tool errors, extraction misses obvious data, the workflow felt harder than it should, an agent's path got blocked, or something worked particularly well and should be preserved. Set category to one of: 'bug' (broken), 'friction' (works but painful), 'feature_request' (capability missing), 'data_quality' (results wrong/incomplete), 'praise' (worth keeping), 'agent_signal' (structured telemetry — also pass signal + tool_used + signal_context; brand context auto-fills from .brand/config). Provide a one-line summary plus optional detail/severity/context. Writes to ~/.brandsystem/feedback/ AND attempts a fire-and-forget POST to brandcode.studio (drains backlog if previously offline). Returns the feedback ID and remote-send status. NOT for reading existing feedback — use brand_feedback_review. NOT for changing item status — use brand_feedback_triage.",
     sendParamsShape,
+    { title: "Send feedback", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async (args) => {
       // Accept "type" as alias for "category" (common agent misguess)
       const normalized = { ...(args as Record<string, unknown>) };
@@ -566,6 +567,7 @@ export function register(server: McpServer) {
     "brand_feedback_review",
     "Review all agent feedback stored in ~/.brandsystem/feedback/. Read-only — reads local JSON files without network access. Shows summary stats (by category, severity, status) and individual items with timestamps. Filter by category (bug, friction, feature_request, agent_signal) or status (new, quarantined, acknowledged, fixed). Quarantined items were flagged for potential prompt injection. Use to triage feedback, spot recurring issues, and prioritize fixes. NOT for submitting feedback — use brand_feedback. NOT for changing item status — use brand_feedback_triage.",
     reviewParamsShape,
+    { title: "Review feedback", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ReviewParamsSchema, args);
       if (!parsed.success) return parsed.response;
@@ -577,6 +579,7 @@ export function register(server: McpServer) {
     "brand_feedback_triage",
     "Update the status of a feedback item after review. Mark as 'acknowledged' (seen, will address), 'fixed' (resolved), or 'wontfix' (intentional, won't change). Add an optional triage note.",
     triageParamsShape,
+    { title: "Triage feedback", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(TriageParamsSchema, args);
       if (!parsed.success) return parsed.response;

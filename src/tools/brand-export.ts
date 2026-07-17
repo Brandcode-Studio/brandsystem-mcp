@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { sanitizeSvg } from "../lib/svg-resolver.js";
-import { PROVISIONAL_ARTIFACT_NOTICE } from "../lib/untrusted-text.js";
+import { PROVISIONAL_ARTIFACT_NOTICE, artifactNotice } from "../lib/untrusted-text.js";
+import { resolveEffectiveApproval } from "../lib/approval-state.js";
 import type {
   CoreIdentityData,
   VisualIdentityData,
@@ -818,6 +819,16 @@ async function handler(input: ExportParams) {
     }
   }
 
+  // Stamp the level-appropriate provenance notice: generators emit the
+  // provisional floor; upgrade it when the runtime holds a higher (still
+  // fingerprint-valid) approval. Understating is safe; overstating never is.
+  if (!pdfBytes) {
+    const approval = await resolveEffectiveApproval(process.cwd());
+    if (approval !== "provisional_extracted") {
+      content = content.replace(PROVISIONAL_ARTIFACT_NOTICE, artifactNotice(approval));
+    }
+  }
+
   const filename = TARGET_FILES[target] || `exports/brand-guide.pdf`;
   if (pdfBytes) {
     await brandDir.writeAsset(`../exports/brand-guide.pdf`, Buffer.from(pdfBytes));
@@ -876,6 +887,7 @@ export function register(server: McpServer) {
     "brand_export",
     "Bundle the compiled brand system into a portable artifact for a specific destination. Use when asked 'share my brand', 'export for ChatGPT/Cursor/team', 'generate brand guidelines', 'make a one-pager', or 'create a brand PDF'. Target 'chat': self-contained markdown for upload to any AI conversation (Claude, ChatGPT, Gemini). Target 'code': MCP server config + CLAUDE.md/.cursorrules snippet. Target 'team': human-readable brand guidelines for designers/writers/marketers. Target 'email': ~500-word summary for Slack or email. Target 'claude-skill': SKILL.md with embedded logo + rules for persistent Claude artifacts. Target 'pdf': branded PDF with swatches, type, anti-patterns, and voice. Set include_logo=false to drop the embedded SVG/data URI when size matters. Writes to .brand/exports/<file> and returns the full content (markdown targets) or a generation summary (pdf). Requires brand_compile to have run first. NOT for previewing one section — use brand_preview.",
     paramsShape,
+    { title: "Export brand guide", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

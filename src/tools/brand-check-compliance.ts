@@ -282,6 +282,7 @@ export function register(server: McpServer) {
     "brand_check_compliance",
     "Publish-time brand gate — single PASS/FAIL verdict on a finished piece of content before it ships. Use when asked 'can I publish this?', 'is this ready to ship?', or in CI/CD pipelines that block on brand violations. Verifies on-palette colors, brand fonts, anti-pattern rules, and never-say words across the whole input. Strict mode also fails on soft (advisory) anti-patterns. Returns PASS or FAIL with the specific failures. NOT for mid-stream linting while writing — use brand_check for fast per-field feedback. NOT for 0-100 scoring or drift analysis — use brand_audit_content. NOT for HTML/CSS structural rules — use brand_preflight.",
     paramsShape,
+    { title: "Check content compliance", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

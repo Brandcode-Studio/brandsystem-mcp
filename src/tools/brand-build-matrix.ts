@@ -627,6 +627,7 @@ export function register(server: McpServer) {
     "brand_build_matrix",
     "Generate persona x journey stage messaging variants — adapted core messages for every audience at every buying stage. Mode 'generate' creates variants using persona tensions, stage mindsets, and brand perspective. Mode 'view' shows the matrix as a grid. Mode 'edit' refines a specific variant by ID. Requires personas and journey stages in strategy.yaml. Returns variant grid with status tracking (Draft/Active/Retired).",
     paramsShape,
+    { title: "Build messaging matrix", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

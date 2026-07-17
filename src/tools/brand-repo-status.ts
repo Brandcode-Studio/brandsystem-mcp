@@ -144,6 +144,7 @@ export function register(server: McpServer) {
     "brand_repo_status",
     'Check the health and sync status of a git-connected brand repo. Shows last sync time, commit SHA, polling health, and recent sync events. Use when the user says "repo status", "is my repo syncing?", "check git connection", or "when did it last sync?".',
     paramsShape,
+    { title: "Repo connection status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async (input) => handler(input as unknown as Record<string, unknown>),
   );
 }

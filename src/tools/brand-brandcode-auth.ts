@@ -416,6 +416,7 @@ export function register(server: McpServer) {
     "brand_brandcode_auth",
     'Activate Brandcode Studio connection for saving and pushing brands. Preferred mode: "activate" displays a short code (e.g. BRAND-7K4X) for the user to enter at brandcode.studio/activate — no copy-paste of tokens needed. Also supports: "status" (check auth), "login" (magic link fallback), "set_key" (manual token), "logout" (clear credentials). Use when the user wants to save their brand to Studio or says "activate", "connect to Brandcode", or "save my brand online". NOT needed for extraction, preview, or brand_check — those work without auth.',
     paramsShape,
+    { title: "Brandcode Studio auth", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;
