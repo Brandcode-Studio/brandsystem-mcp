@@ -10,8 +10,9 @@ One artifact. Every surface on brand.
 ## How to install
 npx @brandsystem/mcp install --client codex --write
 npx @brandsystem/mcp install --client claude-code --write
+npx @brandsystem/mcp install --client cline --write
 
-Supported installer clients: codex, claude-code, cursor, windsurf, claude-desktop. Install is a dry run without --write.
+Supported installer clients: codex, claude-code, cline, cursor, windsurf, claude-desktop. Install is a dry run without --write.
 
 Or start the server directly:
 npx @brandsystem/mcp
@@ -42,7 +43,7 @@ Tested in production: visual consistency is near-instant from the runtime. Voice
 - Contextualize: brand_context returns a task-scoped slice (task_type/audience/budget → deterministic section selection with explicit no-match)
 - Enforce: brand_audit_content (0-100 scoring), brand_check_compliance (pass/fail gate), brand_preflight (HTML/CSS rules), provenance-integrity detection in brand_audit
 - Profiles: Core (12 tools, default — the complete adopt→create→check loop) or full (entire authoring system, BRANDSYSTEM_PROFILE=full)
-- Setup: npx @brandsystem/mcp doctor | install --client <codex|claude-code|cursor|windsurf|claude-desktop> | inspect
+- Setup: npx @brandsystem/mcp doctor | install --client <codex|claude-code|cline|cursor|windsurf|claude-desktop> | inspect
 - Protocol-native: every response carries MCP structuredContent with a declared envelope outputSchema; compact JSON; enforced token budgets on entry tools; structured overflow markers instead of truncation
 - Evidence: public agent-evaluation suite in eval/ (fixtures + methodology + runnable harness, npm run eval); results published only from actual runs
 - Subscribe: brand://runtime and brand://policy as MCP resources

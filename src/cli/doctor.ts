@@ -283,6 +283,19 @@ export async function checkClientConfigs(
       format: "toml",
     },
     {
+      path: join(
+        home,
+        ".cline",
+        "data",
+        "settings",
+        "cline_mcp_settings.json",
+      ),
+      label: "~/.cline/data/settings/cline_mcp_settings.json",
+      client: "Cline",
+      installKey: "cline",
+      format: "json",
+    },
+    {
       path: join(cwd, ".cursor", "mcp.json"),
       label: join(".cursor", "mcp.json"),
       client: "Cursor",
