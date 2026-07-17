@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.11.2 (2026-07-17)
+
+Agent onboarding and discovery release: a first-class Codex install path, clearer protocol guidance, and intent-led package metadata.
+
 ### Added
 
 - **Codex installer path.** `npx @brandsystem/mcp install --client codex --write` delegates to the official `codex mcp add` command; dry-run remains the default.
