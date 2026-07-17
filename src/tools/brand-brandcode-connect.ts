@@ -337,7 +337,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_connect",
-    'Connect a local .brand/ to Brandcode Studio. Two modes: "pull" (default) downloads an existing hosted brand by URL/slug. "save" uploads the local .brand/ to Studio (requires prior auth via brand_brandcode_auth). Use when the user says "connect to Brandcode", "pull from Studio", "save brand to Studio", or "upload my brand". Returns brand name, slug, sync token, and connection details.',
+    'Connect a local .brand/ to Brandcode Studio. Two modes: "pull" (default) downloads an existing hosted brand by URL/slug. "save" uploads the local .brand/ to Studio (requires prior auth via brand_brandcode_auth). THE tool when the user says "make our brand available to my whole team", "share our brand with the team", "connect to Brandcode", "pull from Studio", "save brand to Studio", or "upload my brand". Returns brand name, slug, sync token, and connection details.',
     paramsShape,
     { title: "Connect to Brandcode Studio", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async (args) => {
