@@ -1,0 +1,396 @@
+{
+  "commit": "ced7e5e6c85cccc48a7af430bd1287d2de38596e",
+  "tree": "clean",
+  "package_version": "@brandsystem/mcp@0.14.1",
+  "generated": "2026-07-18T06:00:56.467Z",
+  "model_dependent": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5-20251001",
+    "scenario": "all",
+    "sets": [
+      {
+        "set": "development",
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5-20251001",
+        "date": "2026-07-18T06:00:45.959Z",
+        "metric": "first_tool_selection",
+        "overall_accuracy": 94.73684210526315,
+        "overall_value": "94.7% (18/19)",
+        "positive": {
+          "total": 12,
+          "correct": 11,
+          "accuracy": 91.66666666666666
+        },
+        "negative": {
+          "total": 7,
+          "correct": 7,
+          "false_invocations": 0,
+          "false_invocation_rate": 0
+        },
+        "cases": [
+          {
+            "id": "adopt-existing-guidelines",
+            "category": "adoption",
+            "negative": false,
+            "expected": [
+              "brand_start"
+            ],
+            "selected": "brand_start",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "adopt-pdf-guide",
+            "category": "adoption",
+            "negative": false,
+            "expected": [
+              "brand_start"
+            ],
+            "selected": "brand_start",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "adopt-figma-library",
+            "category": "adoption",
+            "negative": false,
+            "expected": [
+              "brand_start"
+            ],
+            "selected": "brand_start",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "write-linkedin-in-voice",
+            "category": "content",
+            "negative": false,
+            "expected": [
+              "brand_context",
+              "brand_write"
+            ],
+            "selected": "brand_context",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "check-social-post",
+            "category": "governance",
+            "negative": false,
+            "expected": [
+              "brand_check",
+              "brand_check_compliance",
+              "brand_audit_content"
+            ],
+            "selected": "brand_audit_content",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "share-with-team",
+            "category": "connector",
+            "negative": false,
+            "expected": [
+              "brand_brandcode_connect",
+              "brand_brandcode_auth"
+            ],
+            "selected": "brand_brandcode_connect",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "brand-system-state",
+            "category": "status",
+            "negative": false,
+            "expected": [
+              "brand_status"
+            ],
+            "selected": "brand_status",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "subagent-colors-fonts",
+            "category": "runtime",
+            "negative": false,
+            "expected": [
+              "brand_runtime",
+              "brand_context"
+            ],
+            "selected": "brand_runtime",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "resume-where-left-off",
+            "category": "status",
+            "negative": false,
+            "expected": [
+              "brand_status"
+            ],
+            "selected": "brand_status",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "export-to-cursor",
+            "category": "export",
+            "negative": false,
+            "expected": [
+              "brand_export"
+            ],
+            "selected": "brand_export",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "audit-drafts-folder",
+            "category": "governance",
+            "negative": false,
+            "expected": [
+              "brand_audit_drift",
+              "brand_audit_content"
+            ],
+            "selected": "brand_audit_drift",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "fix-wrong-color",
+            "category": "clarify",
+            "negative": false,
+            "expected": [
+              "brand_clarify"
+            ],
+            "selected": "I",
+            "false_invocation": false,
+            "correct": false
+          },
+          {
+            "id": "negative-weather",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "negative-refactor-python",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "negative-q3-revenue",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "negative-book-meeting",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "negative-summarize-pdf-contract",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "negative-rename-git-branch",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          },
+          {
+            "id": "negative-logo-quiz",
+            "category": "negative",
+            "negative": true,
+            "expected": [
+              "NONE"
+            ],
+            "selected": "NONE",
+            "false_invocation": false,
+            "correct": true
+          }
+        ]
+      }
+    ],
+    "second_agent": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "date": "2026-07-18T06:00:56.467Z",
+      "metric": "second_agent",
+      "runtime": {
+        "schema_version": "0.1.0",
+        "approval": "provisional_extracted"
+      },
+      "totals": {
+        "tasks": 5,
+        "job_completion_rate": 40,
+        "job_completion_value": "40.0% (2/5 completed; 2 incomplete, 0 unscored)",
+        "checker_acceptance_value": "100.0% (5/5)",
+        "mean_flags_per_task": 0.2,
+        "mean_output_tokens": 152,
+        "mean_context_tokens": 336,
+        "meta_commentary_count": 0
+      },
+      "tasks": [
+        {
+          "id": "social-post-launch",
+          "task_type": "social-post",
+          "budget": "compact",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 262,
+          "output_tokens": 65,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "completed"
+        },
+        {
+          "id": "blog-intro-consistency",
+          "task_type": "blog-article",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 374,
+          "output_tokens": 134,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "email-renewal",
+          "task_type": "email",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 322,
+          "output_tokens": 80,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "completed"
+        },
+        {
+          "id": "hero-section-css",
+          "task_type": "code-ui",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css",
+            "color"
+          ],
+          "context_tokens": 272,
+          "output_tokens": 218,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "color_checked": "#2a4494",
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "missing: css",
+          "structure": "satisfied",
+          "status": "incomplete"
+        },
+        {
+          "id": "cta-card-html",
+          "task_type": "landing-page",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css"
+          ],
+          "context_tokens": 449,
+          "output_tokens": 261,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 8,
+          "required_inputs": "missing: css",
+          "structure": "satisfied",
+          "status": "incomplete"
+        }
+      ]
+    }
+  }
+}

@@ -161,3 +161,36 @@ Machine-readable per-task receipt: `eval/receipts/2026-07-17-llm-receipt.json`
 (commit, package, provider/model, per-task contract status, rule coverage,
 verdicts, token estimates). Receipts are committed for every published run
 from now on.
+
+---
+
+## Run: 2026-07-18 (first fully reproducible receipt — clean tree, v0.14.1)
+
+- **Receipt:** `eval/receipts/2026-07-18T0600-ced7e5e-llm-receipt.json` — tree **clean**, commit `ced7e5e` (= published v0.14.1). Reproducible from source for the first time; supersedes the 0.13.4-era dirty-tree receipt.
+- **Model:** `claude-haiku-4-5-20251001`
+
+### Routing — development set: 94.7% (18/19), false-positive invocation 0/7
+
+One stochastic miss: `fix-wrong-color` returned prose instead of a tool name
+(the same failure mode seen in the very first run; it passed in between).
+Single-run scores on a 19-case set move ±1 case run-to-run — treat trends,
+not single points.
+
+### Second-agent: 40% (2/5) under the stricter 0.14.1 definition
+
+Now measured with structural validators active (sentence limits, Subject
+shape, fence-only) plus the honest completion gate:
+
+| Task | Status | Why |
+|---|---|---|
+| social-post-launch | **completed** | contract + structure + check + compliance |
+| email-renewal | **completed** | Subject/blank-line/≤3-sentence structure satisfied |
+| blog-intro-consistency | failed | brand_check voice flag under governed rules |
+| hero-section-css | incomplete | still no fenced CSS despite explicit instruction |
+| cta-card-html | incomplete | same |
+
+Checker acceptance was 5/5 — the completion gap is entirely brand_check
+voice adherence and fenced-output instruction-following, the two failure
+modes every honest run since the correction has named. 20% → 40% across
+runs is within single-run noise on 5 tasks; the stable signal is *which*
+tasks fail and why.
