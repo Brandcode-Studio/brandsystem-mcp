@@ -8,6 +8,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parse as parseYaml } from "yaml";
 import type { BrandRuntime } from "./runtime-compiler.js";
 import type { InteractionPolicy } from "./interaction-policy-compiler.js";
 
@@ -20,6 +21,12 @@ export interface CheckFlag {
   severity: "error" | "warning" | "info";
   message: string;
   fix?: string;
+  /**
+   * True when the flag was demoted to advisory because a high-priority color
+   * clarification (clarify-primary) is open — the palette itself is
+   * unconfirmed, so the flag must not fail the check (issue #41).
+   */
+  advisory?: boolean;
 }
 
 export interface CheckResult {
@@ -193,6 +200,37 @@ async function loadCached(cwd: string): Promise<CachedBrand | null> {
 export function invalidateCheckCache(): void {
   _cache = null;
   _cacheCwd = null;
+}
+
+// ---------------------------------------------------------------------------
+// Color-uncertainty gate (issue #41)
+// ---------------------------------------------------------------------------
+
+/**
+ * Advisory note appended to demoted color verdicts while the primary color
+ * is unconfirmed. Shared by brand_check and brand_check_compliance.
+ */
+export const COLOR_ADVISORY_NOTE =
+  "primary color unconfirmed — resolve clarify-primary; color verdicts are advisory until then";
+
+/**
+ * True while any high-priority clarification with a field starting "colors."
+ * is open in needs-clarification.yaml (e.g. clarify-primary). While it holds,
+ * color verdicts must soften from fail to warning: an unconfirmed guess must
+ * not hard-fail the brand's own true colors. Text/font/css checks are
+ * unaffected. Missing or unparseable file means no gate.
+ */
+export async function hasOpenColorClarification(cwd: string): Promise<boolean> {
+  try {
+    const raw = await readFile(join(cwd, ".brand", "needs-clarification.yaml"), "utf-8");
+    const data = parseYaml(raw) as { items?: Array<{ field?: unknown; priority?: unknown }> } | null;
+    const items = Array.isArray(data?.items) ? data!.items! : [];
+    return items.some(
+      (i) => i?.priority === "high" && typeof i?.field === "string" && i.field.startsWith("colors.")
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +436,25 @@ export async function runBrandCheck(cwd: string, input: CheckInput): Promise<Che
 
   if (input.color) {
     checked.push("color");
-    flags.push(...checkColor(input.color, brand));
+    let colorFlags = checkColor(input.color, brand);
+    if (
+      colorFlags.some((f) => f.severity !== "info") &&
+      (await hasOpenColorClarification(cwd))
+    ) {
+      // Primary unconfirmed (clarify-primary open): color verdicts demote from
+      // fail to advisory warning — the palette itself is a guess (issue #41).
+      colorFlags = colorFlags.map((f) =>
+        f.severity === "info"
+          ? f
+          : {
+              ...f,
+              severity: "warning" as const,
+              advisory: true,
+              message: `${f.message} (${COLOR_ADVISORY_NOTE})`,
+            }
+      );
+    }
+    flags.push(...colorFlags);
   }
 
   if (input.font) {
@@ -412,7 +468,7 @@ export async function runBrandCheck(cwd: string, input: CheckInput): Promise<Che
   }
 
   return {
-    pass: flags.every((f) => f.severity === "info"),
+    pass: flags.every((f) => f.severity === "info" || f.advisory === true),
     flags,
     checked,
   };

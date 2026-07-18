@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
 import { CORE_TOOL_NAMES, resolveProfile, type ToolProfile } from "./lib/tool-profile.js";
-import { RESPONSE_ENVELOPE_SCHEMA } from "./lib/response.js";
+import { RESPONSE_ENVELOPE_SCHEMA, setActiveProfile } from "./lib/response.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
@@ -71,6 +71,8 @@ import { register as registerEnrichSkill } from "./tools/brand-enrich-skill.js";
 
 export function createServer(options?: { profile?: ToolProfile }): McpServer {
   const profile = options?.profile ?? resolveProfile();
+  // Responses annotate guidance that references tools outside this profile.
+  setActiveProfile(profile, CORE_TOOL_NAMES);
   const server = new McpServer(
     {
       name: "brandsystem",

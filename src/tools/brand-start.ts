@@ -2,6 +2,8 @@ import { z } from "zod";
 import { readdir, access } from "node:fs/promises";
 import * as cheerio from "cheerio";
 import { isRealPathWithinBase } from "../lib/path-security.js";
+import { derivePrimaryClarification } from "../lib/primary-uncertainty.js";
+import { fenceUntrusted } from "../lib/untrusted-text.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams, startToolTimer } from "../lib/response.js";
@@ -722,22 +724,19 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   const clarifications: ClarificationItem[] = [];
   let itemId = 0;
 
-  if (!freshIdentity.colors.some((c) => c.role === "primary")) {
-    clarifications.push({
-      id: `clarify-${++itemId}`,
-      field: "colors.primary",
-      question: "No primary brand color identified. Which color is your primary brand color?",
-      source: "compilation",
-      priority: "high",
-    });
-  }
+  // Shared with brand_compile (#41): an uncertain primary — including an
+  // achromatic crowned over chromatic candidates — yields the stable
+  // high-priority clarify-primary item in the auto pipeline too.
+  const primaryItem = derivePrimaryClarification(freshIdentity.colors);
+  if (primaryItem) clarifications.push(primaryItem);
 
   for (const color of freshIdentity.colors) {
     if (needsClarification(color.confidence)) {
+      if (color.role === "primary" && primaryItem) continue;
       clarifications.push({
         id: `clarify-${++itemId}`,
         field: `colors.${color.role}`,
-        question: `Color ${color.value} (${color.name}) has low confidence. Is this correct and what role does it play?`,
+        question: `Color ${color.value} (name: ${fenceUntrusted(color.name, 60)}) has low confidence. Is this correct and what role does it play?`,
         source: color.source,
         priority: "medium",
       });

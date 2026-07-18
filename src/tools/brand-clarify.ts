@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES, type ColorEntry, type ClarificationItem } from "../types/index.js";
+import { isChromatic } from "../lib/css-parser.js";
 import { fenceUntrusted } from "../lib/untrusted-text.js";
 import { writeApprovalState, computeBrandFingerprint } from "../lib/approval-state.js";
 import type { NeedsClarificationData } from "../schemas/index.js";
@@ -277,6 +278,22 @@ function parseRoleAssignments(
   return assignments;
 }
 
+/**
+ * Role to demote a previous primary to when clarify-primary re-roles another
+ * color (issue #41). Prefer a role inferable from the color's name; fall back
+ * to "neutral" for achromatic values, else "unknown".
+ */
+function inferDemotedRole(color: ColorEntry): ColorEntry["role"] {
+  const name = color.name.toLowerCase();
+  for (const role of VALID_ROLES) {
+    if (role !== "primary" && name.includes(role)) return role;
+  }
+  if (/\b(background|bg)\b/.test(name)) return "surface";
+  if (/gr[ae]y/.test(name)) return "neutral";
+  if (!isChromatic(color.value)) return "neutral";
+  return "unknown";
+}
+
 async function handler(input: Params) {
   const brandDir = new BrandDir(process.cwd());
 
@@ -354,6 +371,60 @@ async function handler(input: Params) {
       } else {
         changes.push(`${hex} not found in colors — skipped`);
       }
+    }
+  } else if (item.id === "clarify-primary") {
+    // Primary-uncertainty resolution (issue #41): the answer names the true
+    // primary — as a bare hex anywhere in free text or a natural-language
+    // color description. Re-role that color to primary (confirmed) and demote
+    // the previous primary to its inferred-or-"unknown" role.
+    const answerText = input.answer.trim();
+    let chosenHex =
+      answerText.match(/#[0-9a-fA-F]{3,8}/)?.[0]?.toLowerCase() ?? null;
+    if (!chosenHex) {
+      chosenHex = matchColorByDescription(answerText, identity.colors)?.toLowerCase() ?? null;
+    }
+
+    if (!chosenHex) {
+      const colorList = identity.colors.map(
+        (c) => `${c.value} (current role: ${c.role})`
+      );
+      return buildResponse({
+        what_happened: "Could not identify the primary color from your answer",
+        next_steps: [
+          'Answer with a hex value (e.g. "#00a050") or a color description (e.g. "the green one")',
+          `Available colors: ${colorList.join(", ")}`,
+          "If this keeps happening, run brand_feedback to report the issue.",
+        ],
+        data: { error: ERROR_CODES.PARSE_FAILED, answer: input.answer },
+      });
+    }
+
+    const chosenIdx = identity.colors.findIndex(
+      (c) => c.value.toLowerCase() === chosenHex
+    );
+    const prevPrimaryIdx = identity.colors.findIndex((c) => c.role === "primary");
+
+    if (prevPrimaryIdx !== -1 && prevPrimaryIdx !== chosenIdx) {
+      const prev = identity.colors[prevPrimaryIdx];
+      const demotedRole = inferDemotedRole(prev);
+      prev.role = demotedRole;
+      changes.push(`Demoted previous primary ${prev.value} → role "${demotedRole}"`);
+    }
+
+    if (chosenIdx !== -1) {
+      identity.colors[chosenIdx].role = "primary";
+      identity.colors[chosenIdx].confidence = "confirmed";
+      changes.push(`Color ${identity.colors[chosenIdx].value} → role "primary" (confirmed)`);
+    } else {
+      const newColor: ColorEntry = {
+        name: "primary",
+        value: chosenHex,
+        role: "primary",
+        source: "manual",
+        confidence: "confirmed",
+      };
+      identity.colors.push(newColor);
+      changes.push(`Added color ${chosenHex} as "primary" (confirmed)`);
     }
   } else if (item.field.startsWith("colors.")) {
     const rolePart = item.field.replace("colors.", "");

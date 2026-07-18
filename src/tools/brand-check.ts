@@ -120,10 +120,16 @@ async function handler(input: Params) {
     data.live = liveIndicator;
   }
 
+  const hasAdvisoryColorFlags = flags.some((f) => f.advisory === true);
+
   return buildResponse({
     what_happened: `Brand check ${pass ? "passed" : "failed"}: ${parts.join(", ")} (${checked.join(", ")})`,
     next_steps: pass
-      ? []
+      ? hasAdvisoryColorFlags
+        ? [
+            "Color verdicts are advisory: the primary color is unconfirmed. Resolve clarify-primary with brand_clarify, then brand_compile to restore hard color verdicts.",
+          ]
+        : []
       : flags
           .filter((f) => f.fix)
           .slice(0, 3)

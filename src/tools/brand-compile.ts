@@ -8,6 +8,7 @@ import { compileRuntime } from "../lib/runtime-compiler.js";
 import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
 import { generateAndPersistDesignArtifacts } from "../lib/design-synthesis.js";
 import { ERROR_CODES, type ClarificationItem } from "../types/index.js";
+import { derivePrimaryClarification } from "../lib/primary-uncertainty.js";
 import { invalidateCheckCache } from "../lib/brand-check-engine.js";
 import { SCHEMA_VERSION } from "../schemas/index.js";
 import { fenceUntrusted } from "../lib/untrusted-text.js";
@@ -84,18 +85,18 @@ async function handler(server: McpServer) {
   const clarifications: ClarificationItem[] = [];
   let itemId = 0;
 
-  if (!identity.colors.some((c) => c.role === "primary")) {
-    clarifications.push({
-      id: `clarify-${++itemId}`,
-      field: "colors.primary",
-      question: "No primary brand color identified. Which color is your primary brand color?",
-      source: "compilation",
-      priority: "high",
-    });
+  // --- Primary-color uncertainty (issue #41) --- shared with brand_start.
+  const primaryItem = derivePrimaryClarification(identity.colors);
+  const primaryUncertain = primaryItem !== null;
+  if (primaryItem && !clarifications.some((c) => c.id === "clarify-primary")) {
+    clarifications.push(primaryItem);
   }
 
   for (const color of identity.colors) {
     if (needsClarification(color.confidence)) {
+      // The high-priority clarify-primary item already covers the primary —
+      // don't queue a duplicate medium-priority item for the same color.
+      if (color.role === "primary" && primaryUncertain) continue;
       clarifications.push({
         id: `clarify-${++itemId}`,
         field: `colors.${color.role}`,

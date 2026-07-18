@@ -7,6 +7,7 @@ import { loadBrandContext, isHtmlContent } from "../lib/content-scorer.js";
 import { isRealPathWithinBase } from "../lib/path-security.js";
 import * as cheerio from "cheerio";
 import { ERROR_CODES } from "../types/index.js";
+import { hasOpenColorClarification, COLOR_ADVISORY_NOTE } from "../lib/brand-check-engine.js";
 import {
   ensureLiveFreshness,
   buildLiveIndicator,
@@ -175,12 +176,17 @@ async function handler(input: CheckComplianceParams) {
     const brandColors = new Set(ctx.identity.colors.map((c) => normalizeHex(c.value)));
     const usedColors = extractCssColors(css);
     const offPalette = usedColors.filter((c) => !brandColors.has(c) && !NEUTRAL_COLORS.has(c));
+    // While a high-priority color clarification (clarify-primary) is open,
+    // the palette itself is a guess — color failures soften to warnings and
+    // do not fail the gate (issue #41). Still counted in rules_checked.
+    const colorAdvisory = offPalette.length > 0 && (await hasOpenColorClarification(cwd));
     checks.push({
       id: "CRT-COLOR",
-      status: offPalette.length > 0 ? "fail" : "pass",
+      status: offPalette.length > 0 ? (colorAdvisory ? "warn" : "fail") : "pass",
       message: offPalette.length > 0
-        ? `${offPalette.length} off-palette color(s): ${offPalette.slice(0, 3).join(", ")}`
+        ? `${offPalette.length} off-palette color(s): ${offPalette.slice(0, 3).join(", ")}${colorAdvisory ? ` — ${COLOR_ADVISORY_NOTE}` : ""}`
         : "All colors on-palette",
+      detail: colorAdvisory ? "Advisory while clarify-primary is open — resolve it with brand_clarify, then brand_compile" : undefined,
     });
   }
 
