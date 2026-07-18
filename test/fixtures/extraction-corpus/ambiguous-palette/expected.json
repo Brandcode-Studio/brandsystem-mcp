@@ -4,7 +4,7 @@
     { "value": "#d90429", "role": "primary", "confidence": "medium", "note": "promoted to primary: most frequent chromatic color" },
     { "value": "#ffffff", "role": "surface", "confidence": "high" },
     { "value": "#212529", "role": "text", "confidence": "medium" },
-    { "value": "#1d3557", "role": ["secondary", "text"], "known_gap": true, "note": "dark navy is now correctly chromatic (saturation-based isChromatic) and surfaces as a chromatic candidate, but still loses the single text role slot to #212529 in the one-color-per-role merge" }
+    { "value": "#1d3557", "role": ["secondary", "text"], "known_gap": true, "note": "dark navy is now correctly chromatic (saturation-based isChromatic) and surfaces as a chromatic candidate, but still loses the single default-theme text slot to #212529 — same-theme collapse, not addressed by the #35 (role, theme) merge key" }
   ],
   "fonts": [
     { "family": "Lora", "confidence": "medium" }
@@ -26,6 +26,6 @@
     "font_recall": 0.95
   },
   "known_gaps": [
-    "#1d3557 reaches chromatic_candidates (dark-chromatic fix) but is still dropped from the merged identity: the one-color-per-role merge keeps #212529 in the single text slot."
+    "#1d3557 reaches chromatic_candidates (dark-chromatic fix) but is still dropped from the merged identity: the one-color-per-(role, theme) merge keeps #212529 in the single default-theme text slot. It is a dark COLOR, not a dark-THEME color, so the issue #35 theme dimension does not apply."
   ]
 }

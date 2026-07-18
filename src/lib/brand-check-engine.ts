@@ -144,12 +144,20 @@ async function loadCached(cwd: string): Promise<CachedBrand | null> {
     return null;
   }
 
-  // Pre-compute lookup structures
+  // Pre-compute lookup structures. Both theme lanes count: a dark-theme
+  // surface is a legitimate brand color (issue #35 gap 1), so colors_dark
+  // joins the acceptable palette alongside the default/light colors.
   const brandColorSet = new Set<string>();
   const brandColors: CachedBrand["brandColors"] = [];
-  if (runtime.identity?.colors) {
-    for (const [name, hex] of Object.entries(runtime.identity.colors)) {
+  const paletteSources: Array<Record<string, string> | undefined> = [
+    runtime.identity?.colors,
+    runtime.identity?.colors_dark,
+  ];
+  for (const palette of paletteSources) {
+    if (!palette) continue;
+    for (const [name, hex] of Object.entries(palette)) {
       const normalized = normalizeHex(hex);
+      if (brandColorSet.has(normalized)) continue;
       brandColorSet.add(normalized);
       const { r, g, b } = hexToRgb(normalized);
       const lab = rgbToLab(r, g, b);

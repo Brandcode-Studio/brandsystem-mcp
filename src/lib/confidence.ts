@@ -46,13 +46,24 @@ export function needsClarification(confidence: Confidence): boolean {
 }
 
 /**
+ * Merge-slot key for a color's theme dimension (issue #35 gap 1).
+ * Absent theme and explicit "light" share the default slot — precedence and
+ * confidence still resolve within it — while "dark" entries occupy their own
+ * slot so a dark-theme surface never evicts the light-theme surface.
+ */
+function colorThemeKey(entry: ColorEntry): "default" | "dark" {
+  return entry.theme === "dark" ? "dark" : "default";
+}
+
+/**
  * Merge a new color entry into an existing array.
- * If a color with the same role exists and the new source has higher precedence, replace it.
- * If same source, keep the one with higher confidence.
+ * Slots are keyed on (role, theme) — one color per role per theme.
+ * If a color with the same (role, theme) exists and the new source has higher
+ * precedence, replace it. If same source, keep the one with higher confidence.
  */
 export function mergeColor(existing: ColorEntry[], incoming: ColorEntry): ColorEntry[] {
   const idx = existing.findIndex(
-    (e) => e.role === incoming.role && e.role !== "unknown"
+    (e) => e.role === incoming.role && e.role !== "unknown" && colorThemeKey(e) === colorThemeKey(incoming)
   );
 
   if (idx === -1) {
@@ -109,7 +120,7 @@ export function mergeColorWithPriority(
   priority: Source[] = DEFAULT_SOURCE_PRIORITY,
 ): ColorEntry[] {
   const idx = existing.findIndex(
-    (e) => e.role === incoming.role && e.role !== "unknown"
+    (e) => e.role === incoming.role && e.role !== "unknown" && colorThemeKey(e) === colorThemeKey(incoming)
   );
 
   if (idx === -1) {

@@ -8,6 +8,13 @@ export interface ExtractedColor {
   source_type: "css-variable" | "structural" | "computed";
   /** CSS selector context — helps distinguish brand colors from content colors */
   selector_context?: string;
+  /**
+   * Set to "dark" only when the color was seen exclusively inside an explicit
+   * dark-theme scope ([data-theme="dark"], .dark, or a prefers-color-scheme:
+   * dark media block). Never guessed from the color value. A sighting outside
+   * a dark scope clears the tag — the color is then theme-agnostic.
+   */
+  theme?: "dark";
 }
 
 export interface ExtractedFont {
@@ -182,6 +189,23 @@ function isContentSelector(selector: string): boolean {
   return CONTENT_SELECTORS.test(selector.trim());
 }
 
+// ── Dark-theme scope detection (issue #35 gap 1) ─────────────────
+// Only explicit dark-theme signals count: [data-theme="dark"] attribute
+// selectors, a `.dark` class token, or a `prefers-color-scheme: dark` media
+// block. No heuristic guessing from color values.
+
+const DARK_SCOPE_SELECTOR = /\[data-theme\s*=\s*["']?dark["']?\]|\.dark(?![\w-])/;
+
+function isDarkScopeSelector(selector: string): boolean {
+  return DARK_SCOPE_SELECTOR.test(selector);
+}
+
+function isDarkSchemeMedia(node: csstree.CssNode): boolean {
+  if (node.type !== "Atrule" || node.name.toLowerCase() !== "media" || !node.prelude) return false;
+  const prelude = csstree.generate(node.prelude).toLowerCase();
+  return prelude.includes("prefers-color-scheme") && prelude.includes("dark");
+}
+
 /** Parse CSS text and extract colors + fonts */
 export function extractFromCSS(cssText: string): {
   colors: ExtractedColor[];
@@ -199,15 +223,29 @@ export function extractFromCSS(cssText: string): {
 
   // Track current rule's selector for context
   let currentSelector = "";
+  // Depth of nested `@media (prefers-color-scheme: dark)` blocks
+  let darkMediaDepth = 0;
+
+  /** Tag or untag an entry's theme based on where this sighting occurred. */
+  const applyThemeSighting = (entry: ExtractedColor, inDarkScope: boolean) => {
+    if (!inDarkScope && entry.theme === "dark") {
+      // Seen outside a dark scope too — the color is theme-agnostic.
+      delete entry.theme;
+    }
+  };
 
   csstree.walk(ast, {
     enter(node: csstree.CssNode) {
+      if (isDarkSchemeMedia(node)) darkMediaDepth++;
+
       // Track the selector of the current rule
       if (node.type === "Rule" && node.prelude) {
         currentSelector = csstree.generate(node.prelude);
       }
 
       if (node.type !== "Declaration") return;
+
+      const inDarkScope = darkMediaDepth > 0 || isDarkScopeSelector(currentSelector);
 
       const property = node.property;
 
@@ -232,6 +270,7 @@ export function extractFromCSS(cssText: string): {
               existing.source_type = "css-variable";
               existing.property = property;
             }
+            applyThemeSighting(existing, inDarkScope);
           } else {
             colorMap.set(hex, {
               value: hex,
@@ -239,6 +278,7 @@ export function extractFromCSS(cssText: string): {
               frequency: isPlatform ? 0 : 1,
               source_type: sourceType,
               selector_context: currentSelector,
+              ...(inDarkScope ? { theme: "dark" as const } : {}),
             });
           }
         }
@@ -262,6 +302,7 @@ export function extractFromCSS(cssText: string): {
               existing.property = property;
               existing.selector_context = currentSelector;
             }
+            applyThemeSighting(existing, inDarkScope);
           } else {
             colorMap.set(hex, {
               value: hex,
@@ -269,6 +310,7 @@ export function extractFromCSS(cssText: string): {
               frequency: isContent ? 0 : 1, // Content colors start at 0 frequency (deprioritized)
               source_type: isStructural ? "structural" : "computed",
               selector_context: currentSelector,
+              ...(inDarkScope ? { theme: "dark" as const } : {}),
             });
           }
         }
@@ -292,6 +334,9 @@ export function extractFromCSS(cssText: string): {
         }
       }
     },
+    leave(node: csstree.CssNode) {
+      if (isDarkSchemeMedia(node)) darkMediaDepth--;
+    },
   });
 
   // Consolidate alpha variants: #rrggbbaa colors fold into their #rrggbb parent
@@ -302,6 +347,8 @@ export function extractFromCSS(cssText: string): {
       const parent = colorMap.get(baseHex);
       if (parent) {
         parent.frequency += color.frequency;
+        // An unthemed alpha variant proves the base color exists outside dark scope
+        if (!color.theme && parent.theme === "dark") delete parent.theme;
         colorMap.delete(hex);
       } else {
         // No parent exists — promote the base color and drop the alpha variant

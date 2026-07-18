@@ -12,6 +12,8 @@ export const ColorEntrySchema = z.object({
     "tint", "overlay", "border", "gradient", "highlight",
     "unknown",
   ]),
+  // Optional theme dimension (issue #35 gap 1): absent = theme-agnostic/default.
+  theme: z.enum(["light", "dark"]).optional(),
   source: SourceEnum,
   confidence: ConfidenceEnum,
   figma_variable_id: z.string().optional(),

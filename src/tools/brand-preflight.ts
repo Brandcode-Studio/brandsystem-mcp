@@ -15,7 +15,7 @@ import { ERROR_CODES, type AntiPatternRule } from "../types/index.js";
 
 interface PreflightCheck {
   id: string;
-  status: "pass" | "warn" | "fail";
+  status: "pass" | "warn" | "fail" | "info";
   message: string;
   details?: string;
 }
@@ -78,7 +78,9 @@ function extractColors(css: string): string[] {
 /** Extract all font-family values from CSS text */
 function extractFontFamilies(css: string): string[] {
   const families: string[] = [];
-  const re = /font-family\s*:\s*([^;}"]+)/gi;
+  // Value may contain quoted family names ("Founders Grotesk"); quotes are
+  // stripped per-part below, so the capture must not stop at a quote.
+  const re = /font-family\s*:\s*([^;}]+)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(css)) !== null) {
     const raw = m[1].trim();
@@ -121,6 +123,106 @@ function extractAllCss($: cheerio.CheerioAPI): string {
   });
 
   return parts.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// CSS custom property (var) resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Collect custom-property definitions from CSS text (style blocks + inline
+ * styles). No cascade engine: last definition wins, regardless of selector.
+ */
+function collectCustomProperties(css: string): Map<string, string> {
+  const defs = new Map<string, string>();
+  const re = /(?:^|[;{\s])--([A-Za-z0-9_-]+)\s*:\s*([^;}]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(css)) !== null) {
+    defs.set(`--${m[1]}`, m[2].trim());
+  }
+  return defs;
+}
+
+/** Parse a var(...) function starting at `start` (which points at "var("). */
+function parseVarFunction(
+  text: string,
+  start: number
+): { name: string; fallback: string | null; end: number } | null {
+  let i = start + 4; // skip "var("
+  let depth = 1;
+  let inner = "";
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) break;
+    }
+    inner += ch;
+    i++;
+  }
+  if (depth !== 0) return null; // unbalanced — bail
+  const end = i + 1; // position after closing paren
+
+  // Split name from fallback at the first top-level comma
+  let splitAt = -1;
+  let d = 0;
+  for (let j = 0; j < inner.length; j++) {
+    const ch = inner[j];
+    if (ch === "(") d++;
+    else if (ch === ")") d--;
+    else if (ch === "," && d === 0) {
+      splitAt = j;
+      break;
+    }
+  }
+  const name = (splitAt === -1 ? inner : inner.slice(0, splitAt)).trim();
+  const fallback = splitAt === -1 ? null : inner.slice(splitAt + 1).trim();
+  if (!name.startsWith("--")) return null;
+  return { name, fallback, end };
+}
+
+/**
+ * Substitute var(--x) / var(--x, fallback) references using collected
+ * definitions. Defined -> resolved value; undefined with fallback -> fallback
+ * literal; undefined without fallback -> stripped from the checking CSS and
+ * recorded in `unresolved` (reported as info, never as a font/color
+ * violation). Depth-limited to guard against cyclic definitions.
+ */
+function substituteVars(
+  text: string,
+  defs: Map<string, string>,
+  unresolved: Set<string>,
+  depth = 0
+): string {
+  if (depth > 8) return text;
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const idx = text.indexOf("var(", i);
+    if (idx === -1) {
+      out += text.slice(i);
+      break;
+    }
+    out += text.slice(i, idx);
+    const parsed = parseVarFunction(text, idx);
+    if (!parsed) {
+      out += text.slice(idx);
+      break;
+    }
+    const def = defs.get(parsed.name);
+    if (def !== undefined) {
+      out += substituteVars(def, defs, unresolved, depth + 1);
+    } else if (parsed.fallback !== null) {
+      out += substituteVars(parsed.fallback, defs, unresolved, depth + 1);
+    } else {
+      unresolved.add(parsed.name);
+      // Strip the reference so downstream checks never flag the literal
+      // var(--x) token as a non-brand font or color.
+    }
+    i = parsed.end;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +550,45 @@ function checkTypography(
   return checks;
 }
 
+/** Filename patterns that count as logo evidence on img/source/image elements */
+const LOGO_FILENAME_RE = /logo|wordmark|logomark|brandmark/i;
+
+/**
+ * Detect logo evidence on <img>/<source>/<image> elements: a src filename
+ * matching logo/wordmark/logomark/brandmark, or alt/aria-label text that
+ * case-insensitively equals or contains the brand's client_name.
+ */
+function hasImgLogoEvidence(
+  $: cheerio.CheerioAPI,
+  clientName: string
+): boolean {
+  const nameLower = clientName.trim().toLowerCase();
+  let found = false;
+  $("img, source, image").each((_i, el) => {
+    if (found) return;
+    const src =
+      $(el).attr("src") ||
+      $(el).attr("srcset") ||
+      $(el).attr("href") ||
+      $(el).attr("xlink:href") ||
+      "";
+    const filename = src.split(/[?#]/)[0].split("/").pop() || "";
+    if (LOGO_FILENAME_RE.test(filename)) {
+      found = true;
+      return;
+    }
+    if (nameLower) {
+      const label = `${$(el).attr("alt") || ""} ${$(el).attr("aria-label") || ""}`
+        .trim()
+        .toLowerCase();
+      if (label && label.includes(nameLower)) {
+        found = true;
+      }
+    }
+  });
+  return found;
+}
+
 function checkLogo(
   $: cheerio.CheerioAPI,
   identity: CoreIdentityData,
@@ -456,7 +597,9 @@ function checkLogo(
   const checks: PreflightCheck[] = [];
 
   const hasSvg = $("svg").length > 0;
-  const hasImgLogo = $("img[src*='logo'], img[alt*='logo']").length > 0;
+  const hasImgLogo =
+    $("img[src*='logo'], img[alt*='logo']").length > 0 ||
+    hasImgLogoEvidence($, clientName);
   const hasLogoElement = hasSvg || hasImgLogo;
 
   // Check if brand name appears as text
@@ -610,7 +753,12 @@ async function handleCheck(brandDir: BrandDir, html: string) {
 
   // Parse HTML
   const $ = cheerio.load(html);
-  const css = extractAllCss($);
+  const rawCss = extractAllCss($);
+
+  // Resolve same-document CSS custom properties (var(--x)) before rule checks
+  const customProps = collectCustomProperties(rawCss);
+  const unresolvedVars = new Set<string>();
+  const css = substituteVars(rawCss, customProps, unresolvedVars);
 
   // Run all checks
   const checks: PreflightCheck[] = [
@@ -620,10 +768,20 @@ async function handleCheck(brandDir: BrandDir, html: string) {
     ...checkAntiPatterns(css, antiPatterns),
   ];
 
+  if (unresolvedVars.size > 0) {
+    checks.push({
+      id: "V-UNRESOLVED",
+      status: "info",
+      message: `${unresolvedVars.size} unresolvable CSS variable(s) — no same-document definition or fallback; skipped in font/color checks`,
+      details: [...unresolvedVars].slice(0, 10).join(", "),
+    });
+  }
+
   // Compute summary
   const pass = checks.filter((c) => c.status === "pass").length;
   const warn = checks.filter((c) => c.status === "warn").length;
   const fail = checks.filter((c) => c.status === "fail").length;
+  const info = checks.filter((c) => c.status === "info").length;
   const overall = fail > 0 ? "FAIL" : warn > 0 ? "WARN" : "PASS";
 
   const nextSteps: string[] = [];
@@ -632,11 +790,11 @@ async function handleCheck(brandDir: BrandDir, html: string) {
   if (fail === 0 && warn === 0) nextSteps.push("All checks pass — content is brand-compliant");
 
   return buildResponse({
-    what_happened: `Preflight ${overall}: ${pass} pass, ${warn} warn, ${fail} fail`,
+    what_happened: `Preflight ${overall}: ${pass} pass, ${warn} warn, ${fail} fail${info > 0 ? `, ${info} info` : ""}`,
     next_steps: nextSteps,
     data: {
       overall,
-      summary: { pass, warn, fail },
+      summary: { pass, warn, fail, info },
       checks: checks as unknown as Record<string, unknown>[],
     },
   });

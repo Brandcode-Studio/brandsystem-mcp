@@ -41,6 +41,12 @@ export interface BrandRuntime {
 
 export interface RuntimeIdentity {
   colors: Record<string, string>;
+  /**
+   * Dark-theme palette (issue #35 gap 1). Present only when the identity has
+   * theme:"dark" color entries; default/light colors stay in `colors`.
+   * Additive — pre-existing runtimes and consumers are unaffected.
+   */
+  colors_dark?: Record<string, string>;
   typography: Record<string, string>;
   logo: { type: string; has_svg: boolean } | null;
 }
@@ -120,10 +126,17 @@ export function compileRuntime(
 
 function compileIdentity(identity: CoreIdentityData): RuntimeIdentity {
   const colors: Record<string, string> = {};
+  const colorsDark: Record<string, string> = {};
   for (const c of identity.colors) {
     if (!isTokenWorthy(c.confidence)) continue;
+    // Unknown-role keys pass through cleanColorName in BOTH theme lanes:
+    // extracted names are untrusted regardless of theme.
     const key = c.role === "unknown" ? cleanColorName(c) : c.role;
-    colors[key] = c.value;
+    if (c.theme === "dark") {
+      colorsDark[key] = c.value;
+    } else {
+      colors[key] = c.value;
+    }
   }
 
   const typography: Record<string, string> = {};
@@ -139,7 +152,12 @@ function compileIdentity(identity: CoreIdentityData): RuntimeIdentity {
       }
     : null;
 
-  return { colors, typography, logo };
+  return {
+    colors,
+    ...(Object.keys(colorsDark).length > 0 ? { colors_dark: colorsDark } : {}),
+    typography,
+    logo,
+  };
 }
 
 function compileVisual(visual: VisualIdentityData): RuntimeVisual {

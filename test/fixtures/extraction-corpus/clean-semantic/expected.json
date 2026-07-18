@@ -6,7 +6,7 @@
     { "value": "#ff7f11", "role": "accent", "confidence": "high" },
     { "value": "#f4f4f4", "role": "surface", "confidence": "high" },
     { "value": "#161616", "role": "text", "confidence": "high" },
-    { "value": "#ffffff", "role": "surface", "known_gap": true, "note": "mergeColor keeps one color per role — body white folds into the surface slot already held by --surface-muted #f4f4f4" }
+    { "value": "#ffffff", "role": "surface", "known_gap": true, "note": "mergeColor keeps one color per (role, theme) — body white and --surface-muted #f4f4f4 are both default-theme surfaces, so white still folds into the occupied slot (the #35 theme dimension does not apply here)" }
   ],
   "fonts": [
     { "family": "Source Sans Pro", "confidence": "medium" },
@@ -29,6 +29,6 @@
     "font_recall": 0.95
   },
   "known_gaps": [
-    "Single-slot-per-role merge: #ffffff (body background) is extracted but dropped because #f4f4f4 already occupies the surface role."
+    "Single slot per (role, theme): #ffffff (body background) is extracted but dropped because #f4f4f4 already occupies the default-theme surface slot. The issue #35 theme dimension only separates dark-scoped colors; two same-theme surfaces still collapse."
   ]
 }

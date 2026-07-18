@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.14.0 (2026-07-17)
+
+Theme-aware color governance, preflight truth, ingestion hardening, and the TypeScript 7 migration.
+
+### Added
+
+- **Theme-aware color roles** (#35 gap 1, option (a) per the issue analysis). `ColorEntry` gains optional `theme: "light" | "dark"`; the merge key becomes `(role, theme)`, so dual-theme palettes no longer collapse — a dark surface stops evicting the light one. Extraction tags themes only on explicit signals (`[data-theme="dark"]`, `.dark` class scope, `prefers-color-scheme: dark`); no value-based guessing. Dark colors compile into optional `identity.colors_dark` in the runtime, a `dark` DTCG token group, their own design-synthesis group + DESIGN.md line, and both theme lanes join the check-engine palette (with hex dedupe). Fully additive: existing YAML/runtimes unchanged. The dual-theme corpus fixture's merge-collapse known_gap is removed — dark surface/text are now hard recall targets.
+- **Ingestion robustness suite** (`test/security/ingestion-robustness.test.ts`, 21 tests): CSS/HTML/SVG/YAML/JSON parsers driven with unterminated blocks, parser bombs, alias-amplification YAML, entity payloads, attribute bombs, and multi-MB values — all degrade or throw controlled Errors, none hang (per-test timeouts make a hang fail CI). Findings that need src changes are tracked in #45 (extractLogos superlinear DOM cost; raw parser error text reaching agents).
+- **Poisoned-runtime runbook exercised** (`test/security/runbook-exercise.test.ts`): first scripted execution of the documented flow — tamper (never_say injection + approval forgery) → provenance-integrity detection fires on both → runbook response recompiles clean → detection passes. The runbook's exercise log has its first row; live-client drill honestly noted as still pending.
+
+### Fixed
+
+- **Preflight resolves same-document CSS variables** (#43): `var(--x)` and `var(--x, fallback)` substitute from the document's own definitions before rule checks (balanced-paren parser, cycle guard); unresolvable variables surface as a new info-severity `V-UNRESOLVED` check instead of false non-brand-font/color violations. **Bonus real bug**: the font-family capture group aborted at double quotes, so quoted families (`"Inter", sans-serif`) were silently never checked.
+- **Preflight recognizes `<img>` logos** (#43): filename patterns (logo/wordmark/logomark/brandmark) or alt/aria-label matching the client name count as logo evidence.
+
+### Changed
+
+- **TypeScript 7.0.2** (native compiler). Migration verified by same-source dist-diff against 5.9: emitted runtime JavaScript is byte-identical; the only declaration differences are zod-inferred property ordering. Resolves the parked Dependabot #18 investigation.
+
+Tests: 922 → 986.
+
 ## 0.13.4 (2026-07-17)
 
 Field-report release: fixes from the first real second-agent run against a live brand (Colovore, #41-#43).

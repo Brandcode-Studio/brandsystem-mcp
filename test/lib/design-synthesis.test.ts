@@ -137,6 +137,35 @@ describe("buildDesignSynthesis", () => {
     expect(synthesis.evidence.pages_sampled).toBe(0);
     expect(synthesis.ambiguities.some((item) => item.includes("No extraction-evidence.json"))).toBe(true);
   });
+
+  it("lists dark-theme colors in their own group instead of dropping them", () => {
+    const dualThemeIdentity: CoreIdentityData = {
+      ...identity,
+      colors: [
+        ...identity.colors,
+        { name: "Midnight", value: "#0f0f1a", role: "surface", theme: "dark", source: "web", confidence: "high" },
+        { name: "Moon", value: "#e2e8f0", role: "text", theme: "dark", source: "web", confidence: "high" },
+      ],
+    };
+    const synthesis = buildDesignSynthesis(config, dualThemeIdentity, { source: "current-brand" });
+
+    expect(synthesis.colors.dark.map((c) => c.value)).toEqual(["#0f0f1a", "#e2e8f0"]);
+    // Dark entries stay out of the default-theme groups
+    const defaultValues = [
+      ...synthesis.colors.brand,
+      ...synthesis.colors.semantic,
+      ...synthesis.colors.additional,
+    ].map((c) => c.value);
+    expect(defaultValues).not.toContain("#0f0f1a");
+    expect(defaultValues).not.toContain("#e2e8f0");
+    // The light surface/text survive alongside
+    expect(defaultValues).toContain("#ffffff");
+    expect(defaultValues).toContain("#111111");
+
+    const markdown = renderDesignMarkdown(synthesis);
+    expect(markdown).toContain("Dark-theme palette:");
+    expect(markdown).toContain("#0f0f1a");
+  });
 });
 
 describe("renderDesignMarkdown", () => {

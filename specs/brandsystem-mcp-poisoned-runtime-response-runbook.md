@@ -1,7 +1,9 @@
-# Poisoned-Runtime Response Runbook (Provisional)
+# Poisoned-Runtime Response Runbook
 
-**Status:** Provisional — written 2026-07-16, not yet exercised. Do not make public
-incident-readiness claims until this runbook has been exercised at least once.
+**Status:** Exercised in scripted form 2026-07-17 (automated in
+`test/security/runbook-exercise.test.ts`, run on every CI build); a live-client
+drill has not yet been performed. Do not make public incident-readiness claims
+beyond what the scripted exercise covers until a live drill is completed.
 **Scope:** A `brand-runtime.json` (or exported policy-bearing artifact) that contains
 injected instructions or hostile policy content, whether shipped locally to a user or
 synced to a Brandcode Studio client.
@@ -55,4 +57,4 @@ security advisory.
 
 | Date | Scenario | Outcome | Gaps found |
 |------|----------|---------|------------|
-| —    | Not yet exercised | — | — |
+| 2026-07-17 | Scripted tamper (never_say injection + approval forgery), automated in `test/security/runbook-exercise.test.ts` | Detection and response both worked: `checkProvenanceIntegrity` failed both the approval-claim check (forged `production_approved` vs supported `provisional_extracted`) and the policy-fields check (naming `voice.never_say`); recompiling from sources removed the injected instruction and demoted approval to the supported level; detection passed clean afterward. | Exported-artifact coverage (skill exports, reports) remains manual per the Detection section's own note — the detector covers `brand-runtime.json` only. Containment (step 1) and hosted-sync/notification (steps 4–5, Notification) were not exercisable in script; they still need a live-client drill. |

@@ -42,6 +42,9 @@ interface ExpectedColor {
   value: string;
   /** Acceptable role(s). Omit to skip role checking for this color. */
   role?: string | string[];
+  /** Expected theme tag ("dark"). Omit for theme-agnostic/default entries,
+   * which must NOT carry a theme tag. */
+  theme?: string;
   /** Acceptable confidence tier(s). Omit to skip. */
   confidence?: string | string[];
   /** True = ground truth the extractor is KNOWN to miss. Excluded from the
@@ -150,6 +153,8 @@ function extractIdentityFromHtml(html: string, baseUrl: string): ExtractionResul
       name,
       value: ec.value,
       role,
+      // Theme signal from css-parser dark-scope detection (issue #35 gap 1)
+      ...(ec.theme ? { theme: ec.theme } : {}),
       source: "web",
       confidence: inferColorConfidence(ec),
       css_property: ec.property,
@@ -286,6 +291,7 @@ interface FixtureScore {
   fontPrecision: number;
   fontRecall: number;
   roleMismatches: string[];
+  themeMismatches: string[];
   confidenceMismatches: string[];
   falsePositiveColors: string[];
   missedColors: string[];
@@ -307,6 +313,7 @@ function scoreFixture(result: ExtractionResult, expected: ExpectedFixture): Fixt
   const colorRecall = recallTargets.length === 0 ? 1 : matchedTargets.length / recallTargets.length;
 
   const roleMismatches: string[] = [];
+  const themeMismatches: string[] = [];
   const confidenceMismatches: string[] = [];
   let roleChecked = 0;
   let roleCorrect = 0;
@@ -318,6 +325,11 @@ function scoreFixture(result: ExtractionResult, expected: ExpectedFixture): Fixt
       roleChecked++;
       if (roles.includes(c.role)) roleCorrect++;
       else roleMismatches.push(`${c.value}: expected role ${roles.join("|")}, got ${c.role}`);
+    }
+    // Theme dimension: expected theme must match exactly; entries the fixture
+    // marks theme-agnostic (no theme field) must not carry a tag.
+    if ((exp.theme ?? undefined) !== (c.theme ?? undefined)) {
+      themeMismatches.push(`${c.value}: expected theme ${exp.theme ?? "(none)"}, got ${c.theme ?? "(none)"}`);
     }
     const tiers = asList(exp.confidence);
     if (tiers && !tiers.includes(c.confidence)) {
@@ -351,6 +363,7 @@ function scoreFixture(result: ExtractionResult, expected: ExpectedFixture): Fixt
     fontPrecision,
     fontRecall,
     roleMismatches,
+    themeMismatches,
     confidenceMismatches,
     falsePositiveColors: extractedValues.filter((v) => !expectedByValue.has(v)),
     missedColors: recallTargets
@@ -400,7 +413,7 @@ describe("extraction quality corpus (release-gating lane)", () => {
         console.log(`\n===== MEASURE ${fixtureName} =====`);
         // eslint-disable-next-line no-console
         console.log(JSON.stringify({
-          colors: result.colors.map((c) => ({ value: c.value, role: c.role, confidence: c.confidence, name: c.name })),
+          colors: result.colors.map((c) => ({ value: c.value, role: c.role, theme: c.theme, confidence: c.confidence, name: c.name })),
           fonts: result.typography.map((t) => ({ family: t.family, confidence: t.confidence })),
           suggested_primary: result.suggestedPrimary,
           chromatic_candidates: result.chromaticCandidates,
@@ -431,6 +444,10 @@ describe("extraction quality corpus (release-gating lane)", () => {
 
       it("confidence tiers match labels", () => {
         expect(score.confidenceMismatches).toEqual([]);
+      });
+
+      it("theme tags match labels", () => {
+        expect(score.themeMismatches).toEqual([]);
       });
 
       it(`font precision >= ${expected.thresholds.font_precision}`, () => {
