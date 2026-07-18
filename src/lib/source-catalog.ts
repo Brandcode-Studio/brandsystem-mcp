@@ -31,7 +31,10 @@ function slugify(value: string): string {
 }
 
 function buildColorField(entry: ColorEntry): string {
-  return entry.role === "unknown" ? `colors.${slugify(entry.name)}` : `colors.${entry.role}`;
+  const base = entry.role === "unknown" ? `colors.${slugify(entry.name)}` : `colors.${entry.role}`;
+  // Dark-theme entries occupy their own field so a dark surface never
+  // collides with (or silently "conflicts" against) the light surface.
+  return entry.theme === "dark" ? `${base}.dark` : base;
 }
 
 function buildTypographyField(entry: TypographyEntry): string {
@@ -73,6 +76,7 @@ export function buildSourceCatalogRecords(input: {
           name: color.name,
           role: color.role,
           css_property: color.css_property,
+          theme: color.theme,
         },
       },
     });
@@ -183,11 +187,22 @@ export function applyConflictResolution(
   record: SourceFieldRecord,
 ): CoreIdentityData {
   if (field.startsWith("colors.")) {
-    const role = field.slice("colors.".length);
+    const rawKey = field.slice("colors.".length);
+    const isDarkField = rawKey.endsWith(".dark");
+    const role = isDarkField ? rawKey.slice(0, -".dark".length) : rawKey;
     const metadata = record.metadata ?? {};
     const name = typeof metadata.name === "string" ? metadata.name : role;
     const colorRole = (typeof metadata.role === "string" ? metadata.role : role) as ColorEntry["role"];
-    const nextColors = identity.colors.filter((entry) => (entry.role === "unknown" ? slugify(entry.name) : entry.role) !== role);
+    const theme = metadata.theme === "dark" || metadata.theme === "light"
+      ? metadata.theme
+      : isDarkField ? "dark" : undefined;
+    // Resolve within the same (role, theme) slot only: a dark record must
+    // never evict the light entry for the same role, and vice versa.
+    const nextColors = identity.colors.filter((entry) => {
+      const entryKey = entry.role === "unknown" ? slugify(entry.name) : entry.role;
+      const entryDark = entry.theme === "dark";
+      return !(entryKey === role && entryDark === isDarkField);
+    });
     nextColors.push({
       name,
       value: String(record.value),
@@ -195,6 +210,7 @@ export function applyConflictResolution(
       source: record.source,
       confidence: record.confidence,
       css_property: typeof metadata.css_property === "string" ? metadata.css_property : undefined,
+      ...(theme ? { theme } : {}),
     });
     return { ...identity, colors: nextColors };
   }
