@@ -46,3 +46,6 @@ jobs:
         run: /tmp/mcp-publisher login github-oidc
       - name: Publish to the MCP Registry
         run: /tmp/mcp-publisher publish server.json
+      - name: Release invariant — installed-truth must match repo-truth
+        if: ${{ github.event_name == 'release' }}
+        run: node scripts/release-invariant.mjs
