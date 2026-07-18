@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.14.1 (2026-07-18)
+
+Truth-and-trust patch from the Codex 0.13.4 review (all findings verified).
+
+### Fixed
+
+- **The publish gate no longer calls unresolved governance "safe."** While the color-advisory gate is open (unconfirmed primary), `brand_check_compliance` returns `result: "pass_with_advisories"` with `publish_ready: false` and an explicit resolve-clarify-primary instruction — never "safe to publish." `brand_check` stays permissive for iteration; the publish gate does not.
+- **Taint closure reaches tokens.json, and keys can no longer collide.** New central `colorTokenKey()` (sanitized slug + short hex suffix): deterministic, collision-safe identifiers for unknown-role colors in runtime records and DTCG token keys; `$description` carries the sanitized display name. Two hostile "blues" no longer overwrite each other, and raw extracted names now survive only in quarantined evidence.
+- **Receipts identify reproducible source**: each receipt records the tree state (clean vs dirty-with-count), and filenames carry timestamp + commit so same-day runs never overwrite. The 0.13.4-era receipt was generated against a dirty tree — superseded by a clean-tree rerun receipt.
+- **Second-agent structural contracts**: fixture-declared validators (sentence limits, required `Subject:`/blank-line shape, fence-only output) now feed `status: incomplete`; the old presence-only field is honestly renamed `required_inputs`.
+- **Dogfood counting excludes test records** (`record_kind: dogfood | test`): the real count is 4, not 5, and only dogfood records advance the 50-capture holdout threshold.
+
 ## 0.14.0 (2026-07-17)
 
 Theme-aware color governance, preflight truth, ingestion hardening, and the TypeScript 7 migration.

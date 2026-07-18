@@ -60,6 +60,7 @@ if (args.prompt && existsSync(DENYLIST_FILE)) {
 
 const record = {
   date: new Date().toISOString().slice(0, 10),
+  record_kind: args.kind === "test" ? "test" : "dogfood",
   intent: args.intent,
   ...(args.prompt ? { prompt_redacted: args.prompt } : {}),
   source: args.source ?? "unattributed",
@@ -72,8 +73,14 @@ const record = {
 mkdirSync(dirname(CAPTURE_FILE), { recursive: true });
 appendFileSync(CAPTURE_FILE, JSON.stringify(record) + "\n", "utf-8");
 
-const count = readFileSync(CAPTURE_FILE, "utf-8").trim().split("\n").length;
-console.log(`captured (${count} total) → ${CAPTURE_FILE}`);
+const lines = readFileSync(CAPTURE_FILE, "utf-8").trim().split("\n").filter(Boolean);
+// Only real dogfood records count toward the holdout threshold — test/smoke
+// records are excluded (records without record_kind predate the field and
+// count as dogfood unless intent says otherwise).
+const count = lines.filter((l) => {
+  try { return JSON.parse(l).record_kind !== "test"; } catch { return false; }
+}).length;
+console.log(`captured (${count} dogfood record${count === 1 ? "" : "s"}, ${lines.length} total) → ${CAPTURE_FILE}`);
 if (count >= 50) {
   console.log(
     "50+ captures — enough to consider the source-split holdout freeze (eval/dogfood/README.md step 1)."

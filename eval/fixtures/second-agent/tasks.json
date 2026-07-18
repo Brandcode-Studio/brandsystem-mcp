@@ -1,5 +1,5 @@
 {
-  "description": "Second-agent benchmark tasks — MODEL-DEPENDENT tier only (scripts/agent-eval.mjs --with-llm --scenario second-agent). Each task is handed to a FRESH model whose only brand knowledge is the real brand_context output for its task_type, served from a temp copy of test/fixtures/brand-complete that the harness brand_compiles first. The reply is scored deterministically with the real brand_check and brand_check_compliance tools. check_inputs lists which brand_check inputs apply: 'text' always; 'css' only for markup tasks (extracted from a fenced code block — no fence means the reply is scored text-only and that is recorded); 'color' means the first hex in the reply is checked against the governed palette (no hex means the color check is skipped and recorded). budget records which brand_context budget serves the task (exactly one task uses compact). Schema is enforced by validateSecondAgentTasks in scripts/agent-eval.mjs via test/eval-harness.test.ts.",
+  "description": "Second-agent benchmark tasks \u2014 MODEL-DEPENDENT tier only (scripts/agent-eval.mjs --with-llm --scenario second-agent). Each task is handed to a FRESH model whose only brand knowledge is the real brand_context output for its task_type, served from a temp copy of test/fixtures/brand-complete that the harness brand_compiles first. The reply is scored deterministically with the real brand_check and brand_check_compliance tools. check_inputs lists which brand_check inputs apply: 'text' always; 'css' only for markup tasks (extracted from a fenced code block \u2014 no fence means the reply is scored text-only and that is recorded); 'color' means the first hex in the reply is checked against the governed palette (no hex means the color check is skipped and recorded). budget records which brand_context budget serves the task (exactly one task uses compact). Schema is enforced by validateSecondAgentTasks in scripts/agent-eval.mjs via test/eval-harness.test.ts.",
   "brand_fixture": "test/fixtures/brand-complete",
   "tasks": [
     {
@@ -7,15 +7,22 @@
       "task_type": "social-post",
       "budget": "compact",
       "instruction": "Write a 2-sentence launch post for a new analytics feature.",
-      "check_inputs": ["text"],
-      "notes": "Pure text task on the compact context budget — measures whether the tightest governed context still transfers the brand."
+      "check_inputs": [
+        "text"
+      ],
+      "notes": "Pure text task on the compact context budget \u2014 measures whether the tightest governed context still transfers the brand.",
+      "structure": {
+        "max_sentences": 2
+      }
     },
     {
       "id": "blog-intro-consistency",
       "task_type": "blog-article",
       "budget": "standard",
       "instruction": "Write a 3-sentence introduction for a blog article about keeping every brand surface consistent.",
-      "check_inputs": ["text"],
+      "check_inputs": [
+        "text"
+      ],
       "notes": "Copy task; the standard budget serves voice + strategy sections."
     },
     {
@@ -23,23 +30,39 @@
       "task_type": "email",
       "budget": "standard",
       "instruction": "Write an email inviting a customer to renew their annual plan. Format: one line starting with 'Subject: ', then a blank line, then a body of at most 3 sentences.",
-      "check_inputs": ["text"],
-      "notes": "Subject + body structure; scored as text."
+      "check_inputs": [
+        "text"
+      ],
+      "notes": "Subject + body structure; scored as text.",
+      "structure": {
+        "must_match": "^Subject: .+\\n\\n",
+        "max_body_sentences": 3
+      }
     },
     {
       "id": "hero-section-css",
       "task_type": "code-ui",
       "budget": "standard",
       "instruction": "Write a CSS style block for a landing-page hero section (background, heading, and a call-to-action button) using the brand's colors and font. Return only the CSS inside one fenced code block.",
-      "check_inputs": ["text", "css", "color"],
-      "notes": "Markup task: css is extracted from the fenced block; color checks the first hex in the reply against the governed palette (#2a4494 / #e8523f / #f5a623)."
+      "check_inputs": [
+        "text",
+        "css",
+        "color"
+      ],
+      "notes": "Markup task: css is extracted from the fenced block; color checks the first hex in the reply against the governed palette (#2a4494 / #e8523f / #f5a623).",
+      "structure": {
+        "fence_only": true
+      }
     },
     {
       "id": "cta-card-html",
       "task_type": "landing-page",
       "budget": "standard",
       "instruction": "Write a small HTML snippet with an inline <style> block for a call-to-action card (headline, one supporting sentence, button) using the brand's colors and typography. Return only the snippet inside one fenced code block.",
-      "check_inputs": ["text", "css"],
+      "check_inputs": [
+        "text",
+        "css"
+      ],
       "notes": "HTML+CSS task; the fenced snippet is passed to brand_check as css and the whole reply to brand_check_compliance."
     }
   ]

@@ -1,4 +1,5 @@
 import type { CoreIdentityData } from "../schemas/index.js";
+import { colorTokenKey, cleanColorName } from "./color-namer.js";
 import type { DesignSynthesisFile } from "./design-synthesis.js";
 import { isTokenWorthy } from "./confidence.js";
 
@@ -57,11 +58,14 @@ function compileColors(
   for (const color of colors) {
     if (!isTokenWorthy(color.confidence)) continue;
 
-    const key = color.role === "unknown" ? slugify(color.name) : color.role;
+    // Keys and descriptions are agent-facing: sanitized deterministic key
+    // (collision-safe) and sanitized display name — raw extracted names stay
+    // in core-identity evidence only (#taint closure).
+    const key = color.role === "unknown" ? colorTokenKey(color) : color.role;
     const token = {
       $value: color.value,
       $type: "color",
-      $description: color.name,
+      $description: cleanColorName(color),
       $extensions: {
         "com.brandsystem": {
           source: color.source,

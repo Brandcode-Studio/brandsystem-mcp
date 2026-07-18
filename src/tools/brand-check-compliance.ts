@@ -239,19 +239,34 @@ async function handler(input: CheckComplianceParams) {
   // --- Result ---
   const failures = checks.filter((c) => c.status === "fail");
   const pass = failures.length === 0;
+  // Publish-time honesty: while the color-advisory gate is open (unresolved
+  // high-priority color clarification), warns exist precisely because known
+  // governance is unresolved. The publish gate must never call that "safe" —
+  // brand_check stays permissive for iteration; this tool does not.
+  const warns = checks.filter((c) => c.status === "warn").length;
+  const advisoryGateOpen = warns > 0 && (await hasOpenColorClarification(cwd));
+  const result = !pass ? "fail" : advisoryGateOpen ? "pass_with_advisories" : "pass";
+  const publishReady = pass && !advisoryGateOpen;
 
   return buildResponse({
-    what_happened: pass
-      ? `Compliance check: PASS (${checks.length} rules checked, 0 failures)`
-      : `Compliance check: FAIL (${checks.length} rules checked, ${failures.length} failure(s))`,
-    next_steps: pass
-      ? ["Content passes compliance — safe to publish"]
-      : [
+    what_happened: !pass
+      ? `Compliance check: FAIL (${checks.length} rules checked, ${failures.length} failure(s))`
+      : advisoryGateOpen
+        ? `Compliance check: PASS WITH ADVISORIES (${checks.length} rules checked, ${warns} advisory warning(s) — unresolved color governance)`
+        : `Compliance check: PASS (${checks.length} rules checked, 0 failures)`,
+    next_steps: !pass
+      ? [
           `Fix ${failures.length} failing rule(s) before publishing`,
           "Run brand_audit_content for detailed scoring breakdown",
-        ],
+        ]
+      : advisoryGateOpen
+        ? [
+            "NOT publish-ready: the primary color is unconfirmed. Resolve clarify-primary (brand_clarify id=\"clarify-primary\") and re-run before publishing.",
+          ]
+        : ["Content passes compliance — safe to publish"],
     data: {
-      result: pass ? "pass" : "fail",
+      result,
+      publish_ready: publishReady,
       rules_checked: checks.length,
       failures: failures.length,
       checks: checks.slice(0, 20),
