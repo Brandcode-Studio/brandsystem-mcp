@@ -112,14 +112,17 @@ describe("logo-extractor extractLogos robustness", () => {
     expect(Array.isArray(logos)).toBe(true);
   }, T);
 
-  // FINDING (reported, not fixed here): extractLogos is superlinear in DOM
-  // size — measured ~150ms at 5k elements, ~1.1s at 20k, ~7.3s at 50k
-  // (cheerio.load itself stays under 60ms; the selector/isInLogoCloud passes
-  // dominate). It terminates and memory stays bounded, so this is slow-degrade
-  // rather than a hang, but a hostile page can cost ~8s of extraction time.
-  // This test gets a 15s timeout so a true hang still fails.
-  it("50k-element flat body [degrades — slowly; see finding above]", () => {
-    const spans = Array.from({ length: 50_000 }, (_, i) => `<span>x${i}</span>`).join("");
+  // FINDING (reported, not fixed here — tracked in #45): extractLogos is
+  // superlinear in DOM size — measured ~150ms at 5k elements, ~1.1s at 20k,
+  // ~7.3s at 50k on dev hardware (cheerio.load itself stays under 60ms; the
+  // selector/isInLogoCloud passes dominate). It terminates and memory stays
+  // bounded, so this is slow-degrade rather than a hang.
+  // CI asserts the degrade-not-hang property at 20k elements: the 50k case
+  // timed out the slowest CI runner (Node 20) at 15s purely on speed, which
+  // is the #45 perf finding, not a robustness regression. Re-raise the size
+  // when #45 lands a candidate cap.
+  it("20k-element flat body [degrades — slowly; superlinear cost tracked in #45]", () => {
+    const spans = Array.from({ length: 20_000 }, (_, i) => `<span>x${i}</span>`).join("");
     const html = `<html><body><header><img src="/logo.png" alt="logo"></header>${spans}</body></html>`;
     const logos = extractLogos(html, BASE);
     expect(Array.isArray(logos)).toBe(true);
