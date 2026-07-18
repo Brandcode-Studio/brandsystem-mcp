@@ -564,6 +564,7 @@ async function handler(input: Params) {
         role: c.role,
         confidence: c.confidence,
         source: c.source,
+        ...(c.theme ? { theme: c.theme } : {}),
       })),
       fonts: typography.map((t) => ({ family: t.family, confidence: t.confidence })),
       confirmation_needed: {
@@ -575,6 +576,7 @@ async function handler(input: Params) {
             hex: c.value,
             name: c.name,
             role: c.role,
+            ...(c.theme ? { theme: c.theme } : {}),
           })),
           instruction: "Show ALL extracted colors to the user. Ask them to: 1) Confirm which is the primary brand color, 2) Identify any colors that should NOT be in the brand system (e.g., retired colors, third-party colors), 3) Assign roles to any 'unknown' colors (secondary, accent, etc.)",
         },
