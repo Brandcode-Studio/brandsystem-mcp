@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.14.3 (2026-07-18)
+
+Installed-package closure: v0.14.2 was tagged before the final CodeQL fix merged, so npm 0.14.2 lacked it. This release ships it to actual consumers, plus two truthfulness fixes.
+
+### Fixed
+
+- **Fixed-point SVG comment removal now reaches npm consumers** (was on `main` via PR #50 but missed the v0.14.2 tag — release-boundary gap caught in review). Interleaved comment fragments cannot reassemble into a live `<!--` after sanitization.
+- **Preflight message matches its verdict**: a WARN from unresolved CSS variables no longer says "All checks pass — content is brand-compliant"; it now says what to fix before the content can be verified.
+- **Benchmark validators enforce what instructions request**: the blog task ("3 sentences") enforces exactly three (min+max), and the CTA task requires the headline, button/link, and `<style>` block its instruction asks for (`must_match` now supports arrays; `min_sentences` added).
+
 ## 0.14.2 (2026-07-18)
 
 Truth-and-security patch: the five 0.14.1 adjacent-edge closures, an SVG beacon fix, and scanner-facing hygiene.
