@@ -130,7 +130,7 @@ describe('compileRuntime', () => {
     expect(result.identity.colors).toEqual({
       primary: '#e63946',
       text: '#333333',
-      'Misc Teal': '#008080',
+      'misc-teal-0080': '#008080',
     });
   });
 
@@ -781,7 +781,7 @@ describe('compileRuntime', () => {
     expect(result.identity.colors_dark![darkKeys[0]]).toBe('#0f0f1a');
   });
 
-  it('uses color name as key when role is "unknown"', () => {
+  it('uses collision-safe token key when role is "unknown"', () => {
     const result = compileRuntime(
       makeConfig(),
       makeIdentity({
@@ -794,7 +794,7 @@ describe('compileRuntime', () => {
       null,
     );
 
-    expect(result.identity.colors).toHaveProperty('Warm Teal 400', '#2dd4bf');
+    expect(result.identity.colors).toHaveProperty('warm-teal-400-2dd4', '#2dd4bf');
   });
 
   it('sets compiled_at to a valid ISO timestamp', () => {

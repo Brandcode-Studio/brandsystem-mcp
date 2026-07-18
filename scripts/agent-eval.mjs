@@ -210,6 +210,37 @@ export function extractCssFromReply(reply) {
  * "Sure, ...", "I wrote...") despite being asked for content only? Recorded
  * per task, never gated — a brand voice could legitimately start with "Here".
  */
+/**
+ * Deterministic structural validation for second-agent tasks (finding: the
+ * old "output contract" only meant css/color presence). Fixture-declared:
+ * max_sentences, must_match (regex on the reply), max_body_sentences (after
+ * the first blank line), fence_only (no prose outside the fenced block).
+ */
+export function checkTaskStructure(task, reply, extraction) {
+  const s = task.structure;
+  if (!s) return [];
+  const violations = [];
+  const countSentences = (text) =>
+    (text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]+/g) ?? (text.trim() ? [text] : [])).length;
+  if (s.max_sentences != null && countSentences(reply) > s.max_sentences) {
+    violations.push(`more than ${s.max_sentences} sentence(s)`);
+  }
+  if (s.must_match && !new RegExp(s.must_match).test(reply)) {
+    violations.push(`does not match required shape ${JSON.stringify(s.must_match)}`);
+  }
+  if (s.max_body_sentences != null) {
+    const bodyIdx = reply.indexOf("\n\n");
+    const body = bodyIdx === -1 ? "" : reply.slice(bodyIdx + 2);
+    if (countSentences(body) > s.max_body_sentences) {
+      violations.push(`body exceeds ${s.max_body_sentences} sentence(s)`);
+    }
+  }
+  if (s.fence_only && extraction && extraction.fenced && extraction.prose.trim().length > 0) {
+    violations.push("prose outside the required fence-only output");
+  }
+  return violations;
+}
+
 export function hasMetaCommentary(reply) {
   const t = String(reply ?? "").trimStart();
   return /^(here\b|sure\b|certainly\b|i\s)/i.test(t);
@@ -1207,11 +1238,17 @@ async function main() {
           const missing = [];
           if (wantsCss && !(extraction.fenced && extraction.css)) missing.push("css");
           if (task.check_inputs.includes("color") && !rec.color_checked) missing.push("color");
-          rec.output_contract = missing.length === 0 ? "satisfied" : `missing: ${missing.join(", ")}`;
+          rec.required_inputs = missing.length === 0 ? "present" : `missing: ${missing.join(", ")}`;
+
+          // Task-specific structural contract (deterministic): sentence
+          // limits, required shapes, fence-only. Violations mean the job's
+          // stated output contract was not met — status "incomplete".
+          const structureViolations = checkTaskStructure(task, String(reply), extraction);
+          rec.structure = structureViolations.length === 0 ? "satisfied" : `violated: ${structureViolations.join("; ")}`;
 
           // Honest completion: contract + brand_check + compliance + non-vacuous rules.
           rec.status =
-            missing.length > 0
+            missing.length > 0 || structureViolations.length > 0
               ? "incomplete"
               : rec.rules_checked === 0
                 ? "unscored"
@@ -1338,15 +1375,24 @@ async function main() {
       try {
         const { execSync } = await import("node:child_process");
         const commit = execSync("git rev-parse HEAD", { cwd: ROOT, encoding: "utf-8" }).trim();
+        // A receipt against a dirty tree cannot identify reproducible source.
+        // Record the state honestly; publishable receipts require tree: clean.
+        const dirty = execSync("git status --porcelain", { cwd: ROOT, encoding: "utf-8" })
+          .trim()
+          .split("\n")
+          .filter(Boolean);
         const receiptDir = join(EVAL_DIR, "receipts");
         mkdirSync(receiptDir, { recursive: true });
         const receipt = {
           commit,
+          tree: dirty.length === 0 ? "clean" : `dirty (${dirty.length} uncommitted paths — NOT reproducible from commit alone)`,
           package_version: `${pkg.name}@${pkg.version}`,
           generated: runStamp.date,
           model_dependent: results.model_dependent,
         };
-        const rPath = join(receiptDir, `${runStamp.date.slice(0, 10)}-llm-receipt.json`);
+        // commit + timestamp + mode in the name: same-day runs never overwrite.
+        const stamp = runStamp.date.replace(/[:]/g, "").slice(0, 15);
+        const rPath = join(receiptDir, `${stamp}-${commit.slice(0, 7)}-llm-receipt.json`);
         writeFileSync(rPath, JSON.stringify(receipt, null, 2) + "\n");
         console.log(`Receipt written to ${rPath}`);
       } catch (err) {

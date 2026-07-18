@@ -293,14 +293,14 @@ describe("color verdict softening while clarify-primary is open", () => {
     expect(flags.some((f) => f.advisory)).toBe(false);
   });
 
-  it("brand_check_compliance: color failure becomes a warning that does not fail the gate, still counted", async () => {
+  it("brand_check_compliance: color failure becomes advisory: gate does not FAIL but withholds publish approval", async () => {
     await writeIdentity(ACHROMATIC_PRIMARY_IDENTITY);
     await callTool(client, "brand_compile");
 
     const result = await callTool(client, "brand_check_compliance", {
       content: OFF_PALETTE_HTML,
     });
-    expect(result.result).toBe("pass");
+    expect(result.result).toBe("pass_with_advisories");
     const checks = result.checks as Array<{ id: string; status: string; message: string }>;
     const colorCheck = checks.find((c) => c.id === "CRT-COLOR");
     expect(colorCheck?.status).toBe("warn");

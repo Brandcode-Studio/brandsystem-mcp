@@ -1,6 +1,6 @@
 import type { BrandConfigData, CoreIdentityData, VisualIdentityData, MessagingData, ContentStrategyData } from "../schemas/index.js";
 import { isTokenWorthy } from "./confidence.js";
-import { cleanColorName } from "./color-namer.js";
+import { colorTokenKey } from "./color-namer.js";
 
 /**
  * Approval state of a compiled runtime. In 0.9.6 every compile emits
@@ -131,7 +131,7 @@ function compileIdentity(identity: CoreIdentityData): RuntimeIdentity {
     if (!isTokenWorthy(c.confidence)) continue;
     // Unknown-role keys pass through cleanColorName in BOTH theme lanes:
     // extracted names are untrusted regardless of theme.
-    const key = c.role === "unknown" ? cleanColorName(c) : c.role;
+    const key = c.role === "unknown" ? colorTokenKey(c) : c.role;
     if (c.theme === "dark") {
       colorsDark[key] = c.value;
     } else {

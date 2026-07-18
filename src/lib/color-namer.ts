@@ -190,3 +190,20 @@ export function cleanColorName(color: { name: string; value: string; role: strin
   if (flattened.length === 0) return generateColorName(color.value, color.role);
   return flattened.length > 48 ? `${flattened.slice(0, 47)}…` : flattened;
 }
+
+/**
+ * Deterministic, sanitized identifier for a color in agent-facing keyed
+ * artifacts (runtime colors records, DTCG token keys). The sanitized display
+ * name alone can collide — two hostile "unknown" blues both clean to "Blue"
+ * and the later value silently overwrites the earlier. Suffixing a short hex
+ * fragment makes the key unique per actual color while staying stable across
+ * compiles. Display names remain separate (cleanColorName).
+ */
+export function colorTokenKey(color: { name: string; value: string; role: string }): string {
+  const base = cleanColorName(color)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "color";
+  const hex = color.value.replace(/^#/, "").toLowerCase().slice(0, 4);
+  return `${base}-${hex}`;
+}
