@@ -225,8 +225,16 @@ export function checkTaskStructure(task, reply, extraction) {
   if (s.max_sentences != null && countSentences(reply) > s.max_sentences) {
     violations.push(`more than ${s.max_sentences} sentence(s)`);
   }
-  if (s.must_match && !new RegExp(s.must_match).test(reply)) {
-    violations.push(`does not match required shape ${JSON.stringify(s.must_match)}`);
+  if (s.min_sentences != null && countSentences(reply) < s.min_sentences) {
+    violations.push(`fewer than ${s.min_sentences} sentence(s)`);
+  }
+  if (s.must_match) {
+    const patterns = Array.isArray(s.must_match) ? s.must_match : [s.must_match];
+    for (const pattern of patterns) {
+      if (!new RegExp(pattern).test(reply)) {
+        violations.push(`does not match required shape ${JSON.stringify(pattern)}`);
+      }
+    }
   }
   if (s.max_body_sentences != null) {
     const bodyIdx = reply.indexOf("\n\n");

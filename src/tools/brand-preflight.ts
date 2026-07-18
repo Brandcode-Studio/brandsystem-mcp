@@ -791,7 +791,10 @@ async function handleCheck(brandDir: BrandDir, html: string) {
   const nextSteps: string[] = [];
   if (fail > 0) nextSteps.push("Fix failing checks (hard anti-patterns) before shipping");
   if (warn > 0) nextSteps.push("Review warnings — some may be intentional deviations");
-  if (fail === 0 && warn === 0) nextSteps.push("All checks pass — content is brand-compliant");
+  if (overall === "PASS") nextSteps.push("All checks pass — content is brand-compliant");
+  if (overall === "WARN" && fail === 0 && warn === 0) {
+    nextSteps.push("Unresolved CSS variables prevented full verification — define the missing custom properties (or inline the values) and re-run before treating this as brand-compliant");
+  }
 
   return buildResponse({
     what_happened: `Preflight ${overall}: ${pass} pass, ${warn} warn, ${fail} fail${info > 0 ? `, ${info} info` : ""}${overall === "WARN" && fail === 0 && warn === 0 ? " (unresolved CSS variables — some rules could not be verified)" : ""}`,

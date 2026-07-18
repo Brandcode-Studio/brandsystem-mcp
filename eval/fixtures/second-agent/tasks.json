@@ -25,6 +25,7 @@
       ],
       "notes": "Copy task; the standard budget serves voice + strategy sections.",
       "structure": {
+        "min_sentences": 3,
         "max_sentences": 3
       }
     },
@@ -68,7 +69,11 @@
       ],
       "notes": "HTML+CSS task; the fenced snippet is passed to brand_check as css and the whole reply to brand_check_compliance.",
       "structure": {
-        "must_match": "<style[\\s>][\\s\\S]*</style>"
+        "must_match": [
+          "<style[\\s>][\\s\\S]*</style>",
+          "<h[1-6][\\s>]",
+          "<(button|a)[\\s>]"
+        ]
       }
     }
   ]
