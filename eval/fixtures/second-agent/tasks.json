@@ -23,7 +23,10 @@
       "check_inputs": [
         "text"
       ],
-      "notes": "Copy task; the standard budget serves voice + strategy sections."
+      "notes": "Copy task; the standard budget serves voice + strategy sections.",
+      "structure": {
+        "max_sentences": 3
+      }
     },
     {
       "id": "email-renewal",
@@ -63,7 +66,10 @@
         "text",
         "css"
       ],
-      "notes": "HTML+CSS task; the fenced snippet is passed to brand_check as css and the whole reply to brand_check_compliance."
+      "notes": "HTML+CSS task; the fenced snippet is passed to brand_check as css and the whole reply to brand_check_compliance.",
+      "structure": {
+        "must_match": "<style[\\s>][\\s\\S]*</style>"
+      }
     }
   ]
 }

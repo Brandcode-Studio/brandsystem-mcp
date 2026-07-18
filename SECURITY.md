@@ -64,3 +64,22 @@ Please act in good faith:
 
 We will work in good faith with researchers who follow this policy and will
 credit valid reports when requested and appropriate.
+
+## Package capabilities and why security scanners flag them
+
+Behavioral scanners (Socket and similar) flag this package for capabilities
+that are intentional product functions, not vulnerabilities:
+
+| Flag | Why it exists |
+|---|---|
+| Network access | Fetching the websites/Figma sources you explicitly provide; optional Brandcode Studio connector; optional `brand_feedback` reports. No other outbound traffic. |
+| Filesystem access | Reading and writing the local `.brand/` runtime — the product's core artifact. |
+| Environment variables | `BRANDSYSTEM_PROFILE`, opt-in telemetry, and connector credentials. |
+| Shell access | Only in the explicit installer (`install --client codex/cline` delegates to those tools' official CLIs) and Puppeteer launching a local Chromium for rendered extraction. |
+| Native/WASM/minified code | PDF.js (PDF guideline extraction) and browser tooling — upstream, integrity-hashed dependencies. |
+
+Independent facts a reviewer can verify: zero npm advisories on install, zero
+open Dependabot alerts, registry signatures + SLSA provenance on every
+release, no install lifecycle scripts in the production dependency tree, and
+an allowlist-tested tarball (`test/package-contents.test.ts`) that excludes
+hosted code, tests, specs, and source maps.

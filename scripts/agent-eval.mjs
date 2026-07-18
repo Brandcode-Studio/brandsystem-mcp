@@ -1391,7 +1391,7 @@ async function main() {
           model_dependent: results.model_dependent,
         };
         // commit + timestamp + mode in the name: same-day runs never overwrite.
-        const stamp = runStamp.date.replace(/[:]/g, "").slice(0, 15);
+        const stamp = runStamp.date.replace(/[:.]/g, "").slice(0, 17); // to seconds — same-minute runs must not collide
         const rPath = join(receiptDir, `${stamp}-${commit.slice(0, 7)}-llm-receipt.json`);
         writeFileSync(rPath, JSON.stringify(receipt, null, 2) + "\n");
         console.log(`Receipt written to ${rPath}`);

@@ -20,6 +20,7 @@ const ALLOWLIST: RegExp[] = [
 
 const DENYLIST: RegExp[] = [
   /^dist\/hosted\//,
+  /\.map$/, // source maps reference src/ we do not ship — dead weight (0.14.2)
   /^bin\/brandcode-mcp\.mjs$/,
   /^test\//,
   /^specs\//,

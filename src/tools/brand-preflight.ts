@@ -782,7 +782,11 @@ async function handleCheck(brandDir: BrandDir, html: string) {
   const warn = checks.filter((c) => c.status === "warn").length;
   const fail = checks.filter((c) => c.status === "fail").length;
   const info = checks.filter((c) => c.status === "info").length;
-  const overall = fail > 0 ? "FAIL" : warn > 0 ? "WARN" : "PASS";
+  // Unverifiable is not compliant: unresolved var() values mean rules could
+  // not be checked against real values, so a clean run caps at WARN, never
+  // "content is brand-compliant" (adjacent-edge fix, 0.14.2).
+  const hasUnresolved = checks.some((c) => c.id === "V-UNRESOLVED" && c.status === "info");
+  const overall = fail > 0 ? "FAIL" : warn > 0 || hasUnresolved ? "WARN" : "PASS";
 
   const nextSteps: string[] = [];
   if (fail > 0) nextSteps.push("Fix failing checks (hard anti-patterns) before shipping");
@@ -790,7 +794,7 @@ async function handleCheck(brandDir: BrandDir, html: string) {
   if (fail === 0 && warn === 0) nextSteps.push("All checks pass — content is brand-compliant");
 
   return buildResponse({
-    what_happened: `Preflight ${overall}: ${pass} pass, ${warn} warn, ${fail} fail${info > 0 ? `, ${info} info` : ""}`,
+    what_happened: `Preflight ${overall}: ${pass} pass, ${warn} warn, ${fail} fail${info > 0 ? `, ${info} info` : ""}${overall === "WARN" && fail === 0 && warn === 0 ? " (unresolved CSS variables — some rules could not be verified)" : ""}`,
     next_steps: nextSteps,
     data: {
       overall,

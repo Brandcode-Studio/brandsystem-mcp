@@ -204,6 +204,9 @@ export function colorTokenKey(color: { name: string; value: string; role: string
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "color";
-  const hex = color.value.replace(/^#/, "").toLowerCase().slice(0, 4);
+  // Full hex: a truncated suffix reintroduced collisions (#112233 vs
+  // #1122ff both -> "1122"). Six chars is still short and fully unique
+  // per actual color value.
+  const hex = color.value.replace(/^#/, "").toLowerCase();
   return `${base}-${hex}`;
 }

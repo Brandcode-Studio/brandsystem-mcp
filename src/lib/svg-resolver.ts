@@ -83,6 +83,19 @@ export function sanitizeSvg(svg: string): string {
       // Drop any attribute not in the whitelist
       if (!ALLOWED_ATTRIBUTES.has(attrLower)) {
         delete attribs[attrName];
+        continue;
+      }
+
+      // url(...) values in allowlisted attributes (fill, filter, mask,
+      // clip-path, stroke, style, ...) may reference ONLY local fragments.
+      // An external url() survives into brand-report.html as live markup and
+      // fires an outbound request when the report is opened — a tracking
+      // beacon inside a "portable, self-contained" artifact.
+      if (/url\s*\(/i.test(value)) {
+        const external = /url\s*\(\s*['"]?\s*(?!#)[^)'"\s]/i.test(value);
+        if (external) {
+          delete attribs[attrName];
+        }
       }
     }
   });

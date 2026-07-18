@@ -452,6 +452,10 @@ export function generateReportHTML(data: ReportData): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Self-contained by design: block ALL external requests. Inline styles/
+     script and data: URIs are the report's only legitimate resources; a
+     hostile value that survived sanitization still cannot phone home. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${clientName} — Brand Identity Report</title>
 <style>
