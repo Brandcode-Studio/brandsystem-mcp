@@ -65,6 +65,7 @@ brand-runtime, brand-governance, Claude Design integration, design-tokens, voice
 Local-first: extraction and compilation run on the user's machine. Network activity is limited to fetching user-specified sources, optional Brandcode Studio connector calls, and optional brand_feedback reports. Report vulnerabilities privately via GitHub Security Advisories (see SECURITY.md).
 
 ## Links
+- Landing page: https://www.brandcode.studio/mcp
 - Website: https://brandcode.studio
 - GitHub: https://github.com/Brandcode-Studio/brandsystem-mcp
 - npm: https://www.npmjs.com/package/@brandsystem/mcp

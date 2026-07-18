@@ -69,9 +69,11 @@
       ],
       "notes": "HTML+CSS task; the fenced snippet is passed to brand_check as css and the whole reply to brand_check_compliance.",
       "structure": {
+        "fence_only": true,
         "must_match": [
           "<style[\\s>][\\s\\S]*</style>",
           "<h[1-6][\\s>]",
+          "<p[\\s>]",
           "<(button|a)[\\s>]"
         ]
       }
