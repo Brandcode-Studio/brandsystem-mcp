@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.14.4 (2026-07-18)
+
+Ships the theme-dimension completion (#35 gap 1, tool/catalog/response layers) to npm consumers, plus the canonical landing-page metadata.
+
+### Fixed
+
+- **Dark-theme colors survive the source catalog** (#54): dark entries get their own catalog field (`colors.<role>.dark`) so a dark surface no longer collides with — or falsely conflicts against — the light surface; catalog metadata carries `theme`, and conflict resolution operates within the (role, theme) slot only.
+- **Agents can see the theme dimension** (#55): `all_colors` and `confirmation_needed.colors.all_extracted` in `brand_extract_web` and `brand_start` auto mode now carry `theme` — the files preserved dark/light identity but the response projection dropped it. End-to-end test mocks the `safeFetch` boundary and verifies dark CSS → ColorEntry → catalog → MCP response.
+
+### Changed
+
+- `homepage`/`websiteUrl` point at the live landing page https://www.brandcode.studio/mcp (#52), and the release invariant (tag ↔ version ↔ npm ↔ boundary) now runs automatically at the end of every publish.
+
 ## 0.14.3 (2026-07-18)
 
 Installed-package closure: v0.14.2 was tagged before the final CodeQL fix merged, so npm 0.14.2 lacked it. This release ships it to actual consumers, plus two truthfulness fixes.
