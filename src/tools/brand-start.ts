@@ -875,6 +875,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
         hex: c.value,
         role: c.role,
         confidence: c.confidence,
+        ...(c.theme ? { theme: c.theme } : {}),
       })),
       fonts: typography.map((t) => ({ family: t.family, confidence: t.confidence })),
       confirmation_needed: {
@@ -889,6 +890,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
             hex: c.value,
             name: c.name,
             role: c.role,
+            ...(c.theme ? { theme: c.theme } : {}),
           })),
           instruction: "Show ALL extracted colors. Ask: 1) Which is primary? 2) Any that should NOT be in the brand? 3) Roles for unknowns.",
         },
