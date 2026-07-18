@@ -130,7 +130,7 @@ describe('compileRuntime', () => {
     expect(result.identity.colors).toEqual({
       primary: '#e63946',
       text: '#333333',
-      'misc-teal-0080': '#008080',
+      'misc-teal-008080': '#008080',
     });
   });
 
@@ -794,7 +794,7 @@ describe('compileRuntime', () => {
       null,
     );
 
-    expect(result.identity.colors).toHaveProperty('warm-teal-400-2dd4', '#2dd4bf');
+    expect(result.identity.colors).toHaveProperty('warm-teal-400-2dd4bf', '#2dd4bf');
   });
 
   it('sets compiled_at to a valid ISO timestamp', () => {

@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 0.14.2 (2026-07-18)
+
+Truth-and-security patch: the five 0.14.1 adjacent-edge closures, an SVG beacon fix, and scanner-facing hygiene.
+
+### Security
+
+- **External `url()` references stripped from sanitized SVG** (real finding from adversarial review, CodeQL-adjacent): allowlisted attributes (`fill`, `filter`, `mask`, `clip-path`, ...) may now reference only local fragments (`url(#id)`); external URLs — which would beacon out when brand-report.html is opened — are removed. Hostile-value tests added.
+- **Restrictive CSP on generated brand reports** (`default-src 'none'` + inline styles/script + `data:` only): the report is self-contained by design, so even a value that survived sanitization cannot phone home.
+
+### Fixed (0.14.1 adjacent edges — each previously fixed for the tested case only)
+
+- **Publish gate**: keys on the open color clarification itself, not on whether this content tripped a warning — on-palette-against-a-wrong-palette (or colorless) content can no longer earn "safe to publish" while clarify-primary is open.
+- **Preflight verdict**: unresolved CSS variables cap the overall result at WARN — unverifiable is not "brand-compliant."
+- **Token keys**: full 6-char hex suffix — the truncated suffix reintroduced collisions (#112233 vs #1122ff).
+- **Structural contracts**: blog (max 3 sentences) and CTA (must contain a `<style>` block) tasks now carry validators; their previous "structure: satisfied" was vacuous.
+- **Receipt filenames**: timestamps to seconds — same-minute runs no longer collide.
+
+### Changed
+
+- Lockfile synced to MCP SDK 1.29.0 (what fresh consumers install).
+- Source maps excluded from the tarball (425 → 234 files; they referenced src/ we do not ship). Pack-allowlist test enforces it.
+- `SECURITY.md` gains a "package capabilities and why scanners flag them" section (Socket-style heuristics mapped to intentional functions, with verifiable facts).
+- CodeQL: two verified false positives formally dismissed with reasons; the SVG family alert closes with this release's fix.
+
 ## 0.14.1 (2026-07-18)
 
 Truth-and-trust patch from the Codex 0.13.4 review (all findings verified).

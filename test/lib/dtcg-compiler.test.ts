@@ -127,7 +127,7 @@ describe('compileDTCG', () => {
     );
     const brand = result.brand as Record<string, Record<string, unknown>>;
     // Deterministic collision-safe key: sanitized slug + short hex suffix.
-    expect(brand.color).toHaveProperty('warm-teal-400-2dd4');
+    expect(brand.color).toHaveProperty('warm-teal-400-2dd4bf');
   });
 
   it('excludes low-confidence values', () => {
@@ -217,7 +217,7 @@ describe('compileDTCG', () => {
     // Dark colors live under the `dark` group, keyed like the top level
     const dark = brand.color.dark as Record<string, Record<string, unknown>>;
     expect(dark.surface.$value).toBe('#0f0f1a');
-    expect(dark['deep-slate-e2e8'].$value).toBe('#e2e8f0');
+    expect(dark['deep-slate-e2e8f0'].$value).toBe('#e2e8f0');
 
     const ext = dark.surface.$extensions as Record<string, Record<string, unknown>>;
     expect(ext['com.brandsystem'].source).toBe('web');

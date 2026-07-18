@@ -1,6 +1,6 @@
 {
   "name": "@brandsystem/mcp",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "mcpName": "io.github.Brandcode-Studio/brandsystem-mcp",
   "description": "Use existing brand guidelines with AI. This MCP server turns websites, PDFs, and Figma libraries into a portable .brand runtime with design tokens, voice rules, provenance, and compliance checks.",
   "type": "module",
@@ -48,6 +48,7 @@
   "files": [
     "dist",
     "!dist/hosted",
+    "!dist/**/*.map",
     "bin/brandsystem-mcp.mjs",
     "llms.txt",
     "llms-install.md"

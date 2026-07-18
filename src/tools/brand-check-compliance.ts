@@ -244,7 +244,11 @@ async function handler(input: CheckComplianceParams) {
   // governance is unresolved. The publish gate must never call that "safe" —
   // brand_check stays permissive for iteration; this tool does not.
   const warns = checks.filter((c) => c.status === "warn").length;
-  const advisoryGateOpen = warns > 0 && (await hasOpenColorClarification(cwd));
+  // The gate keys on the OPEN CLARIFICATION, not on whether this content
+  // tripped a warning: content matching the possibly-wrong palette (or using
+  // no color at all) produces zero warns while governance is still unresolved
+  // — the palette itself is the unverified claim.
+  const advisoryGateOpen = await hasOpenColorClarification(cwd);
   const result = !pass ? "fail" : advisoryGateOpen ? "pass_with_advisories" : "pass";
   const publishReady = pass && !advisoryGateOpen;
 
@@ -252,7 +256,7 @@ async function handler(input: CheckComplianceParams) {
     what_happened: !pass
       ? `Compliance check: FAIL (${checks.length} rules checked, ${failures.length} failure(s))`
       : advisoryGateOpen
-        ? `Compliance check: PASS WITH ADVISORIES (${checks.length} rules checked, ${warns} advisory warning(s) — unresolved color governance)`
+        ? `Compliance check: PASS WITH ADVISORIES (${checks.length} rules checked, ${warns} advisory warning(s) — the brand palette itself is unconfirmed while clarify-primary is open)`
         : `Compliance check: PASS (${checks.length} rules checked, 0 failures)`,
     next_steps: !pass
       ? [
