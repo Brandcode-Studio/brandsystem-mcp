@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.13.4 (2026-07-17)
+
+Field-report release: fixes from the first real second-agent run against a live brand (Colovore, #41-#43).
+
+### Fixed
+
+- **Uncertain primaries can no longer poison the check loop** (#41). When extraction crowns an achromatic primary while chromatic candidates exist (or the primary is below high confidence, or missing), both `brand_compile` and `brand_start` auto mode now generate a stable, targetable high-priority `clarify-primary` item listing the candidates. `brand_clarify` resolves it (bare hex, hex-in-text, or color description) — re-roling the chosen color to confirmed primary and demoting the old one sensibly. While it is open, `brand_check`/`brand_check_compliance` **soften color verdicts to advisory warnings** ("primary color unconfirmed — resolve clarify-primary") instead of failing the brand's own true colors. A human-confirmed primary — even an achromatic one — never re-fires the item.
+- **Unknown arguments now teach instead of swallowing** (#42): `{url: ...}` returns `Unknown argument: "url" (did you mean "website_url"?)` with the full valid-argument list, centrally in `safeParseParams`.
+- **Core-profile guidance is now profile-aware** (#42): `next_steps` referencing full-only tools are annotated with the `--profile=full` restart instruction instead of leading agents into unknown-tool errors.
+- **Alpha-hex artifacts excluded from extraction** (#42): `#0000`/8-digit low-alpha hexes are dropped as non-brand; opaque-enough short RGBA forms normalize to their RGB (white at 40% is white, not "Red").
+- **`brandcode_onramp` appears once per session** (#42) instead of on every response.
+
+### Added
+
+- Four dogfood captures from the field run (source: colovore) — the first real-usage entries toward the 0.12 holdout.
+
+Preflight var()-resolution and `<img>` logo detection are tracked in #43 for 0.14.
+
 ## 0.13.3 (2026-07-17)
 
 Benchmark truth + taint closure repair (Codex review findings, all verified).

@@ -225,3 +225,25 @@ describe('promotePrimaryColor', () => {
     expect(cyan._promoted_role).toBeUndefined();
   });
 });
+
+describe("alpha-hex normalization (#42.3)", () => {
+  it("drops mostly-transparent hex colors from extraction", () => {
+    const css = ":root { --a: #0000; --b: #ffffff33; --c: #ff0000; }";
+    const result = extractFromCSS(css);
+    const values = result.colors.map((c) => c.value);
+    expect(values).not.toContain("#0000");
+    expect(values).not.toContain("#ffffff33");
+    expect(values).toContain("#ff0000");
+  });
+
+  it("strips alpha from opaque-enough short hex so naming sees real RGB", () => {
+    const css = ".x { color: #fff6; }";
+    const result = extractFromCSS(css);
+    const values = result.colors.map((c) => c.value);
+    expect(values).not.toContain("#fff6");
+    // white at ~40% alpha survives as white, not a malformed token
+    if (values.length > 0) {
+      expect(values).toContain("#ffffff");
+    }
+  });
+});

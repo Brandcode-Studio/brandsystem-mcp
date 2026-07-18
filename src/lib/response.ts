@@ -40,6 +40,50 @@ export function safeParseParams<T extends z.ZodTypeAny>(
   schema: T,
   args: unknown,
 ): { success: true; data: z.infer<T> } | { success: false; response: ReturnType<typeof buildResponse> } {
+  // Unknown-argument detection (#42): a misspelled key ("url" for
+  // "website_url") silently swallowed costs agents a full round-trip.
+  // Error messages teach: name the bad key, suggest the closest valid one.
+  if (
+    schema instanceof z.ZodObject &&
+    args &&
+    typeof args === "object" &&
+    !Array.isArray(args)
+  ) {
+    const known = Object.keys((schema as z.ZodObject<z.ZodRawShape>).shape);
+    const unknown = Object.keys(args as Record<string, unknown>).filter(
+      (k) => !known.includes(k)
+    );
+    if (unknown.length > 0) {
+      const suggest = (bad: string): string | null => {
+        let best: string | null = null;
+        let bestScore = 0;
+        for (const k of known) {
+          const a = bad.toLowerCase();
+          const b = k.toLowerCase();
+          const overlap = [...a].filter((ch) => b.includes(ch)).length / Math.max(a.length, b.length);
+          const contained = b.includes(a) || a.includes(b) ? 0.5 : 0;
+          const score = overlap + contained;
+          if (score > bestScore) { bestScore = score; best = k; }
+        }
+        // Substring containment (url ⊂ website_url) is the strongest signal
+        // agents actually produce; 0.7 admits it while rejecting noise.
+        return bestScore >= 0.7 ? best : null;
+      };
+      const details = unknown.map((k) => {
+        const hint = suggest(k);
+        return hint ? `"${k}" (did you mean "${hint}"?)` : `"${k}"`;
+      });
+      return {
+        success: false,
+        response: buildResponse({
+          what_happened: `Unknown argument${unknown.length > 1 ? "s" : ""}: ${details.join(", ")}`,
+          next_steps: [`Valid arguments: ${known.join(", ")}`, "Retry with the corrected argument names"],
+          data: { error: ERROR_CODES.VALIDATION_FAILED, unknown_arguments: unknown, valid_arguments: known },
+        }),
+      };
+    }
+  }
+
   const result = schema.safeParse(args);
   if (result.success) {
     return { success: true, data: result.data };
@@ -60,6 +104,9 @@ export function safeParseParams<T extends z.ZodTypeAny>(
 /** Cached onramp guidance — set once per session, reused across responses */
 let _cachedOnramp: OnrampGuidance | null = null;
 let _onrampChecked = false;
+// Onramp guidance appears once per session — repeating it on every
+// response is pure token noise for agents (Colovore field report, #42).
+let _onrampShown = false;
 
 /**
  * Check brand completeness and cache the onramp guidance for the session.
@@ -95,6 +142,25 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+/** Active tool profile, set by createServer — lets responses annotate
+ * guidance that points at tools the current profile doesn't register (#42). */
+let _activeProfile: "core" | "full" = "core";
+let _coreToolNames: ReadonlySet<string> = new Set();
+export function setActiveProfile(profile: "core" | "full", coreNames: ReadonlySet<string>): void {
+  _activeProfile = profile;
+  _coreToolNames = coreNames;
+}
+
+function annotateProfileGaps(steps: string[]): string[] {
+  if (_activeProfile !== "core" || _coreToolNames.size === 0) return steps;
+  return steps.map((step) => {
+    const mentioned = step.match(/brand_[a-z_]+/g) ?? [];
+    const fullOnly = [...new Set(mentioned)].filter((t) => !_coreToolNames.has(t));
+    if (fullOnly.length === 0 || step.includes("--profile=full")) return step;
+    return `${step} (${fullOnly.join(", ")} require${fullOnly.length === 1 ? "s" : ""} the full profile — restart the server with --profile=full or BRANDSYSTEM_PROFILE=full)`;
+  });
+}
+
 export function buildResponse(input: McpResponseData): {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: Record<string, unknown>;
@@ -102,7 +168,7 @@ export function buildResponse(input: McpResponseData): {
   const output: Record<string, unknown> = {
     _metadata: {
       what_happened: input.what_happened,
-      next_steps: input.next_steps,
+      next_steps: annotateProfileGaps(input.next_steps),
     },
   };
 
@@ -111,7 +177,8 @@ export function buildResponse(input: McpResponseData): {
   }
 
   // Inject onramp guidance if brand context is thin (cached, non-blocking)
-  if (_cachedOnramp?.shouldShow) {
+  if (_cachedOnramp?.shouldShow && !_onrampShown) {
+    _onrampShown = true;
     output["brandcode_onramp"] = {
       message: _cachedOnramp.message,
       suggested_connector: _cachedOnramp.suggestedConnector,

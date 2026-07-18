@@ -23,12 +23,13 @@ import {
   extractFromCSS,
   inferColorConfidence,
   inferColorRole,
+  isChromatic,
   promotePrimaryColor,
   getTopChromaticCandidates,
 } from "../src/lib/css-parser.js";
 import { extractLogos, type ExtractedLogo } from "../src/lib/logo-extractor.js";
 import { resolveSvg } from "../src/lib/svg-resolver.js";
-import { mergeColor, mergeTypography, needsClarification } from "../src/lib/confidence.js";
+import { mergeColor, mergeTypography, needsClarification, confidenceRank } from "../src/lib/confidence.js";
 import { generateColorName, isCssArtifactName, cleanColorName } from "../src/lib/color-namer.js";
 import { fenceUntrusted } from "../src/lib/untrusted-text.js";
 import type { ColorEntry, TypographyEntry } from "../src/types/index.js";
@@ -187,15 +188,38 @@ function extractIdentityFromHtml(html: string, baseUrl: string): ExtractionResul
 
   // Clarification derivation — mirrors brand_compile (src/tools/brand-compile.ts).
   const clarifications: ClarificationItem[] = [];
-  if (!colors.some((c) => c.role === "primary")) {
+  // Primary-color uncertainty (issue #41) — mirrors the clarify-primary item.
+  const primaryColor = colors.find((c) => c.role === "primary");
+  const primaryChromaticCandidates = colors.filter(
+    (c) => c.role !== "primary" && isChromatic(c.value)
+  );
+  let primaryUncertain = false;
+  if (!primaryColor) {
+    primaryUncertain = true;
+  } else if (primaryColor.confidence !== "confirmed" && primaryChromaticCandidates.length > 0) {
+    primaryUncertain =
+      !isChromatic(primaryColor.value) ||
+      confidenceRank(primaryColor.confidence) < confidenceRank("high");
+  }
+  if (primaryUncertain) {
+    const candidateList = primaryChromaticCandidates.map((c) => c.value).join(", ");
+    let question: string;
+    if (primaryColor) {
+      question = `Primary color is uncertain: current primary is ${primaryColor.value} (name: ${fenceUntrusted(primaryColor.name, 60)}), but chromatic candidate(s) exist: ${candidateList}. Which is the true primary brand color?`;
+    } else if (primaryChromaticCandidates.length > 0) {
+      question = `No primary brand color identified. Chromatic candidate(s): ${candidateList}. Which color is your primary brand color?`;
+    } else {
+      question = "No primary brand color identified. Which color is your primary brand color?";
+    }
     clarifications.push({
       field: "colors.primary",
-      question: "No primary brand color identified. Which color is your primary brand color?",
+      question,
       priority: "high",
     });
   }
   for (const color of colors) {
     if (needsClarification(color.confidence)) {
+      if (color.role === "primary" && primaryUncertain) continue;
       clarifications.push({
         field: `colors.${color.role}`,
         question: `Color ${color.value} (name: ${fenceUntrusted(color.name, 60)}) has low confidence. Is this correct and what role does it play?`,

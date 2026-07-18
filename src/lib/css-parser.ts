@@ -35,6 +35,21 @@ function normalizeToHex(value: string): string | null {
     if (trimmed.length === 4) {
       return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
     }
+    // #rgba: mostly-transparent values are not brand colors; otherwise
+    // strip alpha so downstream naming/roles see the real RGB.
+    if (trimmed.length === 5) {
+      const alpha = parseInt(trimmed[4] + trimmed[4], 16);
+      if (alpha < 0x66) return null;
+      return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
+    }
+    // #rrggbbaa: same treatment.
+    if (trimmed.length === 9) {
+      const alpha = parseInt(trimmed.slice(7, 9), 16);
+      if (alpha < 0x66) return null;
+      return trimmed.slice(0, 7);
+    }
+    // 5- or 7-digit hex is malformed.
+    if (trimmed.length === 6 || trimmed.length === 8) return null;
     return trimmed;
   }
 
