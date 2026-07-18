@@ -199,11 +199,17 @@ export function resolveSvg(
   // Sanitize SVG to remove dangerous elements/attributes
   const sanitized = sanitizeSvg(svgContent);
 
-  // Clean up the SVG: remove XML declaration, normalize whitespace
-  let cleaned = sanitized
-    .replace(/<\?xml[^?]*\?>/g, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .trim();
+  // Clean up the SVG: remove XML declaration and comments. Comment removal
+  // loops to a fixed point so interleaved fragments (`<!<!---->--`) cannot
+  // reassemble into a live `<!--` after a single pass (CodeQL
+  // js/incomplete-multi-character-sanitization).
+  let cleaned = sanitized.replace(/<\?xml[^?]*\?>/g, "");
+  let prev: string;
+  do {
+    prev = cleaned;
+    cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, "");
+  } while (cleaned !== prev);
+  cleaned = cleaned.trim();
 
   // Ensure it starts with <svg
   if (!cleaned.startsWith("<svg")) {
