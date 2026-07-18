@@ -68,6 +68,86 @@ describe('extractFromCSS — color extraction', () => {
   });
 });
 
+describe('extractFromCSS — dark-theme scope tagging (issue #35 gap 1)', () => {
+  it('tags colors found only under [data-theme="dark"] with theme "dark"', () => {
+    const css = `
+      :root { --color-bg: #ffffff; }
+      [data-theme="dark"] { --color-bg: #0f0f1a; }
+    `;
+    const { colors } = extractFromCSS(css);
+    const light = colors.find((c) => c.value === '#ffffff');
+    const dark = colors.find((c) => c.value === '#0f0f1a');
+    expect(light?.theme).toBeUndefined();
+    expect(dark?.theme).toBe('dark');
+  });
+
+  it('tags colors found only under a .dark class scope', () => {
+    const css = `
+      body { background-color: #ffffff; }
+      .dark body { background-color: #111827; }
+    `;
+    const { colors } = extractFromCSS(css);
+    expect(colors.find((c) => c.value === '#111827')?.theme).toBe('dark');
+    expect(colors.find((c) => c.value === '#ffffff')?.theme).toBeUndefined();
+  });
+
+  it('does not treat .dark-prefixed class names as a dark scope', () => {
+    const css = `.darkroom-gallery { background-color: #202020; }`;
+    const { colors } = extractFromCSS(css);
+    expect(colors.find((c) => c.value === '#202020')?.theme).toBeUndefined();
+  });
+
+  it('tags colors inside a prefers-color-scheme: dark media block', () => {
+    const css = `
+      :root { --surface: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        :root { --surface: #16161d; }
+      }
+    `;
+    const { colors } = extractFromCSS(css);
+    expect(colors.find((c) => c.value === '#16161d')?.theme).toBe('dark');
+    expect(colors.find((c) => c.value === '#ffffff')?.theme).toBeUndefined();
+  });
+
+  it('does not tag colors after leaving a dark media block', () => {
+    const css = `
+      @media (prefers-color-scheme: dark) {
+        body { background-color: #16161d; }
+      }
+      .footer { background-color: #333344; }
+    `;
+    const { colors } = extractFromCSS(css);
+    expect(colors.find((c) => c.value === '#16161d')?.theme).toBe('dark');
+    expect(colors.find((c) => c.value === '#333344')?.theme).toBeUndefined();
+  });
+
+  it('clears the dark tag when the same color also appears outside dark scope', () => {
+    const css = `
+      [data-theme="dark"] { --brand-primary: #7c3aed; }
+      a { color: #7c3aed; }
+    `;
+    const { colors } = extractFromCSS(css);
+    expect(colors.find((c) => c.value === '#7c3aed')?.theme).toBeUndefined();
+  });
+
+  it('keeps a shared hex theme-agnostic regardless of sighting order', () => {
+    const css = `
+      a { color: #7c3aed; }
+      [data-theme="dark"] { --brand-primary: #7c3aed; }
+    `;
+    const { colors } = extractFromCSS(css);
+    expect(colors.find((c) => c.value === '#7c3aed')?.theme).toBeUndefined();
+  });
+
+  it('never guesses dark theme from color values alone', () => {
+    const css = `body { background-color: #000000; color: #0f0f1a; }`;
+    const { colors } = extractFromCSS(css);
+    for (const c of colors) {
+      expect(c.theme).toBeUndefined();
+    }
+  });
+});
+
 describe('extractFromCSS — font extraction', () => {
   it('extracts font families from CSS', () => {
     const css = `body { font-family: "Inter", sans-serif; }`;

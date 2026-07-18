@@ -94,6 +94,10 @@
 
 (Second-agent benchmark live: 5/5 job completion, 0 flags, 144/325 tokens per artifact. Negative routing measured: 0% false-positive invocation. #35 gaps 2-4 fixed with fixture flips; gap 1 (merge collapse) deferred with schema recommendation on the issue. All five dependency majors merged individually; TS 7 typechecks clean, parked for 0.14 standalone PR with dist-diff review. Remaining ongoing: dogfood capture toward holdout freeze; 0.14 candidates: TS 7 migration, (role, theme) merge-key decision, design-partner measurement.)
 
+## 0.14 — Theme governance, preflight truth, hardening — SHIPPED 2026-07-17
+
+((role,theme) merge key live end-to-end incl. extraction tagging + colors_dark runtime lane; #43 preflight var()/img-logo fixed + quoted-font bonus bug; ingestion fuzzing suite (findings → #45); poisoned-runtime runbook exercised in scripted form (live drill pending); TypeScript 7.0.2 migrated with byte-identical runtime emit. Remaining ongoing: dogfood capture toward holdout freeze (5/50); design-partner measurement; #45 robustness fixes for 0.15.)
+
 ## Hosted (Use MCP) prerequisite — separate lane
 
 - Disposable browser worker with deny-by-default egress, socket/DNS-level policy, CPU/memory/process/time limits, ephemeral filesystem, no inherited credentials, narrow validated result channel — **before** any browser extraction is exposed remotely. Independently reviewed.

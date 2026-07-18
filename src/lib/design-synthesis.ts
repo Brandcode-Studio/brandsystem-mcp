@@ -82,6 +82,14 @@ export interface DesignSynthesisFile {
       confidence: DesignSignalConfidence;
       provenance: string[];
     }>;
+    /** Dark-theme colors (issue #35 gap 1) — listed in their own group, not dropped. */
+    dark: Array<{
+      role: string;
+      name: string;
+      value: string;
+      confidence: DesignSignalConfidence;
+      provenance: string[];
+    }>;
     mood: {
       temperature: "warm" | "cool" | "balanced";
       contrast: "high" | "medium" | "low";
@@ -435,10 +443,16 @@ function buildColorGroups(identity: CoreIdentityData) {
     provenance: [`${color.source}${color.css_property ? `:${color.css_property}` : ""}`],
   });
 
+  // Dark-theme entries get their own group (issue #35 gap 1) so the light and
+  // dark palettes stay legible side by side instead of interleaving by role.
+  const defaultTheme = tokenWorthy.filter((color) => color.theme !== "dark");
+  const darkTheme = tokenWorthy.filter((color) => color.theme === "dark");
+
   return {
-    brand: tokenWorthy.filter((color) => BRAND_COLOR_ROLES.has(color.role)).map(toSignal),
-    semantic: tokenWorthy.filter((color) => SEMANTIC_COLOR_ROLES.has(color.role)).map(toSignal),
-    additional: tokenWorthy.filter((color) => !BRAND_COLOR_ROLES.has(color.role) && !SEMANTIC_COLOR_ROLES.has(color.role)).map(toSignal),
+    brand: defaultTheme.filter((color) => BRAND_COLOR_ROLES.has(color.role)).map(toSignal),
+    semantic: defaultTheme.filter((color) => SEMANTIC_COLOR_ROLES.has(color.role)).map(toSignal),
+    additional: defaultTheme.filter((color) => !BRAND_COLOR_ROLES.has(color.role) && !SEMANTIC_COLOR_ROLES.has(color.role)).map(toSignal),
+    dark: darkTheme.map(toSignal),
   };
 }
 
@@ -776,6 +790,7 @@ export function buildDesignSynthesis(
     ...colorGroups.brand.map((color) => color.value),
     ...colorGroups.semantic.map((color) => color.value),
     ...colorGroups.additional.map((color) => color.value),
+    ...colorGroups.dark.map((color) => color.value),
   ]);
   const mood = inferColorMood(brandPalette, identity);
   const typographyFamilies = inferTypographyFamilies(identity, evidenceSnapshot.elements);
@@ -914,6 +929,9 @@ export function renderDesignMarkdown(synthesis: DesignSynthesisFile): string {
     `Primary brand colors: ${synthesis.colors.brand.length > 0 ? synthesis.colors.brand.map((color) => `\`${color.role}\` ${color.value}`).join(", ") : "none confirmed"}.`,
     `Semantic support colors: ${synthesis.colors.semantic.length > 0 ? synthesis.colors.semantic.map((color) => `\`${color.role}\` ${color.value}`).join(", ") : "none confirmed"}.`,
     `Additional palette notes: ${synthesis.colors.additional.length > 0 ? synthesis.colors.additional.map((color) => `\`${color.name}\` ${color.value}`).join(", ") : "no additional token-worthy colors"}.`,
+    ...(synthesis.colors.dark.length > 0
+      ? [`Dark-theme palette: ${synthesis.colors.dark.map((color) => `\`${color.role}\` ${color.value}`).join(", ")}.`]
+      : []),
     "",
     "## 3. Typography Rules",
     "",

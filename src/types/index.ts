@@ -5,6 +5,13 @@ export interface ColorEntry {
   name: string;
   value: string; // hex
   role: "primary" | "secondary" | "accent" | "neutral" | "surface" | "text" | "action" | "tint" | "overlay" | "border" | "gradient" | "highlight" | "unknown";
+  /**
+   * Theme dimension (issue #35 gap 1). Absent = theme-agnostic/default —
+   * every pre-existing entry stays valid. "dark" entries occupy their own
+   * (role, theme) merge slot so a dark-theme surface never evicts the
+   * light-theme surface. For merge purposes "light" and absent share a slot.
+   */
+  theme?: "light" | "dark";
   source: Source;
   confidence: Confidence;
   figma_variable_id?: string;

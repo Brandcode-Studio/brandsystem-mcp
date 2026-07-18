@@ -181,6 +181,7 @@ async function handler(input: Params) {
       source: "web",
       confidence: inferColorConfidence(ec),
       css_property: ec.property,
+      ...(ec.theme ? { theme: ec.theme } : {}),
     };
     colors = mergeColor(colors, entry);
   }

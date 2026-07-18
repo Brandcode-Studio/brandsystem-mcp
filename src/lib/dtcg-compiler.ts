@@ -50,12 +50,15 @@ function compileColors(
   colors: CoreIdentityData["colors"]
 ): Record<string, unknown> {
   const group: Record<string, unknown> = {};
+  // Dark-theme colors (issue #35 gap 1) compile under a `dark` token group so
+  // they never collide with (or evict) the default/light tokens.
+  const darkGroup: Record<string, unknown> = {};
 
   for (const color of colors) {
     if (!isTokenWorthy(color.confidence)) continue;
 
     const key = color.role === "unknown" ? slugify(color.name) : color.role;
-    group[key] = {
+    const token = {
       $value: color.value,
       $type: "color",
       $description: color.name,
@@ -63,10 +66,20 @@ function compileColors(
         "com.brandsystem": {
           source: color.source,
           confidence: color.confidence,
+          ...(color.theme && { theme: color.theme }),
           ...(color.figma_variable_id && { figmaVariableId: color.figma_variable_id }),
         },
       },
     };
+    if (color.theme === "dark") {
+      darkGroup[key] = token;
+    } else {
+      group[key] = token;
+    }
+  }
+
+  if (Object.keys(darkGroup).length > 0) {
+    group.dark = darkGroup;
   }
 
   return group;

@@ -22,6 +22,11 @@ const RUNTIME = {
       secondary: "#e8523f",
       accent: "#f5a623",
     },
+    // Dark-theme palette (issue #35 gap 1): legitimate brand colors that must
+    // count as on-palette alongside the default/light lane.
+    colors_dark: {
+      surface: "#0f0f1a",
+    },
     typography: {
       Heading: "Inter",
       Body: "Source Sans Pro",
@@ -165,6 +170,12 @@ describe("color checks", () => {
     const result = await runBrandCheck(TEST_DIR, { color: "#fff" });
     expect(result!.pass).toBe(true);
   });
+
+  it("passes an exact dark-theme brand color (colors_dark counts as on-palette)", async () => {
+    const result = await runBrandCheck(TEST_DIR, { color: "#0f0f1a" });
+    expect(result!.pass).toBe(true);
+    expect(result!.flags).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -252,11 +263,12 @@ describe("multi-input checks", () => {
 // ---------------------------------------------------------------------------
 
 describe("getBrandPalette", () => {
-  it("returns brand colors", async () => {
+  it("returns brand colors from both theme lanes", async () => {
     const palette = await getBrandPalette(TEST_DIR);
     expect(palette).not.toBeNull();
-    expect(palette!.length).toBe(3);
+    expect(palette!.length).toBe(4);
     expect(palette!.map((c) => c.name)).toContain("primary");
+    expect(palette!.map((c) => c.hex)).toContain("#0f0f1a");
   });
 
   it("returns null when no brand data", async () => {

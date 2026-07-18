@@ -4,8 +4,8 @@
     { "value": "#ee6633", "role": "primary", "confidence": "medium", "note": "no role naming anywhere — promoted to primary by chromatic frequency" },
     { "value": "#fdf6ec", "role": "surface", "confidence": "high" },
     { "value": "#ffffff", "role": ["text", "surface"], "confidence": "high", "note": "used as text-on-primary; role 'text' is the extractor's defensible read" },
-    { "value": "#222222", "role": "text", "known_gap": true, "note": "body text color loses the single text role slot to the more frequent #ffffff" },
-    { "value": "#40312a", "role": ["neutral", "text"], "known_gap": true, "note": "dark brown reads as near-black neutral; dropped by the one-color-per-role merge" }
+    { "value": "#222222", "role": "text", "known_gap": true, "note": "body text color loses the single default-theme text slot to the more frequent #ffffff — same-theme collapse, not fixed by the #35 (role, theme) merge key" },
+    { "value": "#40312a", "role": ["neutral", "text"], "known_gap": true, "note": "dark brown reads as near-black neutral; dropped by the one-color-per-(role, theme) merge — no dark-theme scope in this fixture" }
   ],
   "fonts": [
     { "family": "Work Sans", "confidence": "low" },
@@ -34,6 +34,6 @@
     "font_recall": 0.95
   },
   "known_gaps": [
-    "Dark text colors #222222 and #40312a are extracted but lost to the one-color-per-role merge."
+    "Dark text colors #222222 and #40312a are extracted but lost to the one-color-per-(role, theme) merge. Both are default-theme colors (no dark scope on this site), so the issue #35 theme dimension does not preserve them."
   ]
 }

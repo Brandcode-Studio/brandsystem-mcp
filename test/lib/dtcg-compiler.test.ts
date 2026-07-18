@@ -32,6 +32,7 @@ describe('compileDTCG', () => {
       brand: [],
       semantic: [],
       additional: [],
+      dark: [],
       mood: { temperature: 'cool', contrast: 'high', brightness: 'light' },
     },
     typography: {
@@ -194,6 +195,46 @@ describe('compileDTCG', () => {
     expect(token).toHaveProperty('$type');
     expect(token).toHaveProperty('$description');
     expect(token).toHaveProperty('$extensions');
+  });
+
+  it('emits theme:"dark" colors under a dark token group with $extensions preserved', () => {
+    const result = compileDTCG(
+      makeIdentity({
+        colors: [
+          { name: 'Paper', value: '#ffffff', role: 'surface', source: 'web', confidence: 'high' },
+          { name: 'Midnight', value: '#0f0f1a', role: 'surface', theme: 'dark', source: 'web', confidence: 'high' },
+          { name: 'Deep Slate', value: '#e2e8f0', role: 'unknown', theme: 'dark', source: 'web', confidence: 'medium' },
+        ],
+      }),
+      'Acme'
+    );
+    const brand = result.brand as Record<string, Record<string, unknown>>;
+
+    // Light surface keeps its top-level slot
+    expect((brand.color.surface as Record<string, unknown>).$value).toBe('#ffffff');
+
+    // Dark colors live under the `dark` group, keyed like the top level
+    const dark = brand.color.dark as Record<string, Record<string, unknown>>;
+    expect(dark.surface.$value).toBe('#0f0f1a');
+    expect(dark['deep-slate'].$value).toBe('#e2e8f0');
+
+    const ext = dark.surface.$extensions as Record<string, Record<string, unknown>>;
+    expect(ext['com.brandsystem'].source).toBe('web');
+    expect(ext['com.brandsystem'].confidence).toBe('high');
+    expect(ext['com.brandsystem'].theme).toBe('dark');
+  });
+
+  it('omits the dark group when no dark-theme colors exist', () => {
+    const result = compileDTCG(
+      makeIdentity({
+        colors: [
+          { name: 'Brand Red', value: '#e63946', role: 'primary', source: 'web', confidence: 'high' },
+        ],
+      }),
+      'Acme'
+    );
+    const brand = result.brand as Record<string, Record<string, unknown>>;
+    expect(brand.color).not.toHaveProperty('dark');
   });
 
   it('includes synthesis-driven radius, shadow, layout, and motion groups when provided', () => {

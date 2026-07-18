@@ -2,6 +2,9 @@ import { z } from "zod";
 
 const RuntimeIdentitySchema = z.object({
   colors: z.record(z.string()),
+  // Dark-theme palette (issue #35 gap 1). Optional and additive: only present
+  // when the identity carries theme:"dark" entries; older runtimes lack it.
+  colors_dark: z.record(z.string()).optional(),
   typography: z.record(z.string()),
   logo: z.object({
     type: z.string(),

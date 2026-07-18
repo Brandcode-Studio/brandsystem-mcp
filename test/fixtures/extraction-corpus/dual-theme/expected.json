@@ -1,12 +1,12 @@
 {
-  "description": "Dual light/dark palette via :root and [data-theme=dark] custom properties sharing variable names — exercises theme-variant color capture.",
+  "description": "Dual light/dark palette via :root and [data-theme=dark] custom properties sharing variable names — exercises theme-variant color capture with the (role, theme) merge key.",
   "colors": [
     { "value": "#7c3aed", "role": "primary", "confidence": "high" },
     { "value": "#22d3ee", "role": "accent", "confidence": "high" },
     { "value": "#ffffff", "role": "surface", "confidence": "high" },
     { "value": "#1a1a2e", "role": "text", "confidence": "high" },
-    { "value": "#0f0f1a", "role": "surface", "known_gap": true, "note": "dark-theme background: extracted from [data-theme=dark] --color-bg but dropped by the one-color-per-role merge (light surface wins)" },
-    { "value": "#e2e8f0", "role": "text", "known_gap": true, "note": "dark-theme text: same single-slot-per-role collapse" }
+    { "value": "#0f0f1a", "role": "surface", "theme": "dark", "confidence": "high", "note": "dark-theme background from [data-theme=dark] --color-bg — survives the merge as a (surface, dark) entry" },
+    { "value": "#e2e8f0", "role": "text", "theme": "dark", "confidence": "high", "note": "dark-theme text — survives the merge as a (text, dark) entry" }
   ],
   "fonts": [
     { "family": "Inter", "confidence": "medium" },
@@ -28,7 +28,5 @@
     "font_precision": 0.95,
     "font_recall": 0.95
   },
-  "known_gaps": [
-    "Dual-theme palettes collapse: the one-color-per-role merge keeps only the light-theme surface/text; #0f0f1a and #e2e8f0 (dark theme) are extracted upstream but never reach the merged identity."
-  ]
+  "known_gaps": []
 }
