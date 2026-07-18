@@ -419,6 +419,7 @@ async function handler(input: Params) {
           source: "web" as const,
           confidence: inferColorConfidence(ec),
           css_property: ec.property,
+          ...(ec.theme ? { theme: ec.theme } : {}),
         };
       }),
       typography: cleanedFonts.slice(0, 8).map((ef) => ({
