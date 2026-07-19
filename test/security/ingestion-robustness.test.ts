@@ -112,22 +112,36 @@ describe("logo-extractor extractLogos robustness", () => {
     expect(Array.isArray(logos)).toBe(true);
   }, T);
 
-  // FINDING (reported, not fixed here — tracked in #45): extractLogos is
-  // superlinear in DOM size — measured ~150ms at 5k elements, ~1.1s at 20k,
-  // ~7.3s at 50k on dev hardware (cheerio.load itself stays under 60ms; the
-  // selector/isInLogoCloud passes dominate). It terminates and memory stays
-  // bounded, so this is slow-degrade rather than a hang.
-  // CI asserts the degrade-not-hang property at 20k elements: the 50k case
-  // timed out the slowest CI runner (Node 20) at 15s purely on speed, which
-  // is the #45 perf finding, not a robustness regression. Re-raise the size
-  // when #45 lands a candidate cap.
-  it("20k-element flat body [degrades — slowly; superlinear cost tracked in #45]", () => {
-    const spans = Array.from({ length: 20_000 }, (_, i) => `<span>x${i}</span>`).join("");
+  // #45 FIXED: the superlinear cost (~7.3s at 50k elements) was a subtree
+  // find() inside isInLogoCloud that cheerio evaluates in seconds on large
+  // bodies. Replaced with a bounded manual walk plus candidate caps — now
+  // ~180ms at 50k, ~360ms at 100k on dev hardware, scaling linearly.
+  // The 50k case that used to time out the slowest CI runner now runs
+  // inside the standard per-test timeout.
+  it("50k-element flat body [bounded — #45 candidate cap landed]", () => {
+    const spans = Array.from({ length: 50_000 }, (_, i) => `<span>x${i}</span>`).join("");
     const html = `<html><body><header><img src="/logo.png" alt="logo"></header>${spans}</body></html>`;
     const logos = extractLogos(html, BASE);
     expect(Array.isArray(logos)).toBe(true);
     expect(logos.some((l) => l.url === `${BASE}/logo.png`)).toBe(true);
-  }, 15_000);
+  }, T);
+
+  it("thousands of candidate matches stay under the candidate cap", () => {
+    const anchors = Array.from({ length: 5_000 }, (_, i) => `<a href="/"><img src="/img${i}.png"></a>`).join("");
+    const html = `<html><body><header>${anchors}</header></body></html>`;
+    const logos = extractLogos(html, BASE);
+    // Downstream only ever consumes the top few candidates; the cap keeps
+    // hostile pages from manufacturing unbounded work.
+    expect(logos.length).toBeLessThanOrEqual(15);
+  }, T);
+
+  it("a client-logo cloud elsewhere on the page does not reject the header logo", () => {
+    const cloud = `<div class="clients"><img src="/logo-a.png"><img src="/logo-b.png"><img src="/logo-c.png"><a href="/"><img src="/logo-d.png"></a></div>`;
+    const html = `<html><body><header><img src="/logo.png" alt="logo"></header>${cloud}</body></html>`;
+    const logos = extractLogos(html, BASE);
+    expect(logos.some((l) => l.url === `${BASE}/logo.png`)).toBe(true);
+    expect(logos.some((l) => l.url.includes("logo-d"))).toBe(false);
+  }, T);
 
   it("10k-deep nested divs [degrades or controlled-throw]", () => {
     const depth = 10_000;

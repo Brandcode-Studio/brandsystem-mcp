@@ -64,18 +64,70 @@ function isIconSvg($: cheerio.CheerioAPI, el: any): boolean {
 
 const LOGO_CLOUD_CLASSES = /logo-cloud|logos|clients|partners|carousel|slider|marquee|trust|social-proof|logo-wall|logo-grid|logo-bar|logo-strip|companies|brands|featured-in|as-seen/i;
 
-function isInLogoCloud($: cheerio.CheerioAPI, el: any): boolean {
+// ── Cost bounds (#45) ───────────────────────────────────────────
+// isInLogoCloud does a subtree find() per parent level, so its cost is
+// O(candidates × subtree). On hostile/huge pages that went superlinear
+// (~7.3s at 50k elements). Candidates are capped per selector and globally
+// (downstream only ever consumes the top few), and per-parent verdicts are
+// cached so candidates sharing a header scan it once.
+const MAX_CANDIDATES_PER_SELECTOR = 10;
+const MAX_TOTAL_CANDIDATES = 15;
+const MAX_HEADER_SVGS_SCANNED = 20;
+const MAX_CLOUD_SCAN_NODES = 2000;
+
+/**
+ * Count descendant imgs with "logo" in src/data-src, visiting at most
+ * MAX_CLOUD_SCAN_NODES nodes. Replaces a subtree find() that cheerio
+ * evaluates in seconds on 50k-element bodies; real logo clouds are small
+ * containers, so a bounded walk preserves the detection semantics.
+ */
+function countLogoImgsBounded(node: { children?: unknown[] }): number {
+  let count = 0;
+  let visited = 0;
+  const stack: any[] = [...(node.children ?? [])];
+  while (stack.length > 0 && visited < MAX_CLOUD_SCAN_NODES) {
+    const cur = stack.pop();
+    visited++;
+    if (cur?.type !== "tag") continue;
+    if (cur.name === "img") {
+      const src = String(cur.attribs?.src ?? "");
+      const dataSrc = String(cur.attribs?.["data-src"] ?? "");
+      if (src.toLowerCase().includes("logo") || dataSrc.toLowerCase().includes("logo")) {
+        count++;
+        if (count >= 3) return count;
+      }
+    }
+    if (cur.children) stack.push(...cur.children);
+  }
+  return count;
+}
+
+function isInLogoCloud($: cheerio.CheerioAPI, el: any, cache?: Map<unknown, boolean>): boolean {
   // Check parents up to 4 levels
   let current = $(el).parent();
   for (let i = 0; i < 4; i++) {
     if (!current.length) break;
+    const node = current[0];
+    const cached = cache?.get(node);
+    if (cached !== undefined) {
+      if (cached) return true;
+      current = current.parent();
+      continue;
+    }
     const cls = current.attr("class") || "";
     const id = current.attr("id") || "";
-    if (LOGO_CLOUD_CLASSES.test(cls) || LOGO_CLOUD_CLASSES.test(id)) return true;
+    let verdict = LOGO_CLOUD_CLASSES.test(cls) || LOGO_CLOUD_CLASSES.test(id);
 
-    // If this parent has 3+ img children with "logo" in src, it's a logo cloud
-    const logoImgs = current.find('img[src*="logo"], img[data-src*="logo"]');
-    if (logoImgs.length >= 3) return true;
+    // If this parent has 3+ img children with "logo" in src, it's a logo cloud.
+    // Never apply this heuristic to body/html: a client-logo section anywhere
+    // on the page would otherwise flag the whole document as a cloud and
+    // reject the real header logo.
+    const tagName = String((node as { name?: string }).name ?? "").toLowerCase();
+    if (!verdict && tagName !== "body" && tagName !== "html") {
+      verdict = countLogoImgsBounded(node as { children?: unknown[] }) >= 3;
+    }
+    cache?.set(node, verdict);
+    if (verdict) return true;
 
     current = current.parent();
   }
@@ -119,8 +171,9 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
 
   // ── 1. Inline SVGs in header/nav (HIGHEST priority) ──────────
   // The first meaningful SVG in header or nav is almost always the company logo
+  const cloudCache = new Map<unknown, boolean>();
   const headerNavSvgs = $("header svg, nav svg, .header svg, .navbar svg, .site-header svg");
-  for (let i = 0; i < headerNavSvgs.length; i++) {
+  for (let i = 0; i < Math.min(headerNavSvgs.length, MAX_HEADER_SVGS_SCANNED); i++) {
     const el = headerNavSvgs[i];
     if (isIconSvg($, el)) continue;
 
@@ -165,12 +218,14 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
     'a[href="/"] img',
   ];
   for (const sel of headerImgSelectors) {
-    $(sel).each((_, el) => {
-      if (isInLogoCloud($, el)) return;
+    if (logos.length >= MAX_TOTAL_CANDIDATES) break;
+    for (const el of $(sel).toArray().slice(0, MAX_CANDIDATES_PER_SELECTOR)) {
+      if (logos.length >= MAX_TOTAL_CANDIDATES) break;
+      if (isInLogoCloud($, el, cloudCache)) continue;
       // Prefer data-src (lazy-loaded) over src
       const url = resolveUrl($(el).attr("data-src") || $(el).attr("src"));
       if (url) logos.push({ url, type: "selector-img", confidence: "high" });
-    });
+    }
   }
 
   // ── 4. Logo-classed elements (outside header) ─────────────────
@@ -182,12 +237,14 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
     '#logo svg',
   ];
   for (const sel of logoClassSelectors) {
-    $(sel).each((_, el) => {
-      if (isInLogoCloud($, el)) return;
+    if (logos.length >= MAX_TOTAL_CANDIDATES) break;
+    for (const el of $(sel).toArray().slice(0, MAX_CANDIDATES_PER_SELECTOR)) {
+      if (logos.length >= MAX_TOTAL_CANDIDATES) break;
+      if (isInLogoCloud($, el, cloudCache)) continue;
       const tagName = (el as any).tagName?.toLowerCase();
 
       if (tagName === "svg") {
-        if (isIconSvg($, el)) return;
+        if (isIconSvg($, el)) continue;
         const svgHtml = $.html(el);
         if (svgHtml && svgHtml.length > 50 && svgHtml.length < 100_000) {
           logos.push({
@@ -201,7 +258,7 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
         const url = resolveUrl($(el).attr("data-src") || $(el).attr("src"));
         if (url) logos.push({ url, type: "selector-img", confidence: "medium" });
       }
-    });
+    }
   }
 
   // ── 5. OG image ───────────────────────────────────────────────

@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
 import { CORE_TOOL_NAMES, resolveProfile, type ToolProfile } from "./lib/tool-profile.js";
-import { RESPONSE_ENVELOPE_SCHEMA, setActiveProfile } from "./lib/response.js";
+import { RESPONSE_ENVELOPE_SCHEMA, buildResponse, setActiveProfile } from "./lib/response.js";
+import { fenceUntrusted } from "./lib/untrusted-text.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
@@ -113,7 +114,33 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
     }
     const annotations = config.annotations as { title?: string } | undefined;
     if (annotations?.title) config.title = annotations.title;
-    return registerToolBound(name, config, cb);
+    // Error fence (#45): a throw inside a handler would otherwise surface as
+    // an SDK isError response carrying the raw error text — which can quote
+    // hostile input (e.g. a YAML alias-bomb message). Catch at the boundary
+    // and return the structured envelope with a templated summary; the
+    // original message appears only fenced and truncated.
+    const handler = cb as (...cbArgs: unknown[]) => unknown;
+    const fencedCb = async (...cbArgs: unknown[]) => {
+      try {
+        return await handler(...cbArgs);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return buildResponse({
+          what_happened: `${name} could not complete: an input could not be parsed or read`,
+          next_steps: [
+            "Check .brand/ files and any provided sources for corruption or truncation",
+            "Run brand_audit to validate the .brand/ directory",
+            "If this keeps happening, run brand_feedback to report the issue.",
+          ],
+          data: {
+            error: "tool_execution_failed",
+            error_class: err instanceof Error ? err.constructor.name : typeof err,
+            detail_fenced: fenceUntrusted(message),
+          },
+        });
+      }
+    };
+    return registerToolBound(name, config, fencedCb);
   };
 
   // ── Entry points (register first — agents see these first) ──
