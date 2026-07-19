@@ -27,6 +27,43 @@ const TASK_SECTION_MAP: Record<string, ReadonlyArray<"identity" | "visual" | "vo
   other: ["identity", "visual", "voice", "strategy"],
 };
 
+/**
+ * Deterministic per-task_type delivery contract. Measured failure mode
+ * (second-agent benchmark, eval/RESULTS.md): models grounded on the brand
+ * data still wrap markup in prose or skip the requested structure — the
+ * delivery rules live far from the data they apply to. Serving the contract
+ * WITH the context puts it adjacent to the data in the consuming agent's
+ * prompt. Fixed table, no inference — same ethos as TASK_SECTION_MAP.
+ */
+const MARKUP_OUTPUT_CONTRACT = {
+  format: "single_fenced_code_block",
+  rules: [
+    "When the task asks for code or markup, deliver exactly one fenced code block containing the complete artifact",
+    "No text before or after the fence — no preamble, no explanation of choices",
+    "Use only governed palette hex values and governed font families from the context",
+  ],
+} as const;
+const TEXT_OUTPUT_CONTRACT = {
+  format: "content_only",
+  rules: [
+    "Deliver only the requested content — no preamble, no commentary, no explanation of choices",
+    "Follow any structure the task specifies (sentence counts, subject lines, sections) exactly",
+    "Respect voice constraints from the context: never_say terms are hard exclusions",
+  ],
+} as const;
+const TASK_OUTPUT_CONTRACTS: Record<string, typeof MARKUP_OUTPUT_CONTRACT | typeof TEXT_OUTPUT_CONTRACT> = {
+  "code-ui": MARKUP_OUTPUT_CONTRACT,
+  "landing-page": MARKUP_OUTPUT_CONTRACT,
+  "social-post": TEXT_OUTPUT_CONTRACT,
+  "blog-article": TEXT_OUTPUT_CONTRACT,
+  email: TEXT_OUTPUT_CONTRACT,
+  ad: TEXT_OUTPUT_CONTRACT,
+  presentation: TEXT_OUTPUT_CONTRACT,
+  "image-graphic": TEXT_OUTPUT_CONTRACT,
+  "video-script": TEXT_OUTPUT_CONTRACT,
+  other: TEXT_OUTPUT_CONTRACT,
+};
+
 const paramsShape = {
   task_type: z
     .enum([
@@ -89,6 +126,9 @@ export const CONTEXT_OUTPUT_SCHEMA = z
       .passthrough()
       .optional(),
     no_governed_match: z.boolean().optional(),
+    output_contract: z
+      .object({ format: z.string(), rules: z.array(z.string()) })
+      .optional(),
     approval: z.string().optional(),
     error: z.string().optional(),
   })
@@ -180,8 +220,11 @@ async function handler(input: Params) {
     matchedSelectors.sections_selected.length === 0 ||
     (audienceMatch !== null && !audienceMatch.governed);
 
+  const outputContract = TASK_OUTPUT_CONTRACTS[input.task_type] ?? TEXT_OUTPUT_CONTRACT;
+
   const nextSteps: string[] = [
     "Use data.context as the brand grounding for this task — it contains only the sections governed for this task_type",
+    "Follow data.output_contract when delivering: it states the required output shape for this task_type",
   ];
   if (approval === "provisional_extracted") {
     nextSteps.push(
@@ -206,6 +249,7 @@ async function handler(input: Params) {
       context,
       matched_selectors: matchedSelectors,
       no_governed_match: noGovernedMatch,
+      output_contract: outputContract,
       approval,
     },
   });

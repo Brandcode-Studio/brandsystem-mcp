@@ -1,0 +1,158 @@
+{
+  "commit": "f42523667a90fe6586ee2ffa06e26950c2906f3a",
+  "tree": "dirty (5 uncommitted paths — NOT reproducible from commit alone)",
+  "package_version": "@brandsystem/mcp@0.14.4",
+  "generated": "2026-07-19T06:31:19.866Z",
+  "model_dependent": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5-20251001",
+    "scenario": "second-agent",
+    "sets": [],
+    "second_agent": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "date": "2026-07-19T06:31:19.866Z",
+      "metric": "second_agent",
+      "runtime": {
+        "schema_version": "0.1.0",
+        "approval": "provisional_extracted"
+      },
+      "totals": {
+        "tasks": 5,
+        "job_completion_rate": 20,
+        "job_completion_value": "20.0% (1/5 completed; 2 incomplete, 0 unscored)",
+        "checker_acceptance_value": "100.0% (5/5)",
+        "mean_flags_per_task": 0.8,
+        "mean_output_tokens": 143,
+        "mean_context_tokens": 336,
+        "meta_commentary_count": 0
+      },
+      "tasks": [
+        {
+          "id": "social-post-launch",
+          "task_type": "social-post",
+          "budget": "compact",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 262,
+          "output_tokens": 43,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "completed"
+        },
+        {
+          "id": "blog-intro-consistency",
+          "task_type": "blog-article",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 374,
+          "output_tokens": 107,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "email-renewal",
+          "task_type": "email",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 322,
+          "output_tokens": 79,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "hero-section-css",
+          "task_type": "code-ui",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css",
+            "color"
+          ],
+          "context_tokens": 272,
+          "output_tokens": 231,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "color_checked": "#2a4494",
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "missing: css",
+          "structure": "satisfied",
+          "status": "incomplete"
+        },
+        {
+          "id": "cta-card-html",
+          "task_type": "landing-page",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css"
+          ],
+          "context_tokens": 449,
+          "output_tokens": 257,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "check_pass": false,
+          "flags": {
+            "total": 2,
+            "error": 0,
+            "warning": 2,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 8,
+          "required_inputs": "missing: css",
+          "structure": "violated: does not match required shape \"<(button|a)[\\\\s>]\"",
+          "status": "incomplete"
+        }
+      ]
+    }
+  }
+}

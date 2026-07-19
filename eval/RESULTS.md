@@ -194,3 +194,39 @@ voice adherence and fenced-output instruction-following, the two failure
 modes every honest run since the correction has named. 20% → 40% across
 runs is within single-run noise on 5 tasks; the stable signal is *which*
 tasks fail and why.
+
+---
+
+## Run: 2026-07-19 (0.16 — output_contract A/B, 6 runs)
+
+- **Question:** does serving a deterministic per-task_type `output_contract`
+  with `brand_context` (delivery rules adjacent to the brand data) move
+  second-agent job completion?
+- **Design:** 3 runs WITH the contract (tree **clean**, commit `f425236`) vs
+  3 control runs WITHOUT it (same commit, `brand-context.ts` reverted to
+  main — receipts stamped tree **dirty**, which is how to tell them apart).
+  All six receipts committed: `eval/receipts/2026-07-19T06*-f425236-*.json`.
+- **Model:** `claude-haiku-4-5-20251001`
+
+### Answer: no measurable effect at n=3 per arm
+
+| Arm | Completion per run | Mean | Markup fences delivered |
+|---|---|---|---|
+| WITH output_contract | 2/5, 1/5, 3/5 | 40% | 3/6 |
+| control (no contract) | 2/5, 1/5, 2/5 | 33% | 2/6 |
+
+Direction is mildly positive but indistinguishable from noise — Haiku flips
+fence compliance run-to-run in both arms (hero and cta each pass in some
+runs and fail in others, with or without the contract). Do NOT cite this as
+"output_contract improved completion."
+
+What did hold across all six runs: meta-commentary 0/5 every run, checker
+acceptance ≥ 4/5, and the same two failure modes as every honest run since
+the 0.13.1 correction — warning-level voice flags on text tasks and
+inconsistent fenced-output instruction-following on markup tasks.
+
+The contract ships anyway, as a structural affordance rather than a measured
+win: it costs ~60 context tokens, states the delivery rules next to the data
+they govern for every consuming agent (not just this harness), and gives
+future models something explicit to bind to. The honest claim is exactly
+that — no more.
