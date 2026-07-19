@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.16.0 (2026-07-18)
+
+Robustness release: closes #45 (both 0.14 fuzzing findings) and adds the output_contract affordance. (No 0.15 was released; the 0.15 candidate list shipped here.)
+
+### Fixed
+
+- **extractLogos bounded on hostile pages** (#45, #57): the superlinear cost was one context-scoped `find()` inside logo-cloud detection that cheerio evaluates in seconds on large bodies. Bounded manual walk + candidate caps (10/selector, 15 total) + per-parent verdict cache: 7.3s → ~180ms at 50k elements, linear to 100k. Also fixes a pre-existing detection flaw the walk exposed: a client-logo section anywhere on the page flagged `<body>` as a logo cloud and rejected the real header logo.
+- **Handler errors fenced at the tool boundary** (#45, #57): parser throws (e.g. YAML alias-bomb messages that quote hostile input) no longer surface as raw SDK isError text. Every handler is wrapped at the registration choke point; errors return the structured envelope with a templated summary and the original message fenced + truncated.
+
+### Added
+
+- **`output_contract` on brand_context** (#58): deterministic per-task_type delivery rules (single fenced block for code-ui/landing-page; content-only for text tasks) served adjacent to the brand data. Measured honestly in a 6-run A/B: no effect distinguishable from noise at n=3 per arm (40% vs 33% mean completion) — ships as a structural affordance, not a claimed win. Receipts committed; eval/RESULTS.md has the full table.
+
 ## 0.14.4 (2026-07-18)
 
 Ships the theme-dimension completion (#35 gap 1, tool/catalog/response layers) to npm consumers, plus the canonical landing-page metadata.
