@@ -118,26 +118,30 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
     // an SDK isError response carrying the raw error text — which can quote
     // hostile input (e.g. a YAML alias-bomb message). Catch at the boundary
     // and return the structured envelope with a templated summary; the
-    // original message appears only fenced and truncated.
+    // original message appears only fenced and truncated. isError stays true
+    // so generic MCP clients still classify the execution as failed.
     const handler = cb as (...cbArgs: unknown[]) => unknown;
     const fencedCb = async (...cbArgs: unknown[]) => {
       try {
         return await handler(...cbArgs);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return buildResponse({
-          what_happened: `${name} could not complete: an input could not be parsed or read`,
-          next_steps: [
-            "Check .brand/ files and any provided sources for corruption or truncation",
-            "Run brand_audit to validate the .brand/ directory",
-            "If this keeps happening, run brand_feedback to report the issue.",
-          ],
-          data: {
-            error: "tool_execution_failed",
-            error_class: err instanceof Error ? err.constructor.name : typeof err,
-            detail_fenced: fenceUntrusted(message),
-          },
-        });
+        return {
+          ...buildResponse({
+            what_happened: `${name} could not complete: an input could not be parsed or read`,
+            next_steps: [
+              "Check .brand/ files and any provided sources for corruption or truncation",
+              "Run brand_audit to validate the .brand/ directory",
+              "If this keeps happening, run brand_feedback to report the issue.",
+            ],
+            data: {
+              error: "tool_execution_failed",
+              error_class: err instanceof Error ? err.constructor.name : typeof err,
+              detail_fenced: fenceUntrusted(message),
+            },
+          }),
+          isError: true,
+        };
       }
     };
     return registerToolBound(name, config, fencedCb);

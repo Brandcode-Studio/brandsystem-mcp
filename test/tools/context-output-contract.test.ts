@@ -45,10 +45,19 @@ describe("brand_context output_contract", () => {
     }
   });
 
-  it("next_steps direct the agent to the contract", async () => {
+  it("next_steps direct the agent to paths that actually exist in the response", async () => {
     const json = await callTool(client, "brand_context", { task_type: "code-ui" });
     const meta = json._metadata as { next_steps: string[] };
     expect(meta.next_steps.some((s) => s.includes("output_contract"))).toBe(true);
+    // The referenced fields live at the TOP LEVEL of the response (buildResponse
+    // spreads data) — instructions must not point at a nonexistent data.* path.
+    expect(json.context).toBeDefined();
+    expect(json.output_contract).toBeDefined();
+    expect(json.data).toBeUndefined();
+    for (const step of meta.next_steps) {
+      expect(step.includes("data.context")).toBe(false);
+      expect(step.includes("data.output_contract")).toBe(false);
+    }
   });
 
   it("contract is present on the compact budget too", async () => {

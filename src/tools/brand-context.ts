@@ -223,8 +223,8 @@ async function handler(input: Params) {
   const outputContract = TASK_OUTPUT_CONTRACTS[input.task_type] ?? TEXT_OUTPUT_CONTRACT;
 
   const nextSteps: string[] = [
-    "Use data.context as the brand grounding for this task — it contains only the sections governed for this task_type",
-    "Follow data.output_contract when delivering: it states the required output shape for this task_type",
+    "Use the response's `context` field as the brand grounding for this task — it contains only the sections governed for this task_type",
+    "Follow the response's `output_contract` field when delivering: it states the required output shape for this task_type",
   ];
   if (approval === "provisional_extracted") {
     nextSteps.push(
@@ -258,7 +258,7 @@ async function handler(input: Params) {
 export function register(server: McpServer) {
   server.tool(
     "brand_context",
-    "Select a task-scoped brand context from the compiled runtime. THE tool to call first when the user says 'write this in our voice', 'write this LinkedIn post in our brand voice', 'make an on-brand social graphic', or 'build a landing page' — it returns only the governed rules relevant to that task instead of the full runtime. Deterministic: task_type maps to sections via a fixed table, audience matches governed personas exactly or reports no-match — no inference. Returns data.context (the selected brand slices), matched_selectors (what was chosen and why), and no_governed_match. NOT for reading the entire runtime (use brand_runtime) or checking finished content (use brand_check).",
+    "Select a task-scoped brand context from the compiled runtime. THE tool to call first when the user says 'write this in our voice', 'write this LinkedIn post in our brand voice', 'make an on-brand social graphic', or 'build a landing page' — it returns only the governed rules relevant to that task instead of the full runtime. Deterministic: task_type maps to sections via a fixed table, audience matches governed personas exactly or reports no-match — no inference. Returns context (the selected brand slices), output_contract (required delivery shape), matched_selectors (what was chosen and why), and no_governed_match. NOT for reading the entire runtime (use brand_runtime) or checking finished content (use brand_check).",
     paramsShape,
     { title: "Get task-scoped brand context", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {

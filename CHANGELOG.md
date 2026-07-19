@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.16.1 (2026-07-18)
+
+Truth patch from the 0.16.0 Codex review — three findings, all conceded.
+
+### Fixed
+
+- **Fenced errors keep MCP error semantics**: the #45 error fence returned the structured envelope without `isError: true`, so generic MCP clients could classify a failed execution as success. The fence now returns `isError: true` with the same fenced envelope.
+- **brand_context instructions point at real paths**: `next_steps` and the tool description referenced `data.context` / `data.output_contract`, but `buildResponse` spreads data at the top level — the paths didn't exist. Corrected; the client-level test now asserts the referenced paths exist and `data.*` paths don't.
+- **A/B receipt-arm documentation corrected**: the RESULTS.md claim that clean/dirty tree stamps distinguish experiment arms was wrong (receipts accumulate as untracked files, dirtying later runs in both arms). Prose corrected without changing scores; receipts now stamp `experiment_arm` (EVAL_ARM env) and a dirty-diff hash for future A/Bs.
+
 ## 0.16.0 (2026-07-18)
 
 Robustness release: closes #45 (both 0.14 fuzzing findings) and adds the output_contract affordance. (No 0.15 was released; the 0.15 candidate list shipped here.)
