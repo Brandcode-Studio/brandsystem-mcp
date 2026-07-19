@@ -1,0 +1,158 @@
+{
+  "commit": "f42523667a90fe6586ee2ffa06e26950c2906f3a",
+  "tree": "clean",
+  "package_version": "@brandsystem/mcp@0.14.4",
+  "generated": "2026-07-19T06:29:46.150Z",
+  "model_dependent": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5-20251001",
+    "scenario": "second-agent",
+    "sets": [],
+    "second_agent": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "date": "2026-07-19T06:29:46.150Z",
+      "metric": "second_agent",
+      "runtime": {
+        "schema_version": "0.1.0",
+        "approval": "provisional_extracted"
+      },
+      "totals": {
+        "tasks": 5,
+        "job_completion_rate": 40,
+        "job_completion_value": "40.0% (2/5 completed; 1 incomplete, 0 unscored)",
+        "checker_acceptance_value": "100.0% (5/5)",
+        "mean_flags_per_task": 0.4,
+        "mean_output_tokens": 136,
+        "mean_context_tokens": 443,
+        "meta_commentary_count": 0
+      },
+      "tasks": [
+        {
+          "id": "social-post-launch",
+          "task_type": "social-post",
+          "budget": "compact",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 368,
+          "output_tokens": 39,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "completed"
+        },
+        {
+          "id": "blog-intro-consistency",
+          "task_type": "blog-article",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 480,
+          "output_tokens": 97,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "email-renewal",
+          "task_type": "email",
+          "budget": "standard",
+          "check_inputs": [
+            "text"
+          ],
+          "context_tokens": 428,
+          "output_tokens": 73,
+          "meta_commentary": false,
+          "css_extracted": null,
+          "check_pass": false,
+          "flags": {
+            "total": 1,
+            "error": 0,
+            "warning": 1,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "failed"
+        },
+        {
+          "id": "hero-section-css",
+          "task_type": "code-ui",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css",
+            "color"
+          ],
+          "context_tokens": 382,
+          "output_tokens": 229,
+          "meta_commentary": false,
+          "css_extracted": false,
+          "color_checked": "#2a4494",
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 5,
+          "required_inputs": "missing: css",
+          "structure": "satisfied",
+          "status": "incomplete"
+        },
+        {
+          "id": "cta-card-html",
+          "task_type": "landing-page",
+          "budget": "standard",
+          "check_inputs": [
+            "text",
+            "css"
+          ],
+          "context_tokens": 559,
+          "output_tokens": 244,
+          "meta_commentary": false,
+          "css_extracted": true,
+          "check_pass": true,
+          "flags": {
+            "total": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0
+          },
+          "compliance": "pass",
+          "rules_checked": 8,
+          "required_inputs": "present",
+          "structure": "satisfied",
+          "status": "completed"
+        }
+      ]
+    }
+  }
+}
