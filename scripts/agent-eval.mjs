@@ -1391,9 +1391,23 @@ async function main() {
           .filter(Boolean);
         const receiptDir = join(EVAL_DIR, "receipts");
         mkdirSync(receiptDir, { recursive: true });
+        // A/B lesson (0.16 output_contract experiment): tree state alone
+        // cannot identify an experiment arm — receipts accumulating as
+        // untracked files dirty the tree for every run after the first.
+        // Stamp the arm explicitly (EVAL_ARM env) plus a hash of the dirty
+        // paths so variant state is identifiable even on a dirty tree.
+        const { createHash } = await import("node:crypto");
+        const dirtyDiff = dirty.length === 0
+          ? null
+          : createHash("sha256")
+              .update(execSync("git diff HEAD", { cwd: ROOT, encoding: "utf-8" }))
+              .digest("hex")
+              .slice(0, 16);
         const receipt = {
           commit,
           tree: dirty.length === 0 ? "clean" : `dirty (${dirty.length} uncommitted paths — NOT reproducible from commit alone)`,
+          ...(dirtyDiff ? { dirty_diff_sha256_16: dirtyDiff } : {}),
+          experiment_arm: process.env.EVAL_ARM ?? null,
           package_version: `${pkg.name}@${pkg.version}`,
           generated: runStamp.date,
           model_dependent: results.model_dependent,

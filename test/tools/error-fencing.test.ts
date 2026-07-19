@@ -8,8 +8,10 @@ import { connectWithCwd } from "../helpers.js";
 // ---------------------------------------------------------------------------
 // Tool-boundary error fencing (#45): a handler throw (e.g. the yaml package's
 // alias-bomb rejection while reading a hostile .brand/ file) must NOT surface
-// as a raw SDK isError response — it returns the structured envelope with a
-// templated summary, and the parser's message appears only fenced.
+// as a raw SDK isError text dump. It keeps isError: true — generic MCP
+// clients must still classify the execution as failed — but the body is the
+// structured envelope with a templated summary, and the parser's message
+// appears only fenced.
 // ---------------------------------------------------------------------------
 
 const ALIAS_BOMB = [
@@ -43,9 +45,10 @@ describe("tool-boundary error fencing", () => {
     await rm(tmpDir, { recursive: true });
   });
 
-  it("returns the structured envelope instead of a raw isError for a YAML alias bomb", async () => {
+  it("returns isError:true with the structured envelope for a YAML alias bomb", async () => {
     const result = await client.callTool({ name: "brand_status", arguments: {} });
-    expect(result.isError).toBeFalsy();
+    // MCP error semantics preserved: generic clients see a failed execution
+    expect(result.isError).toBe(true);
     const content = result.content as Array<{ type: string; text: string }>;
     const json = JSON.parse(content[0].text);
     const meta = json._metadata as { what_happened: string };

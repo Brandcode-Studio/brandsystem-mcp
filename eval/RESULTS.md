@@ -202,10 +202,18 @@ tasks fail and why.
 - **Question:** does serving a deterministic per-task_type `output_contract`
   with `brand_context` (delivery rules adjacent to the brand data) move
   second-agent job completion?
-- **Design:** 3 runs WITH the contract (tree **clean**, commit `f425236`) vs
-  3 control runs WITHOUT it (same commit, `brand-context.ts` reverted to
-  main — receipts stamped tree **dirty**, which is how to tell them apart).
-  All six receipts committed: `eval/receipts/2026-07-19T06*-f425236-*.json`.
+- **Design:** 3 runs WITH the contract (commit `f425236`) then 3 control runs
+  WITHOUT it (same commit, `brand-context.ts` reverted to main). All six
+  receipts committed: `eval/receipts/2026-07-19T06*-f425236-*.json`.
+- **CORRECTION (Codex review):** an earlier version of this note claimed the
+  clean/dirty tree stamp distinguishes the arms. It does not — only the FIRST
+  treatment receipt is clean; each run's receipt lands as an untracked file,
+  so later runs are dirty in both arms. The arms are identifiable by
+  timestamp order and dirty-path count (treatment: clean, then 1, 2 paths —
+  accumulated receipts only; control: 4, 5, 6 paths — receipts plus the
+  reverted source file). The scores below are unchanged. Receipts now stamp
+  `experiment_arm` (EVAL_ARM env) and a dirty-diff hash so future A/Bs are
+  identifiable without this forensic reconstruction.
 - **Model:** `claude-haiku-4-5-20251001`
 
 ### Answer: no measurable effect at n=3 per arm
