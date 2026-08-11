@@ -19,7 +19,7 @@ Not: "Improves brand consistency across AI tools."
 Yes: "Agents load brand-runtime.json and produce on-brand output from the first draft. No per-prompt boilerplate."
 
 **5. Use numbers when we have them.**
-"34 tools across 4 sessions." "200-400 tokens of prompt boilerplate eliminated." "100% logo detection rate across 10 tested brands." Numbers build trust.
+"12 Core tools, 40+ in the full profile, across 4 sessions." "200-400 tokens of prompt boilerplate eliminated." "100% logo detection rate across 10 tested brands." Numbers build trust.
 
 ## Release Notes Voice
 

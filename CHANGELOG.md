@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Security
+
+- Resolve all 18 open Dependabot alerts with in-range lockfile bumps: pdfjs-dist 6.2.108 (arbitrary JS execution on malicious PDF), undici 7.29.0, fast-uri 3.1.5, ip-address 10.5.0 (SSRF/trust-boundary bypasses), hono 4.13.1, @hono/node-server 2.1.0, body-parser 2.3.0, nanoid, postcss. `npm audit` is clean; zod 4 and @types/node 26 majors deliberately deferred as migrations, not security fixes.
+
+### Changed
+
+- Hosted MCP smoke workflow no longer fails every scheduled run while live-proof credentials are unconfigured: strict mode (blocked → failure) now applies only when `BRANDCODE_MCP_SMOKE_URL` and `BRANDCODE_MCP_SMOKE_FULL_KEY` are set; otherwise the run reports blocked in the job summary and stays green.
+- VOICE.md example tool count updated from the stale "34 tools" to "12 Core tools, 40+ in the full profile".
+
 ## 0.16.1 (2026-07-18)
 
 Truth patch from the 0.16.0 Codex review — three findings, all conceded.
