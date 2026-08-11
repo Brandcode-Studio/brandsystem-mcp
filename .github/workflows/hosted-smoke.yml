@@ -30,7 +30,15 @@ jobs:
           BRANDCODE_MCP_SMOKE_TIMEOUT_MS: ${{ secrets.BRANDCODE_MCP_SMOKE_TIMEOUT_MS }}
         run: |
           set -o pipefail
-          npm run smoke:hosted-mcp -- --strict --json | tee smoke-output.json
+          # Strict mode (blocked -> failure) only when live-proof credentials are
+          # configured; without them the run reports blocked in the summary but
+          # stays green instead of failing every scheduled run.
+          if [ -n "$BRANDCODE_MCP_SMOKE_URL" ] && [ -n "$BRANDCODE_MCP_SMOKE_FULL_KEY" ]; then
+            npm run smoke:hosted-mcp -- --strict --json | tee smoke-output.json
+          else
+            echo "::notice::Hosted MCP smoke credentials not configured; blocked status will not fail the job. Set BRANDCODE_MCP_SMOKE_URL and BRANDCODE_MCP_SMOKE_FULL_KEY to enable strict live proof."
+            npm run smoke:hosted-mcp -- --json | tee smoke-output.json
+          fi
       - name: Publish smoke result to job summary
         if: always()
         run: |
