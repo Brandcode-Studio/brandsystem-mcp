@@ -1,0 +1,6 @@
+# Workflows, release tooling, and package metadata define what gets published.
+/.github/ @zk-xyz
+/scripts/ @zk-xyz
+/package.json @zk-xyz
+/package-lock.json @zk-xyz
+/server.json @zk-xyz

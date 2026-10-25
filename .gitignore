@@ -16,3 +16,6 @@ eval/results/
 eval/dogfood/*.jsonl
 .DS_Store
 **/.DS_Store
+
+# Private security-advisory drafts — never commit
+.security-drafts/
