@@ -7,8 +7,7 @@
  *   .brand/brandcode-package.json — raw pulled package payload
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readBrandFileSafe, writeBrandFileSafe } from "../../lib/safe-write.js";
 import type {
   ConnectorConfig,
   SyncHistory,
@@ -21,10 +20,6 @@ const HISTORY_FILE = "brandcode-sync-history.json";
 const PACKAGE_FILE = "brandcode-package.json";
 const MAX_HISTORY_EVENTS = 50;
 
-function brandPath(cwd: string): string {
-  return join(cwd, ".brand");
-}
-
 // ---------------------------------------------------------------------------
 // Connector config
 // ---------------------------------------------------------------------------
@@ -32,11 +27,9 @@ function brandPath(cwd: string): string {
 export async function readConnectorConfig(
   cwd: string,
 ): Promise<ConnectorConfig | null> {
+  const raw = await readBrandFileSafe(cwd, CONNECTOR_FILE);
+  if (raw === null) return null;
   try {
-    const raw = await readFile(
-      join(brandPath(cwd), CONNECTOR_FILE),
-      "utf-8",
-    );
     return JSON.parse(raw) as ConnectorConfig;
   } catch {
     return null;
@@ -47,12 +40,10 @@ export async function writeConnectorConfig(
   cwd: string,
   config: ConnectorConfig,
 ): Promise<void> {
-  const dir = brandPath(cwd);
-  await mkdir(dir, { recursive: true });
-  await writeFile(
-    join(dir, CONNECTOR_FILE),
+  await writeBrandFileSafe(
+    cwd,
+    CONNECTOR_FILE,
     JSON.stringify(config, null, 2) + "\n",
-    "utf-8",
   );
 }
 
@@ -61,12 +52,11 @@ export async function writeConnectorConfig(
 // ---------------------------------------------------------------------------
 
 export async function readSyncHistory(cwd: string): Promise<SyncHistory> {
+  const raw = await readBrandFileSafe(cwd, HISTORY_FILE);
+  if (raw === null) return { events: [] };
   try {
-    const raw = await readFile(
-      join(brandPath(cwd), HISTORY_FILE),
-      "utf-8",
-    );
-    return JSON.parse(raw) as SyncHistory;
+    const parsed = JSON.parse(raw) as SyncHistory;
+    return parsed && Array.isArray(parsed.events) ? parsed : { events: [] };
   } catch {
     return { events: [] };
   }
@@ -84,12 +74,10 @@ export async function appendSyncEvent(
     history.events = history.events.slice(-MAX_HISTORY_EVENTS);
   }
 
-  const dir = brandPath(cwd);
-  await mkdir(dir, { recursive: true });
-  await writeFile(
-    join(dir, HISTORY_FILE),
+  await writeBrandFileSafe(
+    cwd,
+    HISTORY_FILE,
     JSON.stringify(history, null, 2) + "\n",
-    "utf-8",
   );
 }
 
@@ -100,11 +88,9 @@ export async function appendSyncEvent(
 export async function readPackagePayload(
   cwd: string,
 ): Promise<BrandPackagePayload | null> {
+  const raw = await readBrandFileSafe(cwd, PACKAGE_FILE);
+  if (raw === null) return null;
   try {
-    const raw = await readFile(
-      join(brandPath(cwd), PACKAGE_FILE),
-      "utf-8",
-    );
     return JSON.parse(raw) as BrandPackagePayload;
   } catch {
     return null;
@@ -115,12 +101,10 @@ export async function writePackagePayload(
   cwd: string,
   payload: BrandPackagePayload,
 ): Promise<void> {
-  const dir = brandPath(cwd);
-  await mkdir(dir, { recursive: true });
-  await writeFile(
-    join(dir, PACKAGE_FILE),
+  await writeBrandFileSafe(
+    cwd,
+    PACKAGE_FILE,
     JSON.stringify(payload, null, 2) + "\n",
-    "utf-8",
   );
 
   // Promotion gate: production_approved is conferred only by Brandcode
