@@ -3,6 +3,7 @@ import { getVersion } from "./lib/version.js";
 import { CORE_TOOL_NAMES, resolveProfile, type ToolProfile } from "./lib/tool-profile.js";
 import { RESPONSE_ENVELOPE_SCHEMA, buildResponse, setActiveProfile } from "./lib/response.js";
 import { fenceUntrusted } from "./lib/untrusted-text.js";
+import { strictInputSchema } from "./lib/tool-schema.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
 import { registerResources } from "./resources/brand-resources.js";
@@ -70,6 +71,9 @@ import { register as registerRepoConnect } from "./tools/brand-repo-connect.js";
 import { register as registerRepoStatus } from "./tools/brand-repo-status.js";
 import { register as registerEnrichSkill } from "./tools/brand-enrich-skill.js";
 
+/** Upper bound on array elements + object members in one tools/call. */
+export const LOCAL_MAX_TOOL_INPUT_ELEMENTS = 50_000;
+
 export function createServer(options?: { profile?: ToolProfile }): McpServer {
   const profile = options?.profile ?? resolveProfile();
   // Responses annotate guidance that references tools outside this profile.
@@ -79,7 +83,13 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
       name: "brandsystem",
       version: getVersion(),
     },
-    { instructions: SERVER_INSTRUCTIONS },
+    {
+      instructions: SERVER_INSTRUCTIONS,
+      // Stdio is not exposed to GHSA-46jr-4wx8-v453, but src/index-http.ts can
+      // serve this server over HTTP. Generous enough for large Figma variable
+      // maps and messaging payloads; bounded so one call cannot exhaust heap.
+      maxToolInputElements: LOCAL_MAX_TOOL_INPUT_ELEMENTS,
+    },
   );
 
   // Registration choke point. Every register() calls server.tool() in one of
@@ -107,7 +117,7 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
       outputSchema: TOOL_OUTPUT_SCHEMAS[name] ?? RESPONSE_ENVELOPE_SCHEMA,
     };
     if (args.length === 5) {
-      config.inputSchema = args[2];
+      config.inputSchema = strictInputSchema(args[2]);
       config.annotations = args[3];
     } else if (args.length === 4) {
       config.annotations = args[2];

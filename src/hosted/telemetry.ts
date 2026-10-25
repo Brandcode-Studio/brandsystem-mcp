@@ -18,6 +18,7 @@ import { waitUntil } from "@vercel/functions";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BrandcodeMcpAuthInfo, HostedBrandContext } from "./types.js";
 import { postUcsHistoryEntry } from "./ucs-history-post.js";
+import { strictInputSchema } from "../lib/tool-schema.js";
 
 export const HOSTED_AGENT_RUN_TELEMETRY_STATUS = "active";
 
@@ -246,6 +247,11 @@ export function wrapServerWithTelemetry(
   (target as unknown as Record<symbol, boolean>)[ALREADY_WRAPPED] = true;
 
   const originalTool = target.tool.bind(target);
+  const registerToolBound = (
+    server as unknown as {
+      registerTool: (name: string, config: Record<string, unknown>, cb: unknown) => unknown;
+    }
+  ).registerTool.bind(server);
 
   function instrument(name: string, callback: AnyToolCallback): AnyToolCallback {
     return async (...args: unknown[]) => {
@@ -304,10 +310,12 @@ export function wrapServerWithTelemetry(
     }
     if (typeof fourth === "function" && third && typeof third === "object") {
       // tool(name, description, paramsShape, callback)
-      return originalTool(
+      // registerTool (not the legacy tool() overload, which only accepts raw
+      // shapes) so the advertised input schema stays a closed object under
+      // zod 4 — see strictInputSchema.
+      return registerToolBound(
         name,
-        description,
-        third as Record<string, unknown>,
+        { description, inputSchema: strictInputSchema(third) },
         instrument(name, fourth as AnyToolCallback),
       );
     }

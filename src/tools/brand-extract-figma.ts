@@ -17,8 +17,8 @@ const paramsShape = {
     resolvedType: z.string(),
     value: z.union([z.string(), z.number(), z.boolean()]).optional(),
     collection: z.string().optional(),
-  })).optional().describe("Figma variables in structured format"),
-  variable_map: z.record(z.string()).optional().describe("Simple { name: hex } map from get_variable_defs"),
+  }).meta({ additionalProperties: false })).optional().describe("Figma variables in structured format"),
+  variable_map: z.record(z.string(), z.string()).optional().describe("Simple { name: hex } map from get_variable_defs"),
   styles: z.array(z.object({
     name: z.string(),
     type: z.string(),
@@ -26,7 +26,7 @@ const paramsShape = {
     fontSize: z.number().optional(),
     fontWeight: z.number().optional(),
     lineHeight: z.union([z.string(), z.number()]).optional(),
-  })).optional().describe("Figma text styles"),
+  }).meta({ additionalProperties: false })).optional().describe("Figma text styles"),
   design_context: z.string().optional().describe("Raw output from get_design_context - colors and fonts parsed from generated code"),
   logo_svg: z.string().optional().describe("Raw SVG of logo component"),
 };
