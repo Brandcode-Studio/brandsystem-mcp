@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Types track the oldest supported runtime (engines: >=22.13.0), not the newest Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # Batch in-range bumps into one weekly PR; majors stay individual so
       # migrations (zod 4, @types/node) remain deliberate decisions.

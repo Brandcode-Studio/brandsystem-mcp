@@ -475,7 +475,7 @@ This is a soft warning, not an error. Some tools (brand_write, brand_deepen_iden
 ### Server won't start
 
 ```bash
-# Verify Node.js >= 20.18.1
+# Verify Node.js >= 22.13.0
 node --version
 
 # Test the server manually

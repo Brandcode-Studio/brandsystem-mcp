@@ -13,15 +13,36 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20, 22, 24]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm run lint
       - run: npm test
-      - run: npm audit --audit-level=high
+
+  # One required audit job instead of an audit step in every matrix leg. Production
+  # dependencies gate merges (with an expiring allowlist, so an upstream advisory
+  # with no fix yet can't freeze every PR); dev dependencies only warn here and are
+  # tracked by the scheduled audit workflow.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Production dependencies (blocking)
+        run: node scripts/audit-gate.mjs --omit=dev
+      - name: All dependencies (warn-only)
+        continue-on-error: true
+        run: node scripts/audit-gate.mjs --warn-only

@@ -1,5 +1,10 @@
 name: Publish to npm
 
+# Only the npm-publish and registry-publish jobs can mint an OIDC publish token,
+# and neither installs dependencies or runs repo code: the tarball is built,
+# tested and hashed in `build` (no id-token), then published as an artifact.
+# A compromised dev dependency or test therefore never sees publish credentials.
+
 on:
   workflow_dispatch:
     inputs:
@@ -11,27 +16,111 @@ on:
   release:
     types: [created]
 
+permissions: {}
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
-  publish:
+  build:
+    if: ${{ github.event_name == 'release' || !inputs.registry_only }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Release gate — ref, version, and main ancestry
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$EVENT_NAME" = "release" ]; then
+            if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+              echo "::error::Release tag $GITHUB_REF_NAME does not match package.json ($expected)"
+              exit 1
+            fi
+          elif [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Manual full publishes run only from main (got $GITHUB_REF)"
+            exit 1
+          fi
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Release commit $(git rev-parse --short HEAD) is not on main — merge the release PR before tagging"
+            exit 1
+          fi
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm test
+      - name: Production dependency audit (allowlist-aware)
+        run: node scripts/audit-gate.mjs --omit=dev
+      - name: Pack and hash
+        id: pack
+        run: |
+          set -euo pipefail
+          tarball=$(npm pack --json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0))[0].filename)')
+          sha256=$(sha256sum "$tarball" | cut -d' ' -f1)
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "Packed $tarball sha256=$sha256" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-tarball
+          path: ${{ steps.pack.outputs.tarball }}
+          retention-days: 7
+          if-no-files-found: error
+
+  npm-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm-release
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-tarball
+      - name: Verify tarball hash from build job
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}
+        run: echo "${EXPECTED_SHA256}  ${TARBALL}" | sha256sum --check
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
-        run: npm ci
-      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
-        run: npm run build
-      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
-        run: npm test
-      - if: ${{ github.event_name == 'release' || !inputs.registry_only }}
-        run: npm publish --provenance --access public
+      - name: Publish tarball with provenance
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+        run: npm publish "./${TARBALL}" --provenance --access public
+
+  registry-publish:
+    needs: npm-publish
+    if: ${{ !cancelled() && (needs.npm-publish.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.registry_only)) }}
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: server.json
+          sparse-checkout-cone-mode: false
       - name: Install MCP Registry publisher
         env:
           MCP_PUBLISHER_VERSION: v1.8.0
@@ -46,6 +135,21 @@ jobs:
         run: /tmp/mcp-publisher login github-oidc
       - name: Publish to the MCP Registry
         run: /tmp/mcp-publisher publish server.json
+
+  verify:
+    needs: registry-publish
+    if: ${{ github.event_name == 'release' && needs.registry-publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
       - name: Release invariant — installed-truth must match repo-truth
-        if: ${{ github.event_name == 'release' }}
         run: node scripts/release-invariant.mjs

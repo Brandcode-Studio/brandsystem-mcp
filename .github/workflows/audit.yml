@@ -1,0 +1,28 @@
+name: Dependency Audit
+
+# Daily strict audit of main so a newly published advisory shows up as a red run
+# within a day, without blocking unrelated pull requests.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 05:41 UTC daily (minute offset to avoid the top-of-hour queue)
+    - cron: "41 5 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Production dependencies
+        run: node scripts/audit-gate.mjs --omit=dev
+      - name: All dependencies (high and critical)
+        run: node scripts/audit-gate.mjs
