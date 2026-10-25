@@ -352,7 +352,7 @@ export const STATUS_OUTPUT_SCHEMA = z
     status: z.string().optional(),
     recovery: z.object({ readiness: z.number() }).passthrough().optional(),
     tool_sessions: z.array(z.object({ name: z.string(), tools: z.array(z.string()) })).optional(),
-    getting_started: z.record(z.unknown()).optional(),
+    getting_started: z.record(z.string(), z.unknown()).optional(),
     error: z.string().optional(),
   })
   .passthrough();

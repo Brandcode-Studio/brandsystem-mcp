@@ -184,7 +184,7 @@ export const RUNTIME_OUTPUT_SCHEMA = z
     _metadata: z
       .object({ what_happened: z.string(), next_steps: z.array(z.string()) })
       .passthrough(),
-    runtime: z.record(z.unknown()).optional(),
+    runtime: z.record(z.string(), z.unknown()).optional(),
     approval: z.string().optional(),
     agent_tip: z.string().optional(),
     runtime_origin: z.string().optional(),

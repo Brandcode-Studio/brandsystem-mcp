@@ -28,15 +28,15 @@
     "node": ">=20.18.1"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@upstash/redis": "^1.38.0",
-    "@vercel/functions": "^3.7.5",
+    "@vercel/functions": "^3.10.3",
     "cheerio": "^1.0.0",
     "css-tree": "^3.1.0",
     "pdfjs-dist": "^6.1.200",
-    "puppeteer-core": "^25.3.0",
+    "puppeteer-core": "^25.16.0",
     "yaml": "^2.9.0",
-    "zod": "^3.25.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/css-tree": "^2.3.0",
@@ -79,5 +79,10 @@
     "url": "https://github.com/Brandcode-Studio/brandsystem-mcp"
   },
   "homepage": "https://www.brandcode.studio/mcp",
-  "bugs": "https://github.com/Brandcode-Studio/brandsystem-mcp/issues"
+  "bugs": "https://github.com/Brandcode-Studio/brandsystem-mcp/issues",
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "$zod"
+    }
+  }
 }

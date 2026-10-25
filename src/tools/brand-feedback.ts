@@ -162,6 +162,7 @@ const sendParamsShape = {
       brand_name: z.string().optional().describe("The brand being worked on, if applicable."),
       error_message: z.string().optional().describe("The exact error message received, if applicable."),
     })
+    .meta({ additionalProperties: false })
     .optional()
     .describe("Optional structured context about the session."),
 };

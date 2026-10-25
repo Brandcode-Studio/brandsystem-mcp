@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 const RuntimeIdentitySchema = z.object({
-  colors: z.record(z.string()),
+  colors: z.record(z.string(), z.string()),
   // Dark-theme palette (issue #35 gap 1). Optional and additive: only present
   // when the identity carries theme:"dark" entries; older runtimes lack it.
-  colors_dark: z.record(z.string()).optional(),
-  typography: z.record(z.string()),
+  colors_dark: z.record(z.string(), z.string()).optional(),
+  typography: z.record(z.string(), z.string()),
   logo: z.object({
     type: z.string(),
     has_svg: z.boolean(),
@@ -29,7 +29,7 @@ const RuntimeVoiceSchema = z.object({
   tone_descriptors: z.array(z.string()),
   register: z.string(),
   never_sounds_like: z.string(),
-  anchor_terms: z.record(z.string()),
+  anchor_terms: z.record(z.string(), z.string()),
   never_say: z.array(z.string()),
   jargon_policy: z.string(),
   ai_ism_patterns: z.array(z.string()),

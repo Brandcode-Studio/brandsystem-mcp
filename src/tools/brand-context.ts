@@ -115,7 +115,7 @@ export const CONTEXT_OUTPUT_SCHEMA = z
     _metadata: z
       .object({ what_happened: z.string(), next_steps: z.array(z.string()) })
       .passthrough(),
-    context: z.record(z.unknown()).optional(),
+    context: z.record(z.string(), z.unknown()).optional(),
     matched_selectors: z
       .object({
         task_type: z.string(),
