@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { sanitizeSvg } from "../lib/svg-resolver.js";
-import { PROVISIONAL_ARTIFACT_NOTICE, artifactNotice } from "../lib/untrusted-text.js";
+import { PROVISIONAL_ARTIFACT_NOTICE, artifactNotice, markdownFenceFor } from "../lib/untrusted-text.js";
+import { getVersion } from "../lib/version.js";
 import { resolveEffectiveApproval } from "../lib/approval-state.js";
 import type {
   CoreIdentityData,
@@ -99,9 +100,11 @@ function logoBlock(identity: CoreIdentityData, includeLogo: boolean): string {
     for (const v of logo.variants) {
       if (v.inline_svg) {
         lines.push(`### ${v.name} variant\n`);
-        lines.push("```svg");
-        lines.push(sanitizeSvg(v.inline_svg).trim());
-        lines.push("```\n");
+        const svg = sanitizeSvg(v.inline_svg).trim();
+        const svgFence = markdownFenceFor(svg);
+        lines.push(`${svgFence}svg`);
+        lines.push(svg);
+        lines.push(`${svgFence}\n`);
       }
       if (v.data_uri) {
         lines.push("Data URI for `<img>` tags:\n");
@@ -323,7 +326,7 @@ export function generateCode(data: BrandData): string {
         mcpServers: {
           brandsystem: {
             command: "npx",
-            args: ["-y", "@brandsystem/mcp"],
+            args: ["-y", `@brandsystem/mcp@${getVersion()}`],
           },
         },
       },
@@ -336,7 +339,8 @@ export function generateCode(data: BrandData): string {
   // Instruction snippet
   lines.push("## 2. Project Instructions (`CLAUDE.md` / `.cursorrules`)\n");
   lines.push("Paste this into your CLAUDE.md, .cursorrules, or project instructions:\n");
-  lines.push("```markdown");
+  const instructionsFence = markdownFenceFor(config.client_name);
+  lines.push(`${instructionsFence}markdown`);
   lines.push(`# Brand System: ${config.client_name}`);
   lines.push("");
   lines.push(PROVISIONAL_ARTIFACT_NOTICE);
@@ -360,7 +364,7 @@ export function generateCode(data: BrandData): string {
   lines.push("- Use ONLY hex values from core-identity.yaml — no off-brand colors");
   lines.push("- Embed the logo using inline SVG — never approximate with text");
   lines.push("- Check anti-patterns in visual-identity.yaml — these are absolute constraints");
-  lines.push("```\n");
+  lines.push(`${instructionsFence}\n`);
 
   // Workflow
   lines.push("## Workflow Reference\n");
@@ -400,9 +404,11 @@ export function generateTeam(data: BrandData, includeLogo: boolean): string {
       for (const v of logo.variants) {
         if (v.inline_svg) {
           lines.push(`### ${v.name} variant\n`);
-          lines.push("```svg");
-          lines.push(sanitizeSvg(v.inline_svg).trim());
-          lines.push("```\n");
+          const svg = sanitizeSvg(v.inline_svg).trim();
+          const svgFence = markdownFenceFor(svg);
+          lines.push(`${svgFence}svg`);
+          lines.push(svg);
+          lines.push(`${svgFence}\n`);
         } else {
           lines.push(`- **${v.name}** variant available`);
         }
@@ -611,9 +617,11 @@ export function generateClaudeSkill(data: BrandData, includeLogo: boolean): stri
         if (v.inline_svg) {
           lines.push(`### Primary Logo (SVG — ${logo.type})`);
           lines.push("");
-          lines.push("```svg");
-          lines.push(sanitizeSvg(v.inline_svg).trim());
-          lines.push("```");
+          const svg = sanitizeSvg(v.inline_svg).trim();
+          const svgFence = markdownFenceFor(svg);
+          lines.push(`${svgFence}svg`);
+          lines.push(svg);
+          lines.push(`${svgFence}`);
           lines.push("");
         }
         if (v.data_uri) {
