@@ -2,13 +2,13 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
-import { extractPdfBrandData } from "../lib/pdf-extractor.js";
+import { extractPdfBrandData, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfInputError } from "../lib/pdf-extractor.js";
 import { mergeColorWithPriority, mergeTypographyWithPriority } from "../lib/confidence.js";
 import { buildSourceCatalogRecords, getConfiguredSourcePriority, upsertSourceCatalog } from "../lib/source-catalog.js";
 import { ERROR_CODES } from "../types/index.js";
 
 const paramsShape = {
-  file_path: z.string().min(1).describe("Path to a PDF brand guidelines document."),
+  file_path: z.string().min(1).describe("Path to a PDF brand guidelines document inside the working directory (e.g. './brand-guidelines.pdf'). Max 50 MB; up to 200 pages are parsed per call."),
   pages: z.string().default("all").describe('Page range to parse: "all", "3", or "1-5".'),
 };
 
@@ -31,17 +31,21 @@ async function handler(input: Params) {
   const identity = await brandDir.readCoreIdentity();
   let extracted;
   try {
-    extracted = await extractPdfBrandData(input.file_path, input.pages);
+    extracted = await extractPdfBrandData(input.file_path, input.pages, {
+      baseDir: process.cwd(),
+    });
   } catch (error) {
+    const isInputError = error instanceof PdfInputError;
     return buildResponse({
       what_happened: `PDF extraction failed for ${input.file_path}`,
       next_steps: [
-        "Check that the file exists and is a readable PDF",
+        "Provide a path to a PDF inside the current working directory (e.g. './brand-guidelines.pdf')",
+        `PDFs must be regular files under ${MAX_PDF_BYTES / 1024 / 1024} MB; up to ${MAX_PDF_PAGES} pages are parsed per call — use the pages parameter (e.g. "1-50") for larger documents`,
         "If the PDF is image-only, try a selectable-text export or narrower page range",
       ],
       data: {
         success: false,
-        error: ERROR_CODES.FETCH_FAILED,
+        error: isInputError ? ERROR_CODES.INVALID_PATH : ERROR_CODES.FETCH_FAILED,
         details: error instanceof Error ? error.message : String(error),
       },
     });
@@ -83,6 +87,9 @@ async function handler(input: Params) {
   return buildResponse({
     what_happened: `PDF guideline extraction complete for ${extracted.filePath}`,
     next_steps: [
+      ...(extracted.truncated
+        ? [`Only ${extracted.pagesProcessed} pages were parsed (limit ${MAX_PDF_PAGES} per call) — run again with pages="${extracted.nextPage}-${Math.min(extracted.pageCount, (extracted.nextPage ?? 1) + MAX_PDF_PAGES - 1)}" for the next batch`]
+        : []),
       "Review the extracted colors, typography, spacing, and rule snippets",
       "Run brand_resolve_conflicts with mode \"show\" to inspect differences against existing sources",
       "Run brand_compile to refresh tokens, DESIGN.md, and runtime artifacts",
@@ -92,6 +99,8 @@ async function handler(input: Params) {
       file_path: extracted.filePath,
       pages: extracted.pages,
       page_count: extracted.pageCount,
+      pages_processed: extracted.pagesProcessed,
+      truncated: extracted.truncated,
       extracted: {
         colors: extracted.colors,
         typography: extracted.typography,
