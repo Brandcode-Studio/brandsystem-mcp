@@ -14,6 +14,7 @@ import {
   type RuntimeContractV1,
 } from "../../connectors/brandcode/runtime-contract/index.js";
 import { enforceToolScope } from "../scope.js";
+import { describeUpstreamFailure } from "../upstream-errors.js";
 import type { HostedBrandContext } from "../types.js";
 
 const listParamsShape = {
@@ -619,7 +620,7 @@ export function registerListAssets(
         loaded = await loadAssets(context);
       } catch (err) {
         return buildResponse({
-          what_happened: `Failed to load hosted assets for "${context.slug}": ${(err as Error).message}`,
+          what_happened: `Failed to load hosted assets for "${context.slug}": ${describeUpstreamFailure("asset load", context.slug, err)}`,
           next_steps: [
             "Retry in a moment — the hosted brand service may be temporarily unavailable",
           ],
@@ -682,7 +683,7 @@ export function registerGetAsset(
         loaded = await loadAssets(context);
       } catch (err) {
         return buildResponse({
-          what_happened: `Failed to load hosted assets for "${context.slug}": ${(err as Error).message}`,
+          what_happened: `Failed to load hosted assets for "${context.slug}": ${describeUpstreamFailure("asset load", context.slug, err)}`,
           next_steps: [
             "Retry in a moment — the hosted brand service may be temporarily unavailable",
           ],

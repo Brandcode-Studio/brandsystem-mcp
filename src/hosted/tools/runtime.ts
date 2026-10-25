@@ -19,6 +19,7 @@ import {
   sliceRuntimeContract,
 } from "../../connectors/brandcode/runtime-contract/index.js";
 import { enforceToolScope } from "../scope.js";
+import { describeUpstreamFailure } from "../upstream-errors.js";
 import type { HostedBrandContext } from "../types.js";
 
 const paramsShape = {
@@ -406,7 +407,7 @@ export function registerRuntime(
         pkg = await context.loadBrandPackage();
       } catch (err) {
         return buildResponse({
-          what_happened: `Failed to load hosted brand "${context.slug}": ${(err as Error).message}`,
+          what_happened: `Failed to load hosted brand "${context.slug}": ${describeUpstreamFailure("brand package load", context.slug, err)}`,
           next_steps: [
             "Retry in a moment — the hosted brand service may be temporarily unavailable",
           ],

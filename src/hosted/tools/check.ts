@@ -11,6 +11,7 @@ import { buildResponse, safeParseParams } from "../../lib/response.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
 import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
 import { enforceToolScope } from "../scope.js";
+import { describeUpstreamFailure } from "../upstream-errors.js";
 import type { HostedBrandContext } from "../types.js";
 
 const paramsShape = {
@@ -1186,7 +1187,7 @@ export function registerCheck(server: McpServer, context: HostedBrandContext) {
         pkg = await context.loadBrandPackage();
       } catch (err) {
         return buildResponse({
-          what_happened: `Failed to load hosted brand "${context.slug}": ${(err as Error).message}`,
+          what_happened: `Failed to load hosted brand "${context.slug}": ${describeUpstreamFailure("brand package load", context.slug, err)}`,
           next_steps: [
             "Retry in a moment — the hosted brand service may be temporarily unavailable",
           ],
