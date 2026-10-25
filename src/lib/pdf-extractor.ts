@@ -291,15 +291,16 @@ const PDF_WORKER_SOURCE = `
 (async () => {
   // Dynamic import works whether the eval worker runs as CommonJS or ESM.
   const { parentPort, workerData } = await import("node:worker_threads");
-  let doc;
+  let task;
   try {
     const pdfjs = await import(workerData.pdfjsUrl);
-    doc = await pdfjs.getDocument({
+    task = pdfjs.getDocument({
       data: workerData.data,
       useSystemFonts: true,
       isEvalSupported: false,
       verbosity: 0,
-    }).promise;
+    });
+    const doc = await task.promise;
     const numPages = doc.numPages;
     const start = workerData.start;
     const requestedEnd = workerData.end == null ? numPages : workerData.end;
@@ -330,7 +331,10 @@ const PDF_WORKER_SOURCE = `
   } catch (err) {
     parentPort.postMessage({ ok: false, message: String((err && err.message) || err).slice(0, 300) });
   } finally {
-    if (doc) await doc.destroy().catch(() => {});
+    // Best-effort cleanup; never throw after the result was posted.
+    try {
+      if (task && typeof task.destroy === "function") await task.destroy();
+    } catch {}
   }
 })();
 `;
