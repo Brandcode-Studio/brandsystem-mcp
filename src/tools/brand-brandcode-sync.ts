@@ -14,7 +14,12 @@ import {
   writeConnectorConfig,
   writePackagePayload,
   appendSyncEvent,
+  describeApprovalOutcome,
 } from "../connectors/brandcode/persistence.js";
+import {
+  isTrustedBrandcodeOrigin,
+  trustedOriginsHint,
+} from "../connectors/brandcode/trust.js";
 import { readAuthCredentials } from "../lib/auth-state.js";
 import { readPackagePayload } from "../connectors/brandcode/persistence.js";
 import { computeBrandDiff } from "../lib/brand-diff.js";
@@ -54,7 +59,18 @@ async function handlePull(input: Params) {
   }
 
   // Resolve from stored config
-  const resolved = resolveBrandcodeHostedUrl(config.brandUrl);
+  let resolved;
+  try {
+    resolved = resolveBrandcodeHostedUrl(config.brandUrl);
+  } catch {
+    return buildResponse({
+      what_happened: "The stored Brandcode connection has an invalid brand URL",
+      next_steps: [
+        "Re-run brand_brandcode_connect with a Brandcode Studio URL or slug",
+      ],
+      data: { error: ERROR_CODES.VALIDATION_FAILED },
+    });
+  }
   const fetchOpts = input.share_token
     ? { shareToken: input.share_token }
     : undefined;
@@ -121,7 +137,11 @@ async function handlePull(input: Params) {
   // Capture old package for diff before overwriting
   const oldPackage = await readPackagePayload(cwd);
 
-  await writePackagePayload(cwd, pullResult.package);
+  const approvalOutcome = await writePackagePayload(cwd, pullResult.package, {
+    origin: resolved.baseUrl,
+  });
+  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl);
+  const originTrusted = isTrustedBrandcodeOrigin(resolved.baseUrl);
 
   // Update connector config with new sync token
   const updatedConfig = {
@@ -161,19 +181,30 @@ async function handlePull(input: Params) {
   };
   await appendSyncEvent(cwd, syncEvent);
 
-  const whatHappened = diff.changes.length > 0
+  const whatHappened = (diff.changes.length > 0
     ? `Brand "${config.slug}" synced — ${diff.headline}`
-    : `Brand "${config.slug}" synced — ${changedAreas.length} area(s) changed`;
+    : `Brand "${config.slug}" synced — ${changedAreas.length} area(s) changed`) +
+    (approvalNote ? `. ${approvalNote}` : "");
+
+  const nextSteps = [
+    "Run brand_status to see the updated brand identity",
+    "Run brand_brandcode_status to review sync details",
+  ];
+  if (!originTrusted) {
+    nextSteps.unshift(
+      `${resolved.baseUrl} is not a trusted Brandcode Studio origin: any approval it declares is ignored and credentials are never sent to it. ${trustedOriginsHint()}`,
+    );
+  }
 
   return buildResponse({
     what_happened: whatHappened,
-    next_steps: [
-      "Run brand_status to see the updated brand identity",
-      "Run brand_brandcode_status to review sync details",
-    ],
+    next_steps: nextSteps,
     data: {
       sync_mode: "updated",
       slug: config.slug,
+      origin: resolved.baseUrl,
+      origin_trusted: originTrusted,
+      approval_outcome: approvalOutcome,
       sync_token: pullResult.brand.syncToken,
       previous_sync_token: config.syncToken,
       changed_areas: changedAreas,

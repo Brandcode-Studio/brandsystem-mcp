@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { getVersion } from "../src/lib/version.js";
 import {
+  packageSpec,
   buildServerEntry,
   buildCodexAddArgs,
   buildClineInstallArgs,
@@ -15,6 +17,9 @@ import {
   STANDARD_BRAND_FILES,
   runInspect,
 } from "../src/cli/inspect.js";
+
+const VERSION = getVersion();
+const PINNED = `@brandsystem/mcp@${VERSION}`;
 
 let dir: string;
 let log: ReturnType<typeof vi.spyOn>;
@@ -40,14 +45,14 @@ describe("buildServerEntry", () => {
   it("builds the standard npx entry for the core profile", () => {
     expect(buildServerEntry("core")).toEqual({
       command: "npx",
-      args: ["-y", "@brandsystem/mcp"],
+      args: ["-y", PINNED],
     });
   });
 
   it("appends --profile=full for the full profile", () => {
     expect(buildServerEntry("full")).toEqual({
       command: "npx",
-      args: ["-y", "@brandsystem/mcp", "--profile=full"],
+      args: ["-y", PINNED, "--profile=full"],
     });
   });
 });
@@ -61,7 +66,7 @@ describe("buildCodexAddArgs", () => {
       "--",
       "npx",
       "-y",
-      "@brandsystem/mcp",
+      PINNED,
     ]);
   });
 
@@ -80,7 +85,7 @@ describe("buildClineInstallArgs", () => {
       "--",
       "npx",
       "-y",
-      "@brandsystem/mcp",
+      PINNED,
     ]);
   });
 
@@ -195,7 +200,7 @@ describe("runInstall", () => {
     expect(code).toBe(0);
     expect(commandRunner).not.toHaveBeenCalled();
     expect(loggedOutput()).toContain(
-      "codex mcp add brandsystem -- npx -y @brandsystem/mcp",
+      `codex mcp add brandsystem -- npx -y ${PINNED}`,
     );
   });
 
@@ -216,7 +221,7 @@ describe("runInstall", () => {
       "--",
       "npx",
       "-y",
-      "@brandsystem/mcp",
+      PINNED,
       "--profile=full",
     ]);
     expect(loggedOutput()).toContain("official Codex CLI");
@@ -259,7 +264,7 @@ describe("runInstall", () => {
     const written = JSON.parse(await readFile(join(dir, ".mcp.json"), "utf-8"));
     expect(written).toEqual({
       mcpServers: {
-        brandsystem: { command: "npx", args: ["-y", "@brandsystem/mcp"] },
+        brandsystem: { command: "npx", args: ["-y", PINNED] },
       },
     });
   });
@@ -382,10 +387,73 @@ describe("runInstall", () => {
       "--",
       "npx",
       "-y",
-      "@brandsystem/mcp",
+      PINNED,
       "--profile=full",
     ]);
     expect(loggedOutput()).toContain("official Cline CLI");
+  });
+});
+
+describe("version pinning", () => {
+  it("pins the running package version by default", () => {
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+/);
+    expect(packageSpec()).toBe(PINNED);
+    expect(packageSpec({ version: "1.2.3" })).toBe("@brandsystem/mcp@1.2.3");
+    expect(packageSpec({ unpinned: true })).toBe("@brandsystem/mcp");
+  });
+
+  it("refuses to pin an invalid version", () => {
+    expect(() => packageSpec({ version: "latest; rm -rf /" })).toThrow(/invalid version/);
+  });
+
+  it("default project config contains the exact version", async () => {
+    const code = await runInstall({
+      client: "claude-code",
+      write: true,
+      profile: "core",
+      cwd: dir,
+      version: "9.8.7",
+    });
+    expect(code).toBe(0);
+    const raw = await readFile(join(dir, ".mcp.json"), "utf-8");
+    expect(JSON.parse(raw).mcpServers.brandsystem.args).toEqual(["-y", "@brandsystem/mcp@9.8.7"]);
+  });
+
+  it("--unpinned yields the floating spec", async () => {
+    const code = await runInstall({
+      client: "cursor",
+      write: true,
+      profile: "full",
+      cwd: dir,
+      unpinned: true,
+    });
+    expect(code).toBe(0);
+    const raw = await readFile(join(dir, ".cursor", "mcp.json"), "utf-8");
+    expect(JSON.parse(raw).mcpServers.brandsystem.args).toEqual([
+      "-y",
+      "@brandsystem/mcp",
+      "--profile=full",
+    ]);
+  });
+
+  it("dry-run output shows the pinned spec and how to opt out", async () => {
+    await runInstall({ client: "claude-code", write: false, profile: "core", cwd: dir });
+    expect(loggedOutput()).toContain(PINNED);
+    expect(loggedOutput()).toContain("--unpinned");
+  });
+
+  it("passes the pinned spec to delegated installs, and the floating one with --unpinned", async () => {
+    const commandRunner = vi.fn(async () => 0);
+    await runInstall({ client: "codex", write: true, profile: "core", cwd: dir, commandRunner });
+    expect(commandRunner).toHaveBeenLastCalledWith("codex", [
+      "mcp", "add", "brandsystem", "--", "npx", "-y", PINNED,
+    ]);
+    await runInstall({
+      client: "cline", write: true, profile: "core", cwd: dir, commandRunner, unpinned: true,
+    });
+    expect(commandRunner).toHaveBeenLastCalledWith("cline", [
+      "mcp", "install", "brandsystem", "--yes", "--", "npx", "-y", "@brandsystem/mcp",
+    ]);
   });
 });
 

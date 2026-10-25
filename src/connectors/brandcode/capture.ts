@@ -31,6 +31,8 @@ async function postJson<T>(
       authorization: `Bearer ${authToken}`,
     },
     body: JSON.stringify(body),
+    // Never carry the bearer token across a redirect.
+    redirect: "error",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 

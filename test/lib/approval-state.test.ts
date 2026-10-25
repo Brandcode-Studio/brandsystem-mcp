@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   computeBrandFingerprint,
+  computePackageDigest,
   readApprovalState,
   writeApprovalState,
   resolveEffectiveApproval,
@@ -62,14 +63,65 @@ describe("approval state (promotion gate)", () => {
     expect(await resolveEffectiveApproval(cwd)).toBe("provisional_extracted");
   });
 
-  it("accepts production_approved from brandcode_studio while fingerprint holds", async () => {
+  async function writeStudioApproval(pkg: Record<string, unknown>, origin = "https://www.brandcode.studio") {
+    await writeFile(join(cwd, ".brand", "brandcode-package.json"), JSON.stringify(pkg, null, 2));
+    await writeApprovalState(cwd, {
+      level: "production_approved",
+      confirmed_at: "2026-07-16T00:00:00Z",
+      fingerprint: await computeBrandFingerprint(cwd),
+      authority: "brandcode_studio",
+      package_sha256: computePackageDigest(pkg),
+      origin,
+    });
+  }
+
+  it("accepts production_approved from brandcode_studio while fingerprint and package hold", async () => {
+    await writeStudioApproval({ slug: "acme", approval: "production_approved", b: 1, a: [1, 2] });
+    expect(await resolveEffectiveApproval(cwd)).toBe("production_approved");
+  });
+
+  it("package digest ignores key order and formatting", () => {
+    expect(computePackageDigest({ a: 1, b: { d: 2, c: 3 } })).toBe(
+      computePackageDigest({ b: { c: 3, d: 2 }, a: 1 }),
+    );
+  });
+
+  it("demotes a legacy brandcode_studio state that is not bound to a package", async () => {
+    // Pre-binding states (fingerprint over local YAML only) could have been
+    // conferred by any server; they no longer resolve.
     await writeApprovalState(cwd, {
       level: "production_approved",
       confirmed_at: "2026-07-16T00:00:00Z",
       fingerprint: await computeBrandFingerprint(cwd),
       authority: "brandcode_studio",
     });
-    expect(await resolveEffectiveApproval(cwd)).toBe("production_approved");
+    expect(await resolveEffectiveApproval(cwd)).toBe("provisional_extracted");
+  });
+
+  it("demotes production_approved when the pulled package changes", async () => {
+    await writeStudioApproval({ slug: "acme", approval: "production_approved" });
+    await writeFile(
+      join(cwd, ".brand", "brandcode-package.json"),
+      JSON.stringify({ slug: "acme", approval: "production_approved", injected: true }),
+    );
+    expect(await resolveEffectiveApproval(cwd)).toBe("provisional_extracted");
+  });
+
+  it("demotes production_approved when the package file is removed", async () => {
+    await writeStudioApproval({ slug: "acme", approval: "production_approved" });
+    await rm(join(cwd, ".brand", "brandcode-package.json"));
+    expect(await resolveEffectiveApproval(cwd)).toBe("provisional_extracted");
+  });
+
+  it("demotes production_approved recorded for an untrusted origin", async () => {
+    await writeStudioApproval({ slug: "acme" }, "https://evil.example");
+    expect(await resolveEffectiveApproval(cwd)).toBe("provisional_extracted");
+  });
+
+  it("demotes production_approved when local sources change after the pull", async () => {
+    await writeStudioApproval({ slug: "acme", approval: "production_approved" });
+    await writeFile(join(cwd, ".brand", "messaging.yaml"), "voice: {}\n");
+    expect(await resolveEffectiveApproval(cwd)).toBe("provisional_extracted");
   });
 
   it("round-trips state through read/write", async () => {

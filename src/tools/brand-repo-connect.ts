@@ -14,6 +14,16 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES } from "../types/index.js";
 import { readAuthCredentials } from "../lib/auth-state.js";
+import { brandcodeRequest } from "../connectors/brandcode/client.js";
+import { originOf, trustedOriginsHint } from "../connectors/brandcode/trust.js";
+
+const DEFAULT_STUDIO_URL = "https://www.brandcode.studio";
+
+/** Structured error text from Studio: strip control chars, cap length. */
+function cleanServerText(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").trim().slice(0, 300);
+}
 
 const paramsShape = {
   repo: z
@@ -38,7 +48,7 @@ const paramsShape = {
     .string()
     .optional()
     .describe(
-      "Brandcode Studio URL (default: https://www.brandcode.studio)",
+      "Brandcode Studio URL. Optional; must match the Studio you authenticated with (auth.studioUrl) — credentials are never sent to any other origin.",
     ),
 };
 
@@ -66,35 +76,52 @@ async function handler(raw: Record<string, unknown>) {
     });
   }
 
-  const studioUrl =
-    input.brandcode_url?.replace(/\/$/, "") ||
-    auth.studioUrl?.replace(/\/$/, "") ||
-    "https://www.brandcode.studio";
+  // Credentials go only to the Studio they were issued for. A caller-supplied
+  // brandcode_url may not redirect the admin token anywhere else.
+  const studioUrl = (auth.studioUrl || DEFAULT_STUDIO_URL).replace(/\/$/, "");
+  const credentialOrigin = originOf(studioUrl);
+  if (input.brandcode_url !== undefined) {
+    const requestedOrigin = originOf(input.brandcode_url.trim());
+    if (!requestedOrigin || requestedOrigin !== credentialOrigin) {
+      return buildResponse({
+        what_happened: `Refused: brandcode_url (${requestedOrigin ?? "invalid URL"}) is not the Studio your credentials were issued for (${credentialOrigin ?? "unknown"}). Session tokens are only ever sent to that origin.`,
+        next_steps: [
+          "Omit brandcode_url to use the Studio you authenticated with",
+          `To use a different Studio, run brand_brandcode_auth mode="logout", then authenticate against it (it must be a trusted origin). ${trustedOriginsHint()}`,
+        ],
+        data: { error: ERROR_CODES.VALIDATION_FAILED },
+      });
+    }
+  }
 
   // Call the connect route
   const connectUrl = `${studioUrl}/api/brand/repo/connect`;
 
   try {
-    const response = await fetch(connectUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-brand-session-admin-token": auth.token,
+    const response = await brandcodeRequest<Record<string, unknown>>(
+      connectUrl,
+      { adminToken: auth.token, credentialOrigin: studioUrl },
+      {
+        method: "POST",
+        contentType: "application/json",
+        body: JSON.stringify({
+          brandSlug: input.brand_slug,
+          repo: input.repo,
+          branch: input.branch,
+          brandPath: input.brand_path,
+          ownerEmail: auth.email,
+        }),
+        allowErrorStatus: true,
       },
-      body: JSON.stringify({
-        brandSlug: input.brand_slug,
-        repo: input.repo,
-        branch: input.branch,
-        brandPath: input.brand_path,
-        ownerEmail: auth.email,
-      }),
-    });
+    );
 
-    const body = (await response.json()) as Record<string, unknown>;
+    const body = (response.data && typeof response.data === "object" ? response.data : {}) as Record<string, unknown>;
 
     if (!response.ok) {
       const errorMsg =
-        (body.error as string) ?? `Studio returned ${response.status}`;
+        typeof body.error === "string"
+          ? cleanServerText(body.error)
+          : `Studio returned HTTP ${response.status}`;
 
       if (response.status === 409) {
         const existing = body.existing as Record<string, unknown> | undefined;

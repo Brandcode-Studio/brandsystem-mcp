@@ -3,7 +3,7 @@
  *
  * Usage:
  *   npx @brandsystem/mcp doctor
- *   npx @brandsystem/mcp install --client <claude-code|cline|codex|cursor|windsurf|claude-desktop> [--write] [--profile core|full]
+ *   npx @brandsystem/mcp install --client <claude-code|cline|codex|cursor|windsurf|claude-desktop> [--write] [--profile core|full] [--unpinned]
  *   npx @brandsystem/mcp inspect
  *   npx @brandsystem/mcp brandcode connect <url> [--share-token=TOKEN]
  *   npx @brandsystem/mcp brandcode sync [--share-token=TOKEN]
@@ -23,7 +23,9 @@ import {
   appendSyncEvent,
   readSyncHistory,
   readPackagePayload,
+  describeApprovalOutcome,
 } from "./connectors/brandcode/persistence.js";
+import { isTrustedBrandcodeOrigin } from "./connectors/brandcode/trust.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { SCHEMA_VERSION } from "./schemas/index.js";
 import { runDoctor } from "./cli/doctor.js";
@@ -46,6 +48,8 @@ Commands:
                              Clients: claude-code, cline, codex, cursor, windsurf,
                              claude-desktop.
                              Dry-run by default; pass --write to apply.
+                             Pins @brandsystem/mcp@<this version>; pass
+                             --unpinned for the floating latest spec.
   inspect                    Print package version, resolved tool profile,
                              core tool list, and the .brand/ artifact inventory
   brandcode connect <url>    Connect to a hosted Brandcode Studio brand
@@ -55,6 +59,7 @@ Commands:
 Options:
   --client=NAME              Target MCP client for install
   --write                    Apply changes (install is dry-run without it)
+  --unpinned                 install: write @brandsystem/mcp without a version pin
   --profile=core|full        Tool profile (default: core)
   --share-token=TOKEN        Share token for protected brands
   --help                     Show this help message
@@ -143,7 +148,12 @@ async function cmdConnect(url: string, shareToken?: string) {
   // Scaffold .brand/ if needed
   const brandDir = new BrandDir(cwd);
   if (!(await brandDir.exists())) {
-    const brandName = pullResult.brand.name || resolved.slug;
+    // Only a trusted Studio origin may name the brand.
+    const brandName = isTrustedBrandcodeOrigin(resolved.baseUrl)
+      ? (typeof pullResult.brand.name === "string"
+          ? pullResult.brand.name.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").trim().slice(0, 120)
+          : "") || resolved.slug
+      : resolved.slug;
     await brandDir.initBrand({
       schema_version: SCHEMA_VERSION,
       session: 1,
@@ -155,7 +165,11 @@ async function cmdConnect(url: string, shareToken?: string) {
 
   const now = new Date().toISOString();
 
-  await writePackagePayload(cwd, pullResult.package);
+  const approvalOutcome = await writePackagePayload(cwd, pullResult.package, {
+    origin: resolved.baseUrl,
+  });
+  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl);
+  if (approvalNote) console.log(`  ${approvalNote}`);
 
   const connectorConfig: ConnectorConfig = {
     provider: "brandcode",
@@ -245,7 +259,11 @@ async function cmdSync(shareToken?: string) {
     process.exit(1);
   }
 
-  await writePackagePayload(cwd, pullResult.package);
+  const syncApprovalOutcome = await writePackagePayload(cwd, pullResult.package, {
+    origin: resolved.baseUrl,
+  });
+  const syncApprovalNote = describeApprovalOutcome(syncApprovalOutcome, resolved.baseUrl);
+  if (syncApprovalNote) console.log(`  ${syncApprovalNote}`);
 
   const updatedConfig = {
     ...config,
@@ -358,13 +376,14 @@ export async function runCli(args: string[]): Promise<void> {
     if (!client) {
       console.error("Error: Missing --client.");
       console.error(
-        `Usage: npx @brandsystem/mcp install --client <${INSTALL_CLIENTS.join("|")}> [--write] [--profile core|full]`,
+        `Usage: npx @brandsystem/mcp install --client <${INSTALL_CLIENTS.join("|")}> [--write] [--profile core|full] [--unpinned]`,
       );
       process.exit(1);
     }
     process.exitCode = await runInstall({
       client,
       write: args.includes("--write"),
+      unpinned: args.includes("--unpinned"),
       profile: resolveProfile(parseProfileOption(args)),
       cwd: process.cwd(),
     });

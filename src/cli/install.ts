@@ -9,6 +9,10 @@
  *     mcpServers.brandsystem is added/replaced) and the original is
  *     copied to <file>.backup-<timestamp> first.
  *   - An existing file that is not valid JSON is never overwritten.
+ *   - The package spec is pinned to the running version
+ *     (`@brandsystem/mcp@<version>`) so a project-level config committed to a
+ *     repo never auto-executes a future publish. `--unpinned` opts into the
+ *     floating latest spec explicitly.
  */
 
 import { readFile, writeFile, copyFile, mkdir, access } from "node:fs/promises";
@@ -16,6 +20,9 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import type { ToolProfile } from "../lib/tool-profile.js";
+import { getVersion } from "../lib/version.js";
+
+export const PACKAGE_NAME = "@brandsystem/mcp";
 
 export const INSTALL_CLIENTS = [
   "claude-code",
@@ -44,6 +51,10 @@ export interface InstallOptions {
   platform?: NodeJS.Platform;
   /** Overridable for tests. Runs the official Codex CLI for Codex installs. */
   commandRunner?: CommandRunner;
+  /** Write the floating `@brandsystem/mcp` spec instead of pinning the version. */
+  unpinned?: boolean;
+  /** Overridable for tests. Defaults to the running package version. */
+  version?: string;
 }
 
 export type CommandRunner = (
@@ -55,25 +66,56 @@ export function isInstallClient(value: string): value is InstallClient {
   return (INSTALL_CLIENTS as readonly string[]).includes(value);
 }
 
+const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+/**
+ * The npm spec written into client configs: pinned to the running version by
+ * default (`@brandsystem/mcp@1.2.3`), or the floating `@brandsystem/mcp` when
+ * `unpinned` is set.
+ */
+export function packageSpec(opts: { unpinned?: boolean; version?: string } = {}): string {
+  if (opts.unpinned) return PACKAGE_NAME;
+  const version = opts.version ?? getVersion();
+  if (!SEMVER.test(version)) {
+    throw new Error(`Cannot pin ${PACKAGE_NAME}: invalid version "${version}". Use --unpinned to write the floating spec.`);
+  }
+  return `${PACKAGE_NAME}@${version}`;
+}
+
 /** Build the mcpServers.brandsystem entry for a given profile. */
-export function buildServerEntry(profile: ToolProfile): McpServerEntry {
-  const args = ["-y", "@brandsystem/mcp"];
+export function buildServerEntry(
+  profile: ToolProfile,
+  spec: string = packageSpec(),
+): McpServerEntry {
+  const args = ["-y", spec];
   if (profile === "full") args.push("--profile=full");
   return { command: "npx", args };
 }
 
 /** Build the official `codex mcp add` invocation for this package. */
-export function buildCodexAddArgs(profile: ToolProfile): string[] {
-  const serverArgs = ["npx", "-y", "@brandsystem/mcp"];
+export function buildCodexAddArgs(
+  profile: ToolProfile,
+  spec: string = packageSpec(),
+): string[] {
+  const serverArgs = ["npx", "-y", spec];
   if (profile === "full") serverArgs.push("--profile=full");
   return ["mcp", "add", "brandsystem", "--", ...serverArgs];
 }
 
 /** Build the official `cline mcp install` invocation for this package. */
-export function buildClineInstallArgs(profile: ToolProfile): string[] {
-  const serverArgs = ["npx", "-y", "@brandsystem/mcp"];
+export function buildClineInstallArgs(
+  profile: ToolProfile,
+  spec: string = packageSpec(),
+): string[] {
+  const serverArgs = ["npx", "-y", spec];
   if (profile === "full") serverArgs.push("--profile=full");
   return ["mcp", "install", "brandsystem", "--yes", "--", ...serverArgs];
+}
+
+function pinningNote(spec: string, unpinned: boolean | undefined): string {
+  return unpinned
+    ? `Using the floating spec ${spec}: every launch runs whatever version is latest on npm. Omit --unpinned to pin the current version.`
+    : `Pinned to ${spec}. To upgrade, re-run install from a newer version; pass --unpinned to track the latest release instead (not recommended for configs committed to a repository).`;
 }
 
 /** Resolve where the MCP config lives for each supported client. */
@@ -200,13 +242,21 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
     return 1;
   }
 
+  let spec: string;
+  try {
+    spec = packageSpec({ unpinned: opts.unpinned, version: opts.version });
+  } catch (err) {
+    console.error(`Error: ${(err as Error).message}`);
+    return 1;
+  }
+
   if (opts.client === "codex" || opts.client === "cline") {
     const client = opts.client;
     const command = client;
     const target = resolveConfigPath(client, opts.cwd, opts.home, opts.platform);
     const args = client === "codex"
-      ? buildCodexAddArgs(opts.profile)
-      : buildClineInstallArgs(opts.profile);
+      ? buildCodexAddArgs(opts.profile, spec)
+      : buildClineInstallArgs(opts.profile, spec);
     const renderedCommand = [command, ...args].join(" ");
     const displayName = client === "codex" ? "Codex" : "Cline";
 
@@ -218,6 +268,8 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
       console.log(``);
       console.log(`The official ${displayName} CLI would run:`);
       console.log(`  ${renderedCommand}`);
+      console.log(``);
+      console.log(pinningNote(spec, opts.unpinned));
       console.log(``);
       console.log(`Re-run with --write to apply.`);
       return 0;
@@ -250,7 +302,7 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
     opts.home,
     opts.platform,
   );
-  const entry = buildServerEntry(opts.profile);
+  const entry = buildServerEntry(opts.profile, spec);
   const existingRaw = await readIfExists(target);
 
   let merged: Record<string, unknown>;
@@ -276,6 +328,8 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
     );
     console.log(output.trimEnd());
     console.log(``);
+    console.log(pinningNote(spec, opts.unpinned));
+    console.log(``);
     console.log(`Re-run with --write to apply.`);
     return 0;
   }
@@ -289,7 +343,7 @@ export async function runInstall(opts: InstallOptions): Promise<number> {
   }
 
   await writeFile(target, output, "utf-8");
-  console.log(`Wrote "brandsystem" server entry to ${target}`);
+  console.log(`Wrote "brandsystem" server entry (${spec}) to ${target}`);
   if (opts.client === "claude-desktop") {
     console.log(`Restart Claude Desktop to pick up the new server.`);
   }

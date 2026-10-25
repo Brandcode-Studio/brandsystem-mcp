@@ -47,7 +47,9 @@ export async function fetchTasteGuidance(input: {
         "user-agent": USER_AGENT,
         authorization: `Bearer ${input.authToken}`,
       },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      // Never carry the bearer token across a redirect.
+    redirect: "error",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
     },
   );
   const body = (await response
