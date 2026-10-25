@@ -10,6 +10,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES } from "../types/index.js";
 import { readAuthCredentials } from "../lib/auth-state.js";
+import { brandcodeRequest } from "../connectors/brandcode/client.js";
 
 const paramsShape = {
   brand_slug: z
@@ -43,13 +44,21 @@ async function handler(raw: Record<string, unknown>) {
   const statusUrl = `${studioUrl}/api/brand/repo/status?brandSlug=${encodeURIComponent(input.brand_slug)}`;
 
   try {
-    const response = await fetch(statusUrl, { cache: "no-store" });
-    const body = (await response.json()) as Record<string, unknown>;
+    // Public, credential-free read. Trusted Studio origins use the normal
+    // client; any other origin is fetched https-only through the SSRF guard.
+    const response = await brandcodeRequest<Record<string, unknown>>(
+      statusUrl,
+      undefined,
+      { allowErrorStatus: true },
+    );
+    const body = (response.data && typeof response.data === "object" ? response.data : {}) as Record<string, unknown>;
 
     if (!response.ok) {
       return buildResponse({
         what_happened:
-          (body.error as string) ?? `Studio returned ${response.status}`,
+          response.trusted && typeof body.error === "string"
+            ? body.error.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").trim().slice(0, 300)
+            : `Studio returned HTTP ${response.status}`,
         next_steps: ["Check that the brand slug is correct"],
         data: { error: ERROR_CODES.FETCH_FAILED, status: response.status },
       });

@@ -280,6 +280,8 @@ npx @brandsystem/mcp brandcode status
 
 `install` never overwrites other servers' entries: it deep-merges, backs up the existing file first, and refuses invalid JSON. For protected hosted brands, add `--share-token=TOKEN`.
 
+**Trusted Studio origins.** Credentials (session, admin, and share tokens) are only ever sent to a trusted Brandcode Studio origin — `https://www.brandcode.studio` and `https://brandcode.studio` by default — and only an approval declared by a package from a trusted origin can mark a brand `production_approved`. Other hosts can still be read for public packages (https only, SSRF-guarded, no credentials), but their approval claims are ignored. For local development or staging, add origins with `BRANDCODE_STUDIO_TRUSTED_ORIGINS` (comma-separated; https required, except `http://localhost`, `http://127.0.0.1`, or `http://[::1]` when listed explicitly).
+
 ---
 
 ## The `.brand/` Directory

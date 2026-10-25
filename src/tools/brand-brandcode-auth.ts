@@ -14,6 +14,11 @@ import {
   pollDeviceCode as pollDeviceCodeApi,
   BrandcodeClientError,
 } from "../connectors/brandcode/client.js";
+import {
+  isTrustedBrandcodeOrigin,
+  originOf,
+  trustedOriginsHint,
+} from "../connectors/brandcode/trust.js";
 
 const DEFAULT_STUDIO_URL = "https://www.brandcode.studio";
 
@@ -38,7 +43,7 @@ const paramsShape = {
     .string()
     .optional()
     .describe(
-      'Brandcode Studio base URL. Defaults to "https://brandcode.studio". Override for self-hosted instances.',
+      'Brandcode Studio base URL. Defaults to "https://www.brandcode.studio". Must be a trusted Studio origin; self-hosted/staging origins are added via the BRANDCODE_STUDIO_TRUSTED_ORIGINS environment variable.',
     ),
 };
 
@@ -47,7 +52,23 @@ type Params = z.infer<typeof ParamsSchema>;
 
 async function handler(input: Params) {
   const cwd = process.cwd();
-  const studioUrl = input.studio_url ?? DEFAULT_STUDIO_URL;
+  // Credentials are bound to the Studio origin they are issued by, so that
+  // origin must be on the trusted allowlist (env override for dev/staging).
+  const studioUrl = originOf((input.studio_url ?? DEFAULT_STUDIO_URL).trim()) ?? "";
+  if (
+    input.mode !== "status" &&
+    input.mode !== "logout" &&
+    !isTrustedBrandcodeOrigin(studioUrl)
+  ) {
+    return buildResponse({
+      what_happened: `Refused: studio_url ${studioUrl || "(invalid URL)"} is not a trusted Brandcode Studio origin, so no credentials will be requested from or stored for it.`,
+      next_steps: [
+        "Omit studio_url to use https://www.brandcode.studio",
+        trustedOriginsHint(),
+      ],
+      data: { error: ERROR_CODES.VALIDATION_FAILED },
+    });
+  }
 
   switch (input.mode) {
     case "status":

@@ -12,12 +12,23 @@ import {
   BrandcodeClientError,
 } from "../connectors/brandcode/client.js";
 import {
-  readConnectorConfig,
   writeConnectorConfig,
   writePackagePayload,
   appendSyncEvent,
+  describeApprovalOutcome,
 } from "../connectors/brandcode/persistence.js";
+import {
+  isTrustedBrandcodeOrigin,
+  trustedOriginsHint,
+} from "../connectors/brandcode/trust.js";
 import { readAuthCredentials } from "../lib/auth-state.js";
+
+/** Strip control characters and cap length on a server-supplied brand name. */
+function sanitizeBrandName(name: unknown): string {
+  if (typeof name !== "string") return "";
+  // eslint-disable-next-line no-control-regex
+  return name.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+}
 import type {
   ConnectorConfig,
   SyncHistoryEvent,
@@ -111,10 +122,17 @@ async function handlePull(input: Params) {
     });
   }
 
+  const originTrusted = isTrustedBrandcodeOrigin(resolved.baseUrl);
+  // Only a trusted Studio origin may name the brand; an arbitrary custom
+  // domain could otherwise inject text into client_name.
+  const brandName = originTrusted
+    ? sanitizeBrandName(pullResult.brand?.name) ||
+      sanitizeBrandName(connectArtifact.brand?.name) ||
+      resolved.slug
+    : resolved.slug;
+
   // Scaffold .brand/ if it doesn't exist
   if (!(await brandDir.exists())) {
-    const brandName =
-      pullResult.brand.name || connectArtifact.brand.name || resolved.slug;
     await brandDir.initBrand({
       schema_version: SCHEMA_VERSION,
       session: 1,
@@ -127,8 +145,11 @@ async function handlePull(input: Params) {
   const cwd = process.cwd();
   const now = new Date().toISOString();
 
-  // Save the raw package
-  await writePackagePayload(cwd, pullResult.package);
+  // Save the raw package (approval honored only for trusted origins)
+  const approvalOutcome = await writePackagePayload(cwd, pullResult.package, {
+    origin: resolved.baseUrl,
+  });
+  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl);
 
   // Save connector config
   const connectorConfig: ConnectorConfig = {
@@ -150,23 +171,36 @@ async function handlePull(input: Params) {
     syncMode: "first_sync",
     changedAreas,
     advice: {
-      headline: `Connected to "${pullResult.brand.name}"`,
+      headline: `Connected to "${brandName}"`,
       detail:
         "Brand pulled successfully. Run brand_status to see the imported brand, or brand_brandcode_status to check sync state.",
     },
   };
   await appendSyncEvent(cwd, syncEvent);
 
+  const nextSteps = [
+    "Run brand_status to see the imported brand identity",
+    "Run brand_brandcode_status to inspect connection and sync details",
+    "Run brand_brandcode_sync later to pull updates",
+  ];
+  if (!originTrusted) {
+    nextSteps.unshift(
+      `${resolved.baseUrl} is not a trusted Brandcode Studio origin: the package was read as public data only, any approval it declares is ignored, and credentials will never be sent to it. ${trustedOriginsHint()}`,
+    );
+  }
+
   return buildResponse({
-    what_happened: `Connected to hosted brand "${pullResult.brand.name}" (${resolved.slug})`,
-    next_steps: [
-      "Run brand_status to see the imported brand identity",
-      "Run brand_brandcode_status to inspect connection and sync details",
-      "Run brand_brandcode_sync later to pull updates",
-    ],
+    what_happened:
+      `Connected to hosted brand "${brandName}" (${resolved.slug})` +
+      (originTrusted ? "" : ` from untrusted origin ${resolved.baseUrl}`) +
+      (approvalNote ? `. ${approvalNote}` : ""),
+    next_steps: nextSteps,
     data: {
-      client_name: pullResult.brand.name,
+      client_name: brandName,
       slug: resolved.slug,
+      origin: resolved.baseUrl,
+      origin_trusted: originTrusted,
+      approval_outcome: approvalOutcome,
       sync_mode: "first_sync",
       sync_token: pullResult.brand.syncToken,
       readiness_stage: pullResult.brand.readinessStage,
