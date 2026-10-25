@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { CoreIdentity, BrandConfig, ClarificationItem } from "../types/index.js";
 import { sanitizeSvg } from "./svg-resolver.js";
 
@@ -89,13 +90,65 @@ export function generateBrandInstructions(config: BrandConfig, identity: CoreIde
 }
 
 function escapeHtml(str: string): string {
-  return str
+  return String(str ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+const HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
+
+/** A color value safe to drop into a style attribute; anything else renders transparent. */
+function cssColor(value: string): string {
+  return HEX_COLOR.test(value) ? value : "transparent";
+}
+
+/**
+ * The report's only script. It is a constant — never interpolated — so its
+ * SHA-256 can be pinned in the CSP instead of allowing 'unsafe-inline'. Copy
+ * buttons use a delegated listener: inline on* handlers would need
+ * 'unsafe-inline' (or 'unsafe-hashes') and are deliberately absent.
+ */
+export const REPORT_SCRIPT = `
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Click to copy (delegated: every .copy-btn copies the <code> in its .copy-wrap)
+document.addEventListener('click', event => {
+  const target = event.target;
+  const btn = target instanceof Element ? target.closest('.copy-btn') : null;
+  if (!btn) return;
+  const wrap = btn.closest('.copy-wrap');
+  const code = wrap ? wrap.querySelector('code') : null;
+  if (!code) return;
+  navigator.clipboard.writeText(code.textContent).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+});
+`;
+
+/** CSP source expression for REPORT_SCRIPT, computed from the exact script text. */
+export const REPORT_SCRIPT_CSP_HASH = `'sha256-${createHash("sha256").update(REPORT_SCRIPT, "utf8").digest("base64")}'`;
+
+/**
+ * Report CSP. Blocks ALL external requests and every script except the one
+ * hashed above, so markup that slipped past sanitization can neither run nor
+ * phone home. Inline style attributes remain allowed (swatches, layout).
+ */
+export const REPORT_CSP =
+  `default-src 'none'; script-src ${REPORT_SCRIPT_CSP_HASH}; style-src 'unsafe-inline'; ` +
+  "img-src data:; font-src data:; base-uri 'none'; form-action 'none'";
 
 function confidenceBadge(c: string): string {
   const cls: Record<string, string> = {
@@ -104,12 +157,12 @@ function confidenceBadge(c: string): string {
     medium: "badge-medium",
     low: "badge-low",
   };
-  return `<span class="badge ${cls[c] || "badge-low"}">${c}</span>`;
+  return `<span class="badge ${cls[c] || "badge-low"}">${escapeHtml(c)}</span>`;
 }
 
 function roleBadge(role: string): string {
   if (role === "unknown") return `<span class="badge badge-warn">needs role</span>`;
-  return `<span class="badge badge-role">${role}</span>`;
+  return `<span class="badge badge-role">${escapeHtml(role)}</span>`;
 }
 
 /** Relative luminance for contrast detection */
@@ -125,14 +178,15 @@ function luminance(hex: string): number {
 function buildColorCards(identity: CoreIdentity): string {
   return identity.colors
     .map((c) => {
-      const isLight = luminance(c.value) > 0.7;
+      const color = cssColor(c.value);
+      const isLight = color !== "transparent" && luminance(color) > 0.7;
       return `
         <div class="color-card">
-          <div class="color-swatch${isLight ? " is-light" : ""}" style="background:${c.value}"></div>
+          <div class="color-swatch${isLight ? " is-light" : ""}" style="background:${color}"></div>
           <div class="color-info">
             <div class="color-role">${roleBadge(c.role)}</div>
-            <div class="color-hex">${c.value}</div>
-            <div class="color-meta">${confidenceBadge(c.confidence)} <span class="source">via ${c.source}</span></div>
+            <div class="color-hex">${escapeHtml(c.value)}</div>
+            <div class="color-meta">${confidenceBadge(c.confidence)} <span class="source">via ${escapeHtml(c.source)}</span></div>
           </div>
         </div>`;
     })
@@ -147,8 +201,8 @@ function buildFontCards(identity: CoreIdentity): string {
           <div class="font-specimen">${escapeHtml(t.family)}</div>
           <div class="font-meta">
             ${confidenceBadge(t.confidence)}
-            <span class="source">via ${t.source}</span>
-            ${t.weight ? `<span class="detail">weight ${t.weight}</span>` : ""}
+            <span class="source">via ${escapeHtml(t.source)}</span>
+            ${t.weight ? `<span class="detail">weight ${escapeHtml(String(t.weight))}</span>` : ""}
           </div>
         </div>`
     )
@@ -210,13 +264,13 @@ function buildUsageSection(identity: CoreIdentity): string {
         <h3>Logo SVG</h3>
         <p>Never type the company name in a font. Always use this vector:</p>
         <div class="copy-wrap" id="${svgId}">
-          <button class="copy-btn" onclick="copyBlock('${svgId}')">Copy</button>
-          <pre><code>${escapeHtml(logoVariant.inline_svg.trim())}</code></pre>
+          <button class="copy-btn" type="button">Copy</button>
+          <pre><code>${escapeHtml(sanitizeSvg(logoVariant.inline_svg).trim())}</code></pre>
         </div>
         ${logoVariant.data_uri ? `<h3>Logo Data URI</h3>
         <p>For &lt;img&gt; tags — use as src value:</p>
         <div class="copy-wrap compact" id="${uriId}">
-          <button class="copy-btn" onclick="copyBlock('${uriId}')">Copy</button>
+          <button class="copy-btn" type="button">Copy</button>
           <pre><code>${escapeHtml(logoVariant.data_uri)}</code></pre>
         </div>` : ""}
       </div>`);
@@ -231,7 +285,7 @@ function buildUsageSection(identity: CoreIdentity): string {
       <div class="usage-block">
         <h3>Colors</h3>
         <div class="copy-wrap" id="${colorId}">
-          <button class="copy-btn" onclick="copyBlock('${colorId}')">Copy</button>
+          <button class="copy-btn" type="button">Copy</button>
           <pre><code>${escapeHtml(colorLine)}</code></pre>
         </div>
       </div>`);
@@ -246,7 +300,7 @@ function buildUsageSection(identity: CoreIdentity): string {
       <div class="usage-block">
         <h3>Fonts</h3>
         <div class="copy-wrap" id="${fontId}">
-          <button class="copy-btn" onclick="copyBlock('${fontId}')">Copy</button>
+          <button class="copy-btn" type="button">Copy</button>
           <pre><code>font-family: ${escapeHtml(fontLine)}</code></pre>
         </div>
       </div>`);
@@ -287,7 +341,7 @@ function buildComparisonSection(config: BrandConfig, identity: CoreIdentity): st
             <span class="comp-row-label">Colors</span>
             <span class="comp-row-value">${
               primaryColor
-                ? `<span class="comp-swatch" style="background:${primaryColor.value}"></span>${primaryColor.value} (primary) + ${colorCount - 1} more`
+                ? `<span class="comp-swatch" style="background:${cssColor(primaryColor.value)}"></span>${escapeHtml(primaryColor.value)} (primary) + ${colorCount - 1} more`
                 : colorCount > 0
                   ? `${colorCount} colors extracted with hex values`
                   : `<span class="comp-missing">Not yet extracted</span>`
@@ -422,7 +476,7 @@ function buildClarifications(items: ClarificationItem[]): string {
           <div class="clarify-num">${i + 1}</div>
           <div>
             <div class="clarify-q">${escapeHtml(item.question)}</div>
-            <div class="clarify-field">${escapeHtml(item.field)} &bull; ${item.priority} priority</div>
+            <div class="clarify-field">${escapeHtml(item.field)} &bull; ${escapeHtml(item.priority)} priority</div>
           </div>
         </div>`
         )
@@ -452,10 +506,11 @@ export function generateReportHTML(data: ReportData): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- Self-contained by design: block ALL external requests. Inline styles/
-     script and data: URIs are the report's only legitimate resources; a
-     hostile value that survived sanitization still cannot phone home. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:;">
+<!-- Self-contained by design: block ALL external requests. Inline styles,
+     the single hash-pinned script, and data: URIs are the report's only
+     legitimate resources; a hostile value that survived sanitization can
+     neither execute nor phone home. -->
+<meta http-equiv="Content-Security-Policy" content="${REPORT_CSP}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${clientName} — Brand Identity Report</title>
 <style>
@@ -766,7 +821,7 @@ ${buildClarifications(clarifications)}
     </ol>
     <div class="tab-section-label">Paste into Project Instructions</div>
     <div class="copy-wrap" id="copy-claude">
-      <button class="copy-btn" onclick="copyBlock('copy-claude')">Copy</button>
+      <button class="copy-btn" type="button">Copy</button>
       <pre><code>You have access to the ${clientName} brand identity report in this project's knowledge.
 
 For ALL visual output — HTML artifacts, SVG graphics, diagrams, mockups — apply the brand:
@@ -796,7 +851,7 @@ When generating any visual artifact, load the brand report first and follow its 
     </ol>
     <div class="tab-section-label">Paste into GPT Instructions</div>
     <div class="copy-wrap" id="copy-chatgpt">
-      <button class="copy-btn" onclick="copyBlock('copy-chatgpt')">Copy</button>
+      <button class="copy-btn" type="button">Copy</button>
       <pre><code>You are the ${clientName} brand assistant. You have the brand identity report in your knowledge base.
 
 For ALL visual output — HTML, SVG, code, mockups — you MUST:
@@ -826,7 +881,7 @@ Before generating any visual content, reference the brand report and apply its s
     </ol>
     <div class="tab-section-label">Paste into Gem Instructions</div>
     <div class="copy-wrap" id="copy-gemini">
-      <button class="copy-btn" onclick="copyBlock('copy-gemini')">Copy</button>
+      <button class="copy-btn" type="button">Copy</button>
       <pre><code>You are a brand-compliant design assistant for ${clientName}.
 
 Apply these brand specifications to all visual output:
@@ -846,7 +901,7 @@ ${brandInstructions}</code></pre>
 
     <div class="tab-section-label">Step 1 &mdash; Add the MCP server</div>
     <div class="copy-wrap" id="copy-mcp">
-      <button class="copy-btn" onclick="copyBlock('copy-mcp')">Copy</button>
+      <button class="copy-btn" type="button">Copy</button>
       <pre><code>${escapeHtml(mcpConfig)}</code></pre>
     </div>
     <ul style="margin-bottom:18px">
@@ -858,7 +913,7 @@ ${brandInstructions}</code></pre>
     <div class="tab-section-label">Step 2 &mdash; Upload this report + paste the prompt</div>
     <p>Upload this HTML file to your project, restart your editor, then paste:</p>
     <div class="copy-wrap" id="copy-code-prompt">
-      <button class="copy-btn" onclick="copyBlock('copy-code-prompt')">Copy</button>
+      <button class="copy-btn" type="button">Copy</button>
       <pre><code>I've uploaded my brand identity report (brand-report.html) from brandsystem.app. The basic brand extraction (colors, fonts, logo) is already done — this report has everything from the initial web scan.
 
 Before we start, check if the brandsystem MCP server is available by looking for brand_status in your tools. If it's not there, help me install it:
@@ -884,7 +939,7 @@ Once the MCP is available:
       your <code>CLAUDE.md</code>, <code>.cursorrules</code>, or project rules:
     </div>
     <div class="copy-wrap" id="copy-rules-line" style="margin-top:8px">
-      <button class="copy-btn" onclick="copyBlock('copy-rules-line')">Copy</button>
+      <button class="copy-btn" type="button">Copy</button>
       <pre><code>Use the brand identity in brand-report.html for all visual output. Use the inline SVG for the logo — never type the company name in a font. Use exact hex values from the report for all colors.</code></pre>
     </div>
   </div>
@@ -902,7 +957,7 @@ Once the MCP is available:
       <div class="fix-card-title">Connect to Figma</div>
       <div class="fix-card-desc">Extract logo, colors, and typography directly from your design file (highest accuracy)</div>
       <div class="copy-wrap" id="copy-fix-figma">
-        <button class="copy-btn" onclick="copyBlock('copy-fix-figma')">Copy</button>
+        <button class="copy-btn" type="button">Copy</button>
         <pre><code>I have a Figma file with my brand's design system. Can you walk me through connecting to it to extract our exact colors, typography, and logo? The web extraction got close but I need higher accuracy from the source design file.</code></pre>
       </div>
     </div>
@@ -911,7 +966,7 @@ Once the MCP is available:
       <div class="fix-card-title">Upload brand guidelines</div>
       <div class="fix-card-desc">Share your brand guidelines PDF or document for accurate extraction</div>
       <div class="copy-wrap" id="copy-fix-guidelines">
-        <button class="copy-btn" onclick="copyBlock('copy-fix-guidelines')">Copy</button>
+        <button class="copy-btn" type="button">Copy</button>
         <pre><code>I'm uploading our brand guidelines document. Please extract the correct colors (with their roles — primary, secondary, accent, etc.), typography (font families, weights, and usage), and any logo specifications. Compare what you find against the brand report I set up earlier and tell me what needs to be corrected.</code></pre>
       </div>
     </div>
@@ -920,7 +975,7 @@ Once the MCP is available:
       <div class="fix-card-title">Upload an on-brand asset</div>
       <div class="fix-card-desc">Share a file you know is correct and we&rsquo;ll sample from it</div>
       <div class="copy-wrap" id="copy-fix-asset">
-        <button class="copy-btn" onclick="copyBlock('copy-fix-asset')">Copy</button>
+        <button class="copy-btn" type="button">Copy</button>
         <pre><code>I'm uploading a file that I know is on-brand (it was approved by our design team). Please sample the colors, fonts, and any logo usage from it and compare against the brand report I set up. Update the brand identity with any corrections you find.</code></pre>
       </div>
     </div>
@@ -929,7 +984,7 @@ Once the MCP is available:
       <div class="fix-card-title">Send to your design team</div>
       <div class="fix-card-desc">Forward this report for review &mdash; they can send back corrections</div>
       <div class="copy-wrap" id="copy-fix-team">
-        <button class="copy-btn" onclick="copyBlock('copy-fix-team')">Copy</button>
+        <button class="copy-btn" type="button">Copy</button>
         <pre><code>Can you draft a short message I can send to our design team? I need them to review this brand identity report and tell me:
 1. Are the colors correct? What are the actual hex values and roles (primary, secondary, accent)?
 2. Are the fonts correct? What are the exact family names and weights?
@@ -942,7 +997,7 @@ Once the MCP is available:
       <div class="fix-card-title">Scan a different page</div>
       <div class="fix-card-desc">If this wasn&rsquo;t your main brand page, try a different URL</div>
       <div class="copy-wrap" id="copy-fix-rescan">
-        <button class="copy-btn" onclick="copyBlock('copy-fix-rescan')">Copy</button>
+        <button class="copy-btn" type="button">Copy</button>
         <pre><code>The brand extraction didn't get the right results from that URL. Let's try scanning a different page — I think [PASTE YOUR URL HERE] would be a better source for our brand colors and logo. Please re-run the extraction and update the report.</code></pre>
       </div>
     </div>
@@ -961,29 +1016,7 @@ Once the MCP is available:
   <span>Audit: ${overall} (${auditSummary.pass}/${auditSummary.warn}/${auditSummary.fail})</span>
 </footer>
 
-<script>
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
-});
-
-// Click to copy
-function copyBlock(wrapperId) {
-  const wrap = document.getElementById(wrapperId);
-  const code = wrap.querySelector('code');
-  const btn = wrap.querySelector('.copy-btn');
-  navigator.clipboard.writeText(code.textContent).then(() => {
-    btn.textContent = 'Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-  });
-}
-</script>
+<script>${REPORT_SCRIPT}</script>
 </body>
 </html>`;
 }
