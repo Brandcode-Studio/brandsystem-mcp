@@ -22,6 +22,7 @@ async function startOrigin(): Promise<Listener> {
   const server = http.createServer((req, res) => {
     hits.push(`${req.method} ${req.url} host=${req.headers.host ?? ""}`);
     res.setHeader("x-origin", "1");
+    res.setHeader("content-type", "text/plain; charset=utf-8");
     res.end(`origin saw ${req.url}`);
   });
   server.on("upgrade", (req, socket) => {
