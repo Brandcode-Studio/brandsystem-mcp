@@ -9,7 +9,7 @@ export type BrandcodeMcpScope = "read" | "check" | "feedback" | "capture";
 export interface BrandcodeMcpAuthInfo {
   /** Full bearer token (redact in logs). */
   token: string;
-  /** Per-brand API key id — stable prefix, no secret. */
+  /** Per-brand API key id — stable, non-secret identifier. */
   keyId: string;
   /** Scope bundles granted to this key. */
   scopes: BrandcodeMcpScope[];
@@ -52,17 +52,30 @@ export interface HostedRuntimeOptions {
   environment?: "staging" | "production";
   /** Optional token validator override (tests inject a stub). */
   validateToken?: (token: string) => Promise<BrandcodeMcpAuthInfo | null>;
-  /** Explicitly permit env-seeded test keys in production smoke tests. */
-  allowEnvTestKeys?: boolean;
+  /**
+   * In-process key-validation cache for the UCS validator path. Defaults to a
+   * module-level singleton; tests inject a fresh instance.
+   */
+  validationCache?: KeyValidationCacheLike;
   /** Optional hosted rate-limit override (tests inject a deterministic store). */
   rateLimit?: HostedRateLimitOptions | false;
+}
+
+/** Minimal interface of the key-validation cache (see auth.ts). */
+export interface KeyValidationCacheLike {
+  get(token: string): { hit: true; info: BrandcodeMcpAuthInfo | null } | { hit: false };
+  set(token: string, info: BrandcodeMcpAuthInfo | null): void;
 }
 
 export interface HostedRateLimitOptions {
   /** Enable or disable enforcement. Defaults to enabled. */
   enabled?: boolean;
-  /** Maximum authenticated requests in each fixed window. */
+  /** Maximum authenticated requests per key per brand in each fixed window. */
   maxRequests?: number;
+  /** Maximum authenticated requests per key across all brands in each window. */
+  globalMaxRequests?: number;
+  /** Maximum requests per client IP (pre-auth) in each window. */
+  ipMaxRequests?: number;
   /** Fixed-window duration in milliseconds. */
   windowMs?: number;
   /** Deterministic clock for tests. */
@@ -122,4 +135,14 @@ export interface HostedRateLimitSnapshot {
   blocker_owner: string;
   required_before_public_release: string;
   source: string;
+  /** Per-key budget shared across every brand slug the key can reach. */
+  global?: HostedRateLimitWindowSnapshot | null;
+}
+
+export interface HostedRateLimitWindowSnapshot {
+  scope: "per_key_all_brands" | "per_client_ip";
+  limit: number;
+  remaining: number;
+  window_ms: number;
+  reset_at: string;
 }

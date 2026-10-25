@@ -25,6 +25,7 @@ const options = {
           environment: "staging" as const,
         }
       : null,
+  allowedHosts: ["mcp.example"],
   fetchBrandPackage: async () => ({
     runtime: {
       version: "1.0.0",

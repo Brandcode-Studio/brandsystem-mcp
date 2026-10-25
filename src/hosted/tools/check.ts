@@ -11,23 +11,33 @@ import { buildResponse, safeParseParams } from "../../lib/response.js";
 import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
 import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
 import { enforceToolScope } from "../scope.js";
+import { describeUpstreamFailure } from "../upstream-errors.js";
 import type { HostedBrandContext } from "../types.js";
+
+/** Input caps (characters) — bound per-request scan cost. */
+export const CHECK_TEXT_MAX_LENGTH = 20_000;
+export const CHECK_CSS_MAX_LENGTH = 20_000;
+export const CHECK_TOKEN_MAX_LENGTH = 200;
 
 const paramsShape = {
   text: z
     .string()
+    .max(CHECK_TEXT_MAX_LENGTH)
     .optional()
     .describe("Copy to check for voice and claim governance."),
   color: z
     .string()
+    .max(CHECK_TOKEN_MAX_LENGTH)
     .optional()
     .describe("Hex color to check against hosted brand colors."),
   font: z
     .string()
+    .max(CHECK_TOKEN_MAX_LENGTH)
     .optional()
     .describe("Font family to check against hosted typography."),
   css: z
     .string()
+    .max(CHECK_CSS_MAX_LENGTH)
     .optional()
     .describe(
       "CSS snippet to check for color/font usage and governed styling anti-patterns.",
@@ -1186,7 +1196,7 @@ export function registerCheck(server: McpServer, context: HostedBrandContext) {
         pkg = await context.loadBrandPackage();
       } catch (err) {
         return buildResponse({
-          what_happened: `Failed to load hosted brand "${context.slug}": ${(err as Error).message}`,
+          what_happened: `Failed to load hosted brand "${context.slug}": ${describeUpstreamFailure("brand package load", context.slug, err)}`,
           next_steps: [
             "Retry in a moment — the hosted brand service may be temporarily unavailable",
           ],

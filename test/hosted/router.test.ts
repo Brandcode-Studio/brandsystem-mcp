@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   extractSlug,
   handleHostedRequest,
@@ -66,6 +66,7 @@ const baseOptions = {
   ucsServiceToken: TEST_SERVICE_TOKEN,
   validateToken: validator,
   fetchBrandPackage,
+  allowedHosts: ["mcp.example"],
 };
 
 describe("extractSlug", () => {
@@ -296,7 +297,9 @@ describe("handleHostedRequest — MCP protocol dispatch", () => {
     expect(res.headers.get("x-ratelimit-remaining")).toBe("9");
     expect(res.headers.get("x-ratelimit-reset")).toBe("1800000030");
     expect(seenKeys).toEqual([
+      "brandcode:mcp:rate-limit-ip:staging:unknown",
       "brandcode:mcp:rate-limit:staging:acme:bck_test_acme_re",
+      "brandcode:mcp:rate-limit-global:staging:bck_test_acme_re",
     ]);
   });
 
@@ -338,6 +341,40 @@ describe("handleHostedRequest — MCP protocol dispatch", () => {
     expect(body).toMatchObject({
       error: "rate_limit_unavailable",
       slug: "acme",
+    });
+    expect(JSON.stringify(body)).not.toMatch(/@|redis unavailable|UPSTASH|BRANDCODE_MCP_/);
+  });
+
+  it("reports the unavailable snapshot when only the per-key store check fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const flakyStore: HostedRateLimitStore = {
+      mode: "durable_shared",
+      enforcement: "durable_shared_redis_fixed_window",
+      source: "durable shared test store",
+      check: async (input) => {
+        if (input.key.includes("rate-limit-ip")) {
+          return { count: 1, resetAt: input.now + input.windowMs };
+        }
+        throw new Error("redis unavailable");
+      },
+    };
+    const res = await handleHostedRequest(
+      buildRequest("https://mcp.example/acme", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer bck_test_acme_read",
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: initializeBody(),
+      }),
+      { ...baseOptions, rateLimit: { store: flakyStore } },
+    );
+    expect(res.status).toBe(503);
+    const body = await readJson(res);
+    expect(body).toMatchObject({
+      error: "rate_limit_unavailable",
+      slug: "acme",
       rate_limits: {
         status: "unavailable",
         enforced: false,
@@ -345,5 +382,7 @@ describe("handleHostedRequest — MCP protocol dispatch", () => {
         release_gate: "blocked",
       },
     });
+    vi.restoreAllMocks();
   });
 });
+

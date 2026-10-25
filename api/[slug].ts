@@ -5,50 +5,21 @@
  * convention (https://vercel.com/docs/functions/runtimes/node-js).
  *
  * URL shape at the edge: `https://mcp.staging.brandcode.studio/{slug}` and
- * `https://mcp.brandcode.studio/{slug}`. vercel.ts rewrites `/:slug` to
+ * `https://mcp.brandcode.studio/{slug}`. vercel.json rewrites `/:slug` to
  * `/api/:slug` so the filesystem function at this path serves that traffic.
  *
- * The router reconstructs the public URL (strip the `/api` prefix) before
- * dispatching so the MCP transport and downstream tools see the slug-only
- * path the Phase 0 lock specifies.
+ * All logic lives in src/hosted/entry.ts (unit-tested): it fails closed with
+ * a generic 503 unless BRANDCODE_MCP_ENV is explicitly "production" or
+ * "staging" (and "production" on a VERCEL_ENV=production deployment) and the
+ * service token is set, then restores the public `/{slug}` URL and hands the
+ * request to the router.
  */
-import { handleHostedRequest } from "../src/hosted/router.js";
-import {
-  BRANDCODE_MCP_SERVICE_TOKEN_ENV,
-  readBrandcodeMcpServiceToken,
-} from "../src/hosted/env.js";
+import { createHostedFetchHandler } from "../src/hosted/entry.js";
 
-function publicUrl(originalUrl: string): string {
-  const url = new URL(originalUrl);
-  // Vercel rewrite sends us /api/{slug}; strip /api to restore the public shape.
-  if (url.pathname.startsWith("/api/")) {
-    url.pathname = url.pathname.replace(/^\/api/, "") || "/";
-  }
-  return url.toString();
-}
+const fetchHandler = createHostedFetchHandler();
 
 export default {
   async fetch(request: Request): Promise<Response> {
-    const ucsServiceToken = readBrandcodeMcpServiceToken();
-    if (!ucsServiceToken) {
-      return new Response(
-        JSON.stringify({
-          error: "misconfigured",
-          message: `${BRANDCODE_MCP_SERVICE_TOKEN_ENV} is not set on this deployment`,
-        }),
-        { status: 500, headers: { "content-type": "application/json" } },
-      );
-    }
-
-    const environment =
-      process.env.BRANDCODE_MCP_ENV === "production" ? "production" : "staging";
-
-    const rewritten = new Request(publicUrl(request.url), request);
-    return handleHostedRequest(rewritten, {
-      environment,
-      ucsBaseUrl:
-        process.env.UCS_API_BASE_URL ?? "https://www.brandcode.studio",
-      ucsServiceToken,
-    });
+    return fetchHandler(request);
   },
 };

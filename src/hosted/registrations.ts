@@ -5,8 +5,11 @@
  *
  * Any tool whose scope requirement is not granted to the current key is still
  * registered — the handler returns a 403-equivalent response when called.
- * Scope enforcement happens at the auth layer before dispatch; registration
- * reflects the full surface so listTools advertises the complete contract.
+ * Scope is NOT checked at the auth layer before dispatch: the router only
+ * authenticates the key and binds it to the slug. Each tool handler enforces
+ * its own scope as its first step via `enforceToolScope()` (./scope.ts), so
+ * every new tool must call it. Registration reflects the full surface so
+ * listTools advertises the complete contract.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { HostedBrandContext } from "./types.js";

@@ -13,14 +13,24 @@ import http from "node:http";
 import { Readable } from "node:stream";
 import {
   BRANDCODE_MCP_SERVICE_TOKEN_ENV,
+  readAllowedHosts,
   readBrandcodeMcpServiceToken,
+  resolveHostedEnvironment,
 } from "./hosted/env.js";
 import { handleHostedRequest } from "./hosted/router.js";
 import type { RouterOptions } from "./hosted/router.js";
 
 function readEnv(): RouterOptions {
-  const environment =
-    process.env.BRANDCODE_MCP_ENV === "production" ? "production" : "staging";
+  // Local/dev entry: an unset BRANDCODE_MCP_ENV still means staging here
+  // (bin/brandcode-mcp.mjs documents that default), but an invalid value or
+  // a VERCEL_ENV=production mismatch is refused, same as the Vercel entry.
+  const resolved = resolveHostedEnvironment({
+    ...process.env,
+    BRANDCODE_MCP_ENV: process.env.BRANDCODE_MCP_ENV?.trim() || "staging",
+  });
+  if (!resolved.ok) {
+    throw new Error(`Hosted MCP misconfigured: ${resolved.reason}`);
+  }
   const ucsServiceToken = readBrandcodeMcpServiceToken();
   if (!ucsServiceToken) {
     throw new Error(
@@ -28,9 +38,15 @@ function readEnv(): RouterOptions {
     );
   }
   return {
-    environment,
+    environment: resolved.environment,
     ucsBaseUrl: process.env.UCS_API_BASE_URL ?? "https://www.brandcode.studio",
     ucsServiceToken,
+    // Local dev serves on localhost; production hostnames are the default
+    // only when deployed. Override with BRANDCODE_MCP_ALLOWED_HOSTS.
+    allowedHosts: readAllowedHosts() ?? [
+      `localhost:${process.env.PORT ?? 3030}`,
+      `127.0.0.1:${process.env.PORT ?? 3030}`,
+    ],
   };
 }
 
@@ -50,6 +66,11 @@ async function nodeToWebRequest(
       headers.set(key, value);
     }
   }
+  // The router's per-IP limiter trusts x-real-ip (Vercel sets it at the
+  // edge). Here there is no edge, so overwrite any client-supplied value with
+  // the socket peer address and drop x-forwarded-for.
+  headers.delete("x-forwarded-for");
+  headers.set("x-real-ip", req.socket.remoteAddress ?? "unknown");
 
   const method = req.method ?? "GET";
   const hasBody = method !== "GET" && method !== "HEAD";
@@ -96,10 +117,21 @@ export function createHttpServer(options: RouterOptions) {
       const webResponse = await handleHostedRequest(webRequest, options);
       await writeWebResponse(webResponse, res);
     } catch (err) {
+      console.error(
+        `[brandcode-mcp] http adapter error: ${(err as Error)?.message ?? "unknown"}`,
+      );
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
       res.statusCode = 500;
       res.setHeader("content-type", "application/json");
+      res.setHeader("cache-control", "no-store");
       res.end(
-        JSON.stringify({ error: "internal_error", message: (err as Error).message }),
+        JSON.stringify({
+          error: "internal_error",
+          message: "The request could not be completed. Retry later.",
+        }),
       );
     }
   });

@@ -282,8 +282,7 @@ function rateLimitPosture(snapshot?: HostedRateLimitSnapshot) {
     reset_at: null,
     retry_after_seconds: null,
     release_gate: "blocked",
-    blocker_owner:
-      "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
+    blocker_owner: "Brandcode Studio Ops",
     required_before_public_release:
       "Route brand_status through the hosted HTTP boundary and implement durable shared hosted rate-limit enforcement before broad public release",
     source: "not available outside hosted HTTP router",

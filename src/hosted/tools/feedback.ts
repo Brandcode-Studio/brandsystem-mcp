@@ -14,6 +14,10 @@ import {
   FeedbackUpstreamError,
 } from "../feedback-fetcher.js";
 import { enforceToolScope } from "../scope.js";
+import {
+  logUpstreamFailure,
+  publicUpstreamMessage,
+} from "../upstream-errors.js";
 import { HOSTED_AGENT_RUN_TELEMETRY_STATUS } from "../telemetry.js";
 import type { HostedBrandContext } from "../types.js";
 
@@ -50,13 +54,19 @@ function stripUrls(value: string): string {
 
 function cleanString(value: string | undefined | null): string | null {
   if (typeof value !== "string") return null;
-  const trimmed = stripUrls(value).replace(/\s+/g, " ").trim();
+  const trimmed = stripUrls(value)
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return trimmed || null;
 }
 
 function cleanDetail(value: string | undefined): string | null {
   if (typeof value !== "string") return null;
-  const trimmed = stripUrls(value).trim();
+  // Keep newlines/tabs for readable detail; drop every other control char.
+  const trimmed = stripUrls(value)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .trim();
   return trimmed || null;
 }
 
@@ -161,8 +171,9 @@ function buildFeedbackEntry(params: Params, context: HostedBrandContext) {
 }
 
 function errorResponse(err: FeedbackUpstreamError, context: HostedBrandContext) {
+  logUpstreamFailure("feedback append", context.slug, err);
   return buildResponse({
-    what_happened: `Failed to append hosted feedback for "${context.slug}": ${err.message}`,
+    what_happened: `Failed to append hosted feedback for "${context.slug}": ${publicUpstreamMessage(err.code)}`,
     next_steps:
       err.code === "hosted_brand_not_found"
         ? ["Confirm the hosted brand slug before calling brand_feedback again"]

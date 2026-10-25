@@ -57,6 +57,13 @@ const STOP_WORDS = new Set([
   "in", "into", "is", "it", "of", "on", "or", "so", "the", "to", "too", "with",
 ]);
 
+/**
+ * Scoring cost is O(terms × docs); only the first 32 unique query terms are
+ * scored (repeats of those terms are kept so ranking matches UCS for any
+ * ordinary query).
+ */
+export const RETRIEVAL_MAX_QUERY_TERMS = 32;
+
 function tokenize(value: string | null | undefined): string[] {
   return normalizeText(value)
     .toLowerCase()
@@ -64,6 +71,16 @@ function tokenize(value: string | null | undefined): string[] {
     .split(/\s+/)
     .map((token) => token.trim())
     .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+
+function tokenizeQuery(value: string | null | undefined): string[] {
+  const tokens = tokenize(value);
+  const allowed = new Set<string>();
+  for (const token of tokens) {
+    if (allowed.size >= RETRIEVAL_MAX_QUERY_TERMS) break;
+    allowed.add(token);
+  }
+  return tokens.filter((token) => allowed.has(token));
 }
 
 function excerptAround(text: string, queryTokens: string[], radius = 120): string {
@@ -223,7 +240,7 @@ export function queryBrandKnowledgeCorpus(input: {
 }): import("../connectors/brandcode/knowledge-types.js").BrandRetrievalResult {
   const mode = input.query.mode ?? "fact_lookup";
   const topK = Math.max(1, input.query.topK ?? 5);
-  const tokens = tokenize(input.query.text);
+  const tokens = tokenizeQuery(input.query.text);
   const transportProfile = input.query.transportProfile ?? null;
   const requestedKinds =
     input.query.sourceKinds ??

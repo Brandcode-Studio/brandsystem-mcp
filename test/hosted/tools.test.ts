@@ -22,7 +22,7 @@ const TEST_RATE_LIMIT: HostedRateLimitSnapshot = {
   reset_at: "2026-05-11T12:01:00.000Z",
   retry_after_seconds: null,
   release_gate: "blocked",
-  blocker_owner: "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
+  blocker_owner: "Brandcode Studio Ops",
   required_before_public_release:
     "Replace in-process pre-release enforcement with durable shared hosted rate-limit enforcement before broad public release",
   source: "hosted tool test",
@@ -39,9 +39,9 @@ const TEST_DURABLE_RATE_LIMIT: HostedRateLimitSnapshot = {
   reset_at: "2026-05-11T12:01:00.000Z",
   retry_after_seconds: null,
   release_gate: "blocked",
-  blocker_owner: "Jason Lankow / Brandcode Studio Ops <jlankow@columnfive.com>",
+  blocker_owner: "Brandcode Studio Ops",
   required_before_public_release:
-    "Capture command-backed hosted durable/shared rate-limit proof and Jason explicit release approval before broad public release",
+    "Capture command-backed hosted durable/shared rate-limit proof and explicit release approval before broad public release",
   source: "hosted durable tool test",
 };
 
@@ -2215,5 +2215,18 @@ describe("brand_status (hosted)", () => {
     const json = await call(client, "brand_status", {});
     expect(json.rate_limits).toEqual(TEST_DURABLE_RATE_LIMIT);
     expect(json.status).toContain("Rate limits:  active_durable_shared");
+  });
+
+  it("does not expose an ops owner email when no router snapshot is attached", async () => {
+    const { client } = await connectClient(
+      buildContext(
+        { runtime: { version: "1.0.0", client_name: "Acme" } },
+        { rateLimit: undefined },
+      ),
+    );
+    const json = await call(client, "brand_status", {});
+    const rateLimits = json.rate_limits as Record<string, unknown>;
+    expect(rateLimits.status).toBe("disabled");
+    expect(JSON.stringify(rateLimits)).not.toMatch(/@|Jason|Lankow/);
   });
 });

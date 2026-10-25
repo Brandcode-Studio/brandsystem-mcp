@@ -12,11 +12,21 @@ import type { BrandPackagePayload } from "../../connectors/brandcode/types.js";
 import type { TasteGuidanceProjection } from "../../connectors/brandcode/taste-guidance.js";
 import { queryBrandKnowledgeCorpus } from "../brand-retrieval.js";
 import { enforceToolScope } from "../scope.js";
+import { describeUpstreamFailure } from "../upstream-errors.js";
 import type { HostedBrandContext } from "../types.js";
+
+/** Longest accepted search query (characters). */
+export const SEARCH_QUERY_MAX_LENGTH = 500;
+/**
+ * Scoring is O(unique terms × docs), so only the first N unique query terms
+ * are scored. 32 comfortably covers any natural-language query.
+ */
+export const SEARCH_MAX_QUERY_TERMS = 32;
 
 const paramsShape = {
   query: z
     .string()
+    .max(SEARCH_QUERY_MAX_LENGTH)
     .describe("Natural-language query over hosted brand knowledge."),
   mode: z
     .enum([
@@ -333,7 +343,7 @@ function collectDocs(pkg: BrandPackagePayload | null): SearchDoc[] {
   return docs;
 }
 
-function tokenize(query: string): string[] {
+export function tokenize(query: string): string[] {
   return Array.from(
     new Set(
       query
@@ -342,7 +352,7 @@ function tokenize(query: string): string[] {
         .map((token) => token.trim())
         .filter((token) => token.length >= 2),
     ),
-  );
+  ).slice(0, SEARCH_MAX_QUERY_TERMS);
 }
 
 function scoreDoc(doc: SearchDoc, tokens: string[]): number {
@@ -474,7 +484,7 @@ export function registerSearch(server: McpServer, context: HostedBrandContext) {
         pkg = await context.loadBrandPackage();
       } catch (err) {
         return buildResponse({
-          what_happened: `Failed to load hosted brand "${context.slug}": ${(err as Error).message}`,
+          what_happened: `Failed to load hosted brand "${context.slug}": ${describeUpstreamFailure("brand package load", context.slug, err)}`,
           next_steps: [
             "Retry in a moment — the hosted brand service may be temporarily unavailable",
           ],

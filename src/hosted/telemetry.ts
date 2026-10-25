@@ -30,8 +30,33 @@ export interface AgentRunRecordInput {
   outcome: "ok" | "auth_error" | "upstream_error" | "tool_error" | "stub";
   latencyMs: number;
   auth: BrandcodeMcpAuthInfo;
+  /** Server-generated id for this tool call (never client-controlled). */
   requestId: string;
+  /**
+   * The client's JSON-RPC id, kept for correlation only when it is short
+   * (see boundedClientRequestId). Null/undefined = dropped.
+   */
+  clientRequestId?: string | null;
   errorMessage?: string;
+}
+
+/** Longest client JSON-RPC id stored alongside a telemetry record. */
+export const MAX_CLIENT_REQUEST_ID_LENGTH = 64;
+const MAX_ERROR_MESSAGE_LENGTH = 500;
+
+/**
+ * Keep a client-supplied JSON-RPC id only when it is a short string/number.
+ * Anything longer, non-scalar, or containing control characters is dropped —
+ * a client must not be able to write unbounded data into UCS history.
+ */
+export function boundedClientRequestId(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const text = String(value);
+  if (text.length === 0 || text.length > MAX_CLIENT_REQUEST_ID_LENGTH) {
+    return null;
+  }
+  if (/[\u0000-\u001F\u007F]/.test(text)) return null;
+  return text;
 }
 
 /**
@@ -70,12 +95,18 @@ function buildAgentRunEntry(input: AgentRunRecordInput): Record<string, unknown>
         keyId: input.auth.keyId,
         environment: input.auth.environment,
         requestId: input.requestId,
+        ...(input.clientRequestId
+          ? { clientRequestId: input.clientRequestId }
+          : {}),
       },
       telemetry: {
         outcome: input.outcome,
         durationMs: input.latencyMs,
         failureKind: input.outcome === "ok" ? null : input.outcome,
-        errorMessage: input.errorMessage ?? null,
+        errorMessage:
+          typeof input.errorMessage === "string"
+            ? input.errorMessage.slice(0, MAX_ERROR_MESSAGE_LENGTH)
+            : null,
       },
       trustEnvelopeId: null,
       receiptIds: [],
@@ -257,14 +288,15 @@ export function wrapServerWithTelemetry(
     return async (...args: unknown[]) => {
       const startedAt = Date.now();
       // The MCP SDK's RequestHandlerExtra (last callback arg) carries the
-      // JSON-RPC requestId regardless of which tool.tool() overload was used.
+      // client's JSON-RPC id regardless of which tool.tool() overload was
+      // used. It is client-controlled and unbounded, so the record's
+      // requestId is always server-generated; the client id is kept only
+      // when short.
       const extra = args[args.length - 1] as
         | { requestId?: unknown }
         | undefined;
-      const requestId =
-        extra && typeof extra.requestId !== "undefined"
-          ? String(extra.requestId)
-          : randomUUID();
+      const requestId = randomUUID();
+      const clientRequestId = boundedClientRequestId(extra?.requestId);
 
       try {
         const result = await callback(...args);
@@ -278,6 +310,7 @@ export function wrapServerWithTelemetry(
           latencyMs: Date.now() - startedAt,
           auth: context.auth,
           requestId,
+          clientRequestId,
         });
         return result;
       } catch (err) {
@@ -290,6 +323,7 @@ export function wrapServerWithTelemetry(
           latencyMs: Date.now() - startedAt,
           auth: context.auth,
           requestId,
+          clientRequestId,
           errorMessage: (err as Error)?.message ?? "unknown tool error",
         });
         throw err;
