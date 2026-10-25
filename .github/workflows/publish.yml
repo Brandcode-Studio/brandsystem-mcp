@@ -121,6 +121,23 @@ jobs:
           persist-credentials: false
           sparse-checkout: server.json
           sparse-checkout-cone-mode: false
+      - name: Wait for npm to serve the version
+        # The MCP Registry validates the package against npm, which can lag the
+        # publish by a minute or more (v0.17.0's first run failed this way).
+        run: |
+          set -euo pipefail
+          version=$(jq -r '.packages[0].version' server.json)
+          name=$(jq -r '.packages[0].identifier' server.json)
+          url="https://registry.npmjs.org/${name/\//%2f}/${version}"
+          for attempt in $(seq 1 40); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' "$url")" = "200" ]; then
+              echo "npm serves ${name}@${version}"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::npm still does not serve ${name}@${version} after 10 minutes"
+          exit 1
       - name: Install MCP Registry publisher
         env:
           MCP_PUBLISHER_VERSION: v1.8.0
