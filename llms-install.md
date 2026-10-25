@@ -14,7 +14,7 @@ Install the published npm package as a stdio MCP server named `brandsystem`, pre
 
 ## Preferred setup
 
-Use the package's safe installer. It is a dry run unless `--write` is present. Cline and Codex delegate to their official MCP commands; direct JSON targets back up the existing config and only add or replace `mcpServers.brandsystem`.
+Use the package's safe installer. It is a dry run unless `--write` is present. Cline and Codex delegate to their official MCP commands; direct JSON targets back up the existing config and only add or replace `mcpServers.brandsystem`. The installer pins the package to the version that ran it (`@brandsystem/mcp@<version>`); add `--unpinned` only if the user explicitly wants the floating latest release.
 
 ```bash
 # Cline
@@ -43,6 +43,8 @@ If the client is not supported by the installer, merge this entry into its MCP s
   }
 }
 ```
+
+Prefer pinning a version (`"@brandsystem/mcp@<version>"`) in project-level configs that are committed to a repository.
 
 Cline's shared settings file is `~/.cline/data/settings/cline_mcp_settings.json`. Start a new client task after changing MCP settings.
 

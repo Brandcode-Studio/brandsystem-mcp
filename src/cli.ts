@@ -3,7 +3,7 @@
  *
  * Usage:
  *   npx @brandsystem/mcp doctor
- *   npx @brandsystem/mcp install --client <claude-code|cline|codex|cursor|windsurf|claude-desktop> [--write] [--profile core|full]
+ *   npx @brandsystem/mcp install --client <claude-code|cline|codex|cursor|windsurf|claude-desktop> [--write] [--profile core|full] [--unpinned]
  *   npx @brandsystem/mcp inspect
  *   npx @brandsystem/mcp brandcode connect <url> [--share-token=TOKEN]
  *   npx @brandsystem/mcp brandcode sync [--share-token=TOKEN]
@@ -48,6 +48,8 @@ Commands:
                              Clients: claude-code, cline, codex, cursor, windsurf,
                              claude-desktop.
                              Dry-run by default; pass --write to apply.
+                             Pins @brandsystem/mcp@<this version>; pass
+                             --unpinned for the floating latest spec.
   inspect                    Print package version, resolved tool profile,
                              core tool list, and the .brand/ artifact inventory
   brandcode connect <url>    Connect to a hosted Brandcode Studio brand
@@ -57,6 +59,7 @@ Commands:
 Options:
   --client=NAME              Target MCP client for install
   --write                    Apply changes (install is dry-run without it)
+  --unpinned                 install: write @brandsystem/mcp without a version pin
   --profile=core|full        Tool profile (default: core)
   --share-token=TOKEN        Share token for protected brands
   --help                     Show this help message
@@ -373,13 +376,14 @@ export async function runCli(args: string[]): Promise<void> {
     if (!client) {
       console.error("Error: Missing --client.");
       console.error(
-        `Usage: npx @brandsystem/mcp install --client <${INSTALL_CLIENTS.join("|")}> [--write] [--profile core|full]`,
+        `Usage: npx @brandsystem/mcp install --client <${INSTALL_CLIENTS.join("|")}> [--write] [--profile core|full] [--unpinned]`,
       );
       process.exit(1);
     }
     process.exitCode = await runInstall({
       client,
       write: args.includes("--write"),
+      unpinned: args.includes("--unpinned"),
       profile: resolveProfile(parseProfileOption(args)),
       cwd: process.cwd(),
     });
