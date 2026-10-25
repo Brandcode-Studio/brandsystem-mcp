@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 import type { CoreIdentity, BrandConfig, ClarificationItem } from "../types/index.js";
 import { sanitizeSvg } from "./svg-resolver.js";
+import {
+  PROVISIONAL_ARTIFACT_NOTICE,
+  MAX_FONT_NAME_LENGTH,
+  inlineUntrusted,
+  isPlausibleFontName,
+  markdownFenceFor,
+} from "./untrusted-text.js";
 
 export interface ReportData {
   config: BrandConfig;
@@ -10,42 +17,60 @@ export interface ReportData {
   auditSummary: { pass: number; warn: number; fail: number };
 }
 
+/** Cap on the client name wherever it is interpolated into pasteable prompt text. */
+const MAX_PROMPT_NAME_LENGTH = 80;
+
+/** Logo data URIs are base64 image payloads; anything else is not embedded. */
+const SAFE_IMAGE_DATA_URI = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/i;
+
 /**
  * Generate a plain-text brand instruction block that can be pasted
  * into any AI tool's custom instructions / project context / system prompt.
  * Written as a directive to an AI, not a description for a human.
+ *
+ * Every brand value here was machine-extracted from untrusted sources, and
+ * the block is designed to be pasted into an instruction channel. So: it
+ * opens with the data-not-instructions provenance notice; free-text values
+ * (client name, font families) are flattened to one capped line with
+ * backticks neutralized; colors must be hex; raw logo SVG text is never
+ * embedded (the vector lives in brand-report.html and core-identity.yaml) —
+ * only a validated base64 data URI, inside a fence longer than any backtick
+ * run it contains.
  */
 export function generateBrandInstructions(config: BrandConfig, identity: CoreIdentity): string {
   const lines: string[] = [];
+  const name = inlineUntrusted(config.client_name, MAX_PROMPT_NAME_LENGTH) || "this brand";
 
-  lines.push(`# Brand Identity: ${config.client_name}`);
+  lines.push(`# Brand Identity: ${name}`);
   lines.push("");
-  lines.push(`Apply these guidelines to all visual output, code-generated artifacts, and design work for ${config.client_name}.`);
+  lines.push(PROVISIONAL_ARTIFACT_NOTICE);
+  lines.push("");
+  lines.push(`Apply these guidelines to all visual output, code-generated artifacts, and design work for ${name}.`);
 
   // Logo
   const logoVariant = identity.logo[0]?.variants[0];
-  if (logoVariant?.inline_svg) {
+  const hasLogo = Boolean(logoVariant?.inline_svg || logoVariant?.data_uri);
+  if (hasLogo) {
     lines.push("");
     lines.push("## Logo");
     lines.push("");
-    lines.push(`IMPORTANT: Always use the SVG below for the ${config.client_name} logo. Never type the company name in a font — always embed this vector markup. For dark backgrounds, add fill="#ffffff" to override the path fills.`);
-    lines.push("");
-    lines.push("```svg");
-    lines.push(sanitizeSvg(logoVariant.inline_svg).trim());
-    lines.push("```");
-    if (logoVariant.data_uri) {
+    lines.push(`IMPORTANT: Always use the provided ${name} logo artwork. Never type the company name in a font. The vector logo is embedded in brand-report.html and stored in .brand/core-identity.yaml. For dark backgrounds, render it with white (#ffffff) fills.`);
+    const dataUri = logoVariant?.data_uri?.trim();
+    if (dataUri && SAFE_IMAGE_DATA_URI.test(dataUri)) {
+      const fence = markdownFenceFor(dataUri);
       lines.push("");
       lines.push("For `<img>` tags or contexts that don't support inline SVG, use this data URI as the src:");
       lines.push("");
-      lines.push("```");
-      lines.push(logoVariant.data_uri);
-      lines.push("```");
+      lines.push(fence);
+      lines.push(dataUri);
+      lines.push(fence);
     }
   }
 
   // Colors
-  const namedColors = identity.colors.filter((c) => c.role !== "unknown" && c.confidence !== "low");
-  const unknownColors = identity.colors.filter((c) => c.role === "unknown" && c.confidence !== "low");
+  const usable = identity.colors.filter((c) => c.confidence !== "low" && HEX_COLOR.test(c.value));
+  const namedColors = usable.filter((c) => c.role !== "unknown");
+  const unknownColors = usable.filter((c) => c.role === "unknown");
   if (namedColors.length > 0 || unknownColors.length > 0) {
     lines.push("");
     lines.push("## Colors");
@@ -55,7 +80,7 @@ export function generateBrandInstructions(config: BrandConfig, identity: CoreIde
     lines.push("| Role | Hex |");
     lines.push("|------|-----|");
     for (const c of namedColors) {
-      lines.push(`| ${c.role} | ${c.value} |`);
+      lines.push(`| ${inlineUntrusted(c.role, 24)} | ${c.value} |`);
     }
     for (const c of unknownColors) {
       lines.push(`| (unassigned) | ${c.value} |`);
@@ -63,13 +88,13 @@ export function generateBrandInstructions(config: BrandConfig, identity: CoreIde
   }
 
   // Typography
-  const fonts = identity.typography.filter((t) => t.confidence !== "low");
+  const fonts = identity.typography.filter((t) => t.confidence !== "low" && isPlausibleFontName(t.family));
   if (fonts.length > 0) {
     lines.push("");
     lines.push("## Typography");
     lines.push("");
     for (const f of fonts) {
-      lines.push(`- ${f.family}`);
+      lines.push(`- ${inlineUntrusted(f.family, MAX_FONT_NAME_LENGTH)}`);
     }
   }
 
@@ -77,8 +102,8 @@ export function generateBrandInstructions(config: BrandConfig, identity: CoreIde
   lines.push("");
   lines.push("## Rules");
   lines.push("");
-  if (logoVariant?.inline_svg) {
-    lines.push("- Never approximate the logo with text in a similar font — always use the SVG above");
+  if (hasLogo) {
+    lines.push("- Never approximate the logo with text in a similar font — always use the provided logo artwork");
   }
   lines.push("- Use exact hex values from the color table — no \"close enough\" substitutions");
   lines.push("- When generating HTML, CSS, or any visual code, reference these brand values directly");
@@ -314,7 +339,7 @@ function buildComparisonSection(config: BrandConfig, identity: CoreIdentity): st
   const primaryColor = identity.colors.find((c) => c.role === "primary");
   const colorCount = identity.colors.filter((c) => c.confidence !== "low").length;
   const brandFonts = identity.typography.filter((t) => t.confidence !== "low");
-  const clientName = escapeHtml(config.client_name);
+  const clientName = escapeHtml(inlineUntrusted(config.client_name, MAX_PROMPT_NAME_LENGTH));
 
   return `
   <section>
@@ -491,7 +516,7 @@ export function generateReportHTML(data: ReportData): string {
   const overall = auditSummary.fail > 0 ? "FAIL" : auditSummary.warn > 0 ? "WARN" : "PASS";
 
   const brandInstructions = escapeHtml(generateBrandInstructions(config, identity));
-  const clientName = escapeHtml(config.client_name);
+  const clientName = escapeHtml(inlineUntrusted(config.client_name, MAX_PROMPT_NAME_LENGTH));
 
   const mcpConfig = `{
   "mcpServers": {
@@ -922,7 +947,7 @@ Before we start, check if the brandsystem MCP server is available by looking for
 - Then restart so the MCP loads
 
 Once the MCP is available:
-1. Run brand_init with client name "${clientName}"${config.website_url ? ` and website "${escapeHtml(config.website_url)}"` : ""}
+1. Run brand_init with client name "${clientName}"${config.website_url ? ` and website "${escapeHtml(inlineUntrusted(config.website_url, 200))}"` : ""}
 2. Import the existing identity from the uploaded brand report — don't re-scan the website, the basics are already captured
 3. Then let's go deeper — Figma extraction for higher-accuracy colors, the full logo set, and typography weights</code></pre>
     </div>

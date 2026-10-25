@@ -23,6 +23,8 @@ import {
   type VisualColorCandidate,
 } from "../lib/visual-extractor.js";
 import { mergeColorWithPriority, mergeTypographyWithPriority } from "../lib/confidence.js";
+import { recordRejectedFonts } from "../lib/font-guard.js";
+import { isPlausibleFontName } from "../lib/untrusted-text.js";
 import { generateColorName } from "../lib/color-namer.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
 import { buildSourceCatalogRecords, getConfiguredSourcePriority, upsertSourceCatalog } from "../lib/source-catalog.js";
@@ -108,7 +110,10 @@ async function handler(input: Params) {
         if (colors.length > before) mergedCount++;
       }
 
-      // Merge visual fonts
+      // Merge visual fonts. Computed font names are page-controlled text;
+      // the merge gate rejects implausible ones, which are routed to
+      // needs-clarification and kept out of the catalog/response too.
+      const rejectedFonts: TypographyEntry[] = [];
       for (const font of result.uniqueFonts) {
         const entry: TypographyEntry = {
           name: font,
@@ -116,9 +121,11 @@ async function handler(input: Params) {
           source: "visual",
           confidence: "medium",
         };
-        visualTypography.push(entry);
-        typography = mergeTypographyWithPriority(typography, entry, sourcePriority);
+        const rejectedBefore = rejectedFonts.length;
+        typography = mergeTypographyWithPriority(typography, entry, sourcePriority, rejectedFonts);
+        if (rejectedFonts.length === rejectedBefore) visualTypography.push(entry);
       }
+      await recordRejectedFonts(brandDir, rejectedFonts);
 
       if (result.visualTokens.spacing.scale.length > 0 || result.visualTokens.spacing.baseUnit) {
         spacing = {
@@ -168,7 +175,10 @@ async function handler(input: Params) {
         all_with_roles: roleCandidates,
       },
 
-      computed_fonts: result.uniqueFonts,
+      computed_fonts: result.uniqueFonts.filter((font) => isPlausibleFontName(font)),
+      ...(result.uniqueFonts.some((font) => !isPlausibleFontName(font))
+        ? { rejected_font_names: result.uniqueFonts.filter((font) => !isPlausibleFontName(font)).length }
+        : {}),
 
       spacing: result.visualTokens.spacing,
 

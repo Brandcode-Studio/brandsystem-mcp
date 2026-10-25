@@ -29,7 +29,11 @@ describe('generateBrandInstructions', () => {
     expect(result).toContain('Acme Corp');
   });
 
-  it('includes logo SVG when available', () => {
+  // Flipped deliberately (output-safety hardening): the pasteable block used
+  // to embed the raw logo SVG inside a ```svg fence, so hostile SVG text (or a
+  // literal ``` in it) landed in users' custom instructions. It now points to
+  // the vector in brand-report.html / core-identity.yaml instead.
+  it('references the logo when available without embedding raw SVG text', () => {
     const identity = makeIdentity({
       logo: [
         {
@@ -46,8 +50,9 @@ describe('generateBrandInstructions', () => {
       ],
     });
     const result = generateBrandInstructions(makeConfig(), identity);
-    expect(result).toContain('<svg>');
     expect(result).toContain('## Logo');
+    expect(result).toContain('brand-report.html');
+    expect(result).not.toContain('<svg');
   });
 
   it('includes color table when colors are present', () => {

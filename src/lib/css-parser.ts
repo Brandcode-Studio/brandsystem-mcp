@@ -1,5 +1,6 @@
 import * as csstree from "css-tree";
 import type { Confidence } from "../types/index.js";
+import { isPlausibleFontName } from "./untrusted-text.js";
 
 export interface ExtractedColor {
   value: string; // hex
@@ -319,10 +320,13 @@ export function extractFromCSS(cssText: string): {
       // Font families
       if (property === "font-family") {
         const raw = csstree.generate(node.value);
+        // Implausible names (sentences, paths, markup, var() references) are
+        // dropped here so they never reach extraction evidence; the identity
+        // merge applies the same check to fonts from every other source.
         const families = raw
           .split(",")
           .map((f) => f.trim().replace(/^["']|["']$/g, ""))
-          .filter((f) => f.length > 0 && !isSystemFont(f));
+          .filter((f) => f.length > 0 && !isSystemFont(f) && isPlausibleFontName(f));
 
         // Generic web-safe fonts (Arial, Helvetica, Georgia, …) only count as
         // brand signal when they lead the stack. Behind a distinctive first

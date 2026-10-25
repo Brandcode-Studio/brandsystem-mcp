@@ -12,6 +12,7 @@ import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryCol
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";
 import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography, needsClarification } from "../lib/confidence.js";
+import { enforceFontPlausibility, pendingRejectedFontItem, recordRejectedFonts } from "../lib/font-guard.js";
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
@@ -355,6 +356,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
 
   const cleanedFonts = extractedFonts.filter(f => !f.family.startsWith("var("));
   let typography = [...identity.typography];
+  const rejectedFonts: TypographyEntry[] = [];
   for (const ef of cleanedFonts.slice(0, 8)) {
     const entry: TypographyEntry = {
       name: ef.family,
@@ -362,7 +364,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
       source: "web",
       confidence: ef.frequency >= 5 ? "high" : ef.frequency >= 2 ? "medium" : "low",
     };
-    typography = mergeTypography(typography, entry);
+    typography = mergeTypography(typography, entry, rejectedFonts);
   }
 
   // --- Logo extraction ---
@@ -665,7 +667,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
             source: "web",
             confidence: "medium",
           };
-          typography = mergeTypography(typography, entry);
+          typography = mergeTypography(typography, entry, rejectedFonts);
         }
 
         // Rewrite identity with merged data
@@ -716,7 +718,11 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
 
   // --- Step 2: Compile (same logic as brand_compile) ---
   const config = await brandDir.readConfig();
-  const freshIdentity = await brandDir.readCoreIdentity();
+  // Font names rejected by the merge gate go to needs-clarification; the
+  // compile-time pass also scrubs any implausible name already stored.
+  await recordRejectedFonts(brandDir, rejectedFonts);
+  const freshIdentity = await enforceFontPlausibility(brandDir);
+  const rejectedFontItem = await pendingRejectedFontItem(brandDir);
   const designArtifacts = await generateAndPersistDesignArtifacts(brandDir, { overwrite: true });
 
   const tokens = compileDTCG(freshIdentity, config.client_name, designArtifacts.synthesis);
@@ -759,12 +765,13 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
       clarifications.push({
         id: `clarify-${++itemId}`,
         field: `typography.${typo.family}`,
-        question: `Font "${typo.family}" has low confidence. Is this your brand font?`,
+        question: `Font ${fenceUntrusted(typo.family, 60)} has low confidence. Is this your brand font?`,
         source: typo.source,
         priority: "medium",
       });
     }
   }
+  if (rejectedFontItem) clarifications.push(rejectedFontItem);
 
   if (freshIdentity.logo.length === 0) {
     clarifications.push({

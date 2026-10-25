@@ -46,11 +46,72 @@ export function artifactNotice(
 }
 
 export function fenceUntrusted(value: string, maxLen = 160): string {
-  const flattened = value
+  return `"${flattenUntrusted(value, maxLen).replace(/"/g, "'")}"`;
+}
+
+/**
+ * Flatten untrusted text to a single, length-capped line: control characters
+ * and newlines become spaces, whitespace runs collapse. Shared by every
+ * helper that interpolates extracted strings into generated artifacts.
+ */
+export function flattenUntrusted(value: string, maxLen = 160): string {
+  const flattened = String(value ?? "")
     .replace(/[\u0000-\u001F\u007F]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const capped =
-    flattened.length > maxLen ? `${flattened.slice(0, maxLen - 1)}…` : flattened;
-  return `"${capped.replace(/"/g, "'")}"`;
+  return flattened.length > maxLen ? `${flattened.slice(0, maxLen - 1)}…` : flattened;
+}
+
+/**
+ * Prepare an untrusted value for inline use inside a markdown artifact that
+ * an agent may read as instructions (brand-instructions block, DESIGN.md).
+ * Flattens to one capped line and replaces backticks so the value can never
+ * open or close a code span / fence around it.
+ */
+export function inlineUntrusted(value: string, maxLen = 80): string {
+  return flattenUntrusted(value, maxLen).replace(/`+/g, "'");
+}
+
+/**
+ * Return a CommonMark backtick fence strictly longer than any backtick run
+ * inside `content` (minimum three). Content embedded between two such fences
+ * cannot terminate the block early, whatever it contains.
+ */
+export function markdownFenceFor(content: string): string {
+  let longest = 0;
+  for (const run of content.match(/`+/g) ?? []) {
+    if (run.length > longest) longest = run.length;
+  }
+  return "`".repeat(Math.max(3, longest + 1));
+}
+
+/**
+ * Upper bound on a plausible font family name. Real family names are short
+ * labels ("Inter", "IBM Plex Sans Condensed", "Noto Sans Old North Arabian").
+ */
+export const MAX_FONT_NAME_LENGTH = 64;
+export const MAX_FONT_NAME_WORDS = 5;
+
+const FONT_NAME_PATTERN = /^[\p{L}\p{N}\p{M} .'&+_\-]+$/u;
+
+/**
+ * Decide whether an extracted string is shaped like a font family name.
+ *
+ * Font names arrive from untrusted sources (site CSS, computed styles, Figma
+ * files, PDFs) and flow into DESIGN.md, brand-runtime.json, and pasteable
+ * instruction blocks. This is a structural check, not a keyword blocklist:
+ * letters, digits, spaces and the punctuation real family names use
+ * (`. ' & + _ -`), at most MAX_FONT_NAME_LENGTH characters and
+ * MAX_FONT_NAME_WORDS words. Sentences, paths, URLs, markup and shell text
+ * fail on shape alone.
+ */
+export function isPlausibleFontName(name: unknown): boolean {
+  if (typeof name !== "string") return false;
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > MAX_FONT_NAME_LENGTH) return false;
+  if (!FONT_NAME_PATTERN.test(trimmed)) return false;
+  // Must contain at least one letter or digit (rejects "...", "--", "&&")
+  if (!/[\p{L}\p{N}]/u.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  return words.length <= MAX_FONT_NAME_WORDS;
 }

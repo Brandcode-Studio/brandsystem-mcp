@@ -1,5 +1,6 @@
 import { BrandDir } from "./brand-dir.js";
 import { mergeColorWithPriority, mergeTypographyWithPriority } from "./confidence.js";
+import { recordRejectedFonts } from "./font-guard.js";
 import { generateColorName } from "./color-namer.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
 import type { ComputedElement, SiteExtractionResultSuccess, VisualColorCandidate } from "./visual-extractor.js";
@@ -109,6 +110,7 @@ export async function persistSiteExtraction(
       }
     }
 
+    const rejectedFonts: TypographyEntry[] = [];
     for (const [family, count] of [...fontCounts.entries()].sort((a, b) => b[1] - a[1])) {
       const entry: TypographyEntry = {
         name: family,
@@ -117,9 +119,10 @@ export async function persistSiteExtraction(
         confidence: count >= 6 ? "high" : count >= 2 ? "medium" : "low",
       };
       const before = typography.length;
-      typography = mergeTypographyWithPriority(typography, entry, sourcePriority);
+      typography = mergeTypographyWithPriority(typography, entry, sourcePriority, rejectedFonts);
       if (typography.length > before) fontsAdded++;
     }
+    await recordRejectedFonts(brandDir, rejectedFonts);
 
     const spacingScale = [...spacingCandidates.keys()].sort((a, b) => a - b);
     const baseUnit = extraction.selectedPages

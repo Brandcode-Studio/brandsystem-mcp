@@ -7,6 +7,7 @@ import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryCol
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";
 import { resolveSvg, resolveImage, hasEmptyGradientStops } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
+import { recordRejectedFonts } from "../lib/font-guard.js";
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
@@ -190,6 +191,7 @@ async function handler(input: Params) {
   // Filter out CSS variable references (e.g., "var(--font-family-graphik)")
   const cleanedFonts = extractedFonts.filter(f => !f.family.startsWith("var("));
   let typography = [...identity.typography];
+  const rejectedFonts: TypographyEntry[] = [];
   for (const ef of cleanedFonts.slice(0, 8)) {
     const entry: TypographyEntry = {
       name: ef.family,
@@ -197,7 +199,7 @@ async function handler(input: Params) {
       source: "web",
       confidence: ef.frequency >= 5 ? "high" : ef.frequency >= 2 ? "medium" : "low",
     };
-    typography = mergeTypography(typography, entry);
+    typography = mergeTypography(typography, entry, rejectedFonts);
   }
 
   // --- Logo extraction ---
@@ -401,6 +403,7 @@ async function handler(input: Params) {
     spacing: identity.spacing,
   };
   await brandDir.writeCoreIdentity(updated);
+  await recordRejectedFonts(brandDir, rejectedFonts);
   await upsertSourceCatalog(
     brandDir,
     buildSourceCatalogRecords({
