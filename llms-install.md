@@ -8,7 +8,7 @@ Install the published npm package as a stdio MCP server named `brandsystem`, pre
 
 ## Requirements
 
-- Node.js 20.18.1 or newer
+- Node.js 22.13.0 or newer
 - `npx` available on `PATH`
 - Run setup from the project where the user wants the generated `.brand/` directory
 

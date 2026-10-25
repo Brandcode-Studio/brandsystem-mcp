@@ -1,0 +1,4 @@
+{
+  "$comment": "Temporarily accepted advisories for scripts/audit-gate.mjs. Each entry needs ghsa, reason, and expires (YYYY-MM-DD). Expired entries and entries that no longer match an advisory fail the gate, so this list cannot rot.",
+  "entries": []
+}

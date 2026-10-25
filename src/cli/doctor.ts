@@ -20,7 +20,7 @@ export interface DoctorCheck {
   message: string;
 }
 
-const MIN_NODE_VERSION = "20.18.1";
+const MIN_NODE_VERSION = "22.13.0";
 
 function compareVersions(a: string, b: string): number {
   const pa = a.split(".").map((n) => parseInt(n, 10) || 0);

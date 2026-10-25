@@ -24,15 +24,15 @@ afterEach(async () => {
 
 describe("checkNodeVersion", () => {
   it("passes for versions at or above the minimum", () => {
-    expect(checkNodeVersion("20.18.1").status).toBe("ok");
-    expect(checkNodeVersion("20.19.0").status).toBe("ok");
-    expect(checkNodeVersion("22.1.0").status).toBe("ok");
+    expect(checkNodeVersion("22.13.0").status).toBe("ok");
+    expect(checkNodeVersion("22.20.1").status).toBe("ok");
+    expect(checkNodeVersion("24.1.0").status).toBe("ok");
   });
 
   it("fails for versions below the minimum", () => {
     expect(checkNodeVersion("18.20.0").status).toBe("fail");
-    expect(checkNodeVersion("20.18.0").status).toBe("fail");
-    expect(checkNodeVersion("20.17.9").status).toBe("fail");
+    expect(checkNodeVersion("20.18.1").status).toBe("fail");
+    expect(checkNodeVersion("22.12.9").status).toBe("fail");
   });
 
   it("passes for the running Node.js by default", () => {
