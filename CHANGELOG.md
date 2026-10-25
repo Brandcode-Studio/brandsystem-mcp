@@ -4,6 +4,10 @@
 
 ### Security
 
+- **Dependency sweep, Oct 2026 (CI audit gate green again)**: MCP SDK 1.32.2, puppeteer-core 25.16 (chromium-bidi on zod 4), @vercel/functions 3.10, and **zod 4.6.7**. zod 3 has no fix for GHSA-mrhx-c7xc-m3w5 (memory exhaustion validating oversized collections), so the migration was the only path to zero high advisories; a scoped override moves @vercel/cli-config's exact zod 4.1.11 pin to the root zod. `npm audit` reports 0 vulnerabilities. Migration was 10 single-argument `z.record()` calls; all 1010 tests and the deterministic eval tier pass unchanged.
+- **Request-size caps for GHSA-46jr-4wx8-v453** (SDK 1.32 ships them off by default): hosted `maxToolInputElements` 5,000 and transport `maxRequestBodySize` 1 MiB (was the 4 MiB default); local server `maxToolInputElements` 50,000 since `src/index-http.ts` can serve it over HTTP. Tests prove the element cap and the 413 body cap reject.
+- **Agent-facing schemas unchanged by zod 4**: zod 4's JSON Schema converter drops `additionalProperties: false` from default objects. A shared `strictInputSchema()` helper restores it at both registration choke points (local and hosted) without switching parsing to strict, so unknown-argument did-you-mean guidance still works. A tools/list diff against main shows only an added email `pattern` and equivalent `propertyNames`.
+
 - Resolve all 18 open Dependabot alerts with in-range lockfile bumps: pdfjs-dist 6.2.108 (arbitrary JS execution on malicious PDF), undici 7.29.0, fast-uri 3.1.5, ip-address 10.5.0 (SSRF/trust-boundary bypasses), hono 4.13.1, @hono/node-server 2.1.0, body-parser 2.3.0, nanoid, postcss. `npm audit` is clean; zod 4 and @types/node 26 majors deliberately deferred as migrations, not security fixes.
 
 ### Changed

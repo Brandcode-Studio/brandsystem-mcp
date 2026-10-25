@@ -14,6 +14,9 @@
  * is enforced by sessionIdGenerator: undefined.
  */
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+
+/** Max JSON-RPC request body accepted by the hosted transport. */
+export const HOSTED_MAX_REQUEST_BODY_BYTES = 1024 * 1024; // 1 MiB
 import { authorizeRequest, AuthError } from "./auth.js";
 import { fetchHostedBrandPackage, UpstreamError } from "./brand-fetcher.js";
 import { checkHostedRateLimit, hostedRateLimitHeaders } from "./rate-limit.js";
@@ -207,6 +210,9 @@ export async function handleHostedRequest(
     transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
+      // SDK default is 4 MiB; hosted tool inputs are bounded strings and small
+      // arrays, so cap the body well below that (GHSA-46jr-4wx8-v453).
+      maxRequestBodySize: HOSTED_MAX_REQUEST_BODY_BYTES,
     });
     await server.connect(transport);
     const response = await transport.handleRequest(request);
