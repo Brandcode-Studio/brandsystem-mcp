@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { getVersion } from "./version.js";
 import { safeFetch } from "./url-validator.js";
+import { loadHtmlBounded } from "./markup-guard.js";
 
 const MAX_LOGO_BYTES = 500_000;
 
@@ -150,14 +151,209 @@ function getSvgWidthScore(el: any, $: cheerio.CheerioAPI): number {
   return -1; // Too small, probably an icon
 }
 
+// ── Linear descendant collection ────────────────────────────────
+// Descendant selectors like `header svg` make css-select walk every
+// candidate's ancestor chain (O(candidates × depth)), which went quadratic
+// on deeply nested hostile pages, and each selector rescanned the whole
+// document. Instead, ONE iterative document walk indexes the few container
+// kinds we care about (header, nav, .logo, ...) plus <meta>/<link>; each rule
+// then walks its containers' subtrees once, in document order. A container
+// nested inside an already-walked one is skipped, so every element is
+// visited at most once per rule.
+
+type DomEl = {
+  type: string;
+  name?: string;
+  attribs?: Record<string, string>;
+  children?: DomEl[];
+};
+
+function isTagNode(node: DomEl): boolean {
+  return node.type === "tag" || node.type === "script" || node.type === "style";
+}
+
+type ContainerKind =
+  | "header" | "nav" | ".header" | ".navbar" | ".site-header"
+  | 'a[href="/"]' | ".logo" | "#logo" | '[class*="site-logo"]';
+
+const HEADER_NAV_KINDS: ContainerKind[] = ["header", "nav", ".header", ".navbar", ".site-header"];
+
+function hasClassToken(el: DomEl, token: string): boolean {
+  const cls = el.attribs?.class;
+  if (!cls) return false;
+  return cls.split(/\s+/).includes(token);
+}
+
+/** Every container kind this element matches (same semantics as the CSS selectors). */
+function containerKinds(el: DomEl): ContainerKind[] {
+  const kinds: ContainerKind[] = [];
+  if (el.name === "header") kinds.push("header");
+  if (el.name === "nav") kinds.push("nav");
+  if (el.attribs?.class) {
+    if (hasClassToken(el, "header")) kinds.push(".header");
+    if (hasClassToken(el, "navbar")) kinds.push(".navbar");
+    if (hasClassToken(el, "site-header")) kinds.push(".site-header");
+    if (hasClassToken(el, "logo")) kinds.push(".logo");
+    if (el.attribs.class.includes("site-logo")) kinds.push('[class*="site-logo"]');
+  }
+  if (el.name === "a" && el.attribs?.href === "/") kinds.push('a[href="/"]');
+  if (el.attribs?.id === "logo") kinds.push("#logo");
+  return kinds;
+}
+
+interface PageIndex {
+  containers: Map<ContainerKind, DomEl[]>;
+  /** Pre-order position of each indexed container. */
+  order: Map<DomEl, number>;
+  /** <meta> and <link> elements in document order. */
+  metaLinks: DomEl[];
+}
+
+function indexPage(root: DomEl): PageIndex {
+  const containers = new Map<ContainerKind, DomEl[]>();
+  const order = new Map<DomEl, number>();
+  const metaLinks: DomEl[] = [];
+  const stack: DomEl[] = [root];
+  let position = 0;
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (isTagNode(node)) {
+      position++;
+      if (node.name === "meta" || node.name === "link") metaLinks.push(node);
+      const kinds = containerKinds(node);
+      if (kinds.length > 0) order.set(node, position);
+      for (const kind of kinds) {
+        let list = containers.get(kind);
+        if (!list) containers.set(kind, (list = []));
+        list.push(node);
+      }
+    }
+    const children = node.children ?? [];
+    for (let k = children.length - 1; k >= 0; k--) stack.push(children[k]);
+  }
+  return { containers, order, metaLinks };
+}
+
+/** Union of several container kinds, deduplicated, in document order. */
+function containersOf(index: PageIndex, kinds: ContainerKind[]): DomEl[] {
+  if (kinds.length === 1) return index.containers.get(kinds[0]) ?? [];
+  const unique = new Set<DomEl>();
+  for (const kind of kinds) {
+    for (const el of index.containers.get(kind) ?? []) unique.add(el);
+  }
+  return [...unique].sort((a, b) => index.order.get(a)! - index.order.get(b)!);
+}
+
+function collectDescendants(
+  containers: DomEl[],
+  predicate: (el: DomEl) => boolean,
+  limit: number,
+): DomEl[] {
+  const results: DomEl[] = [];
+  const visited = new Set<DomEl>();
+  for (const container of containers) {
+    if (visited.has(container)) continue;
+    const stack: DomEl[] = [];
+    const kids = container.children ?? [];
+    for (let k = kids.length - 1; k >= 0; k--) stack.push(kids[k]);
+    while (stack.length > 0) {
+      const node = stack.pop()!;
+      if (!isTagNode(node)) continue;
+      visited.add(node);
+      if (predicate(node)) {
+        results.push(node);
+        if (results.length >= limit) return results;
+      }
+      const children = node.children ?? [];
+      for (let k = children.length - 1; k >= 0; k--) stack.push(children[k]);
+    }
+  }
+  return results;
+}
+
+const attrIncludes = (el: DomEl, attr: string, needle: string, caseInsensitive = false): boolean => {
+  const value = el.attribs?.[attr];
+  if (value === undefined) return false;
+  return caseInsensitive ? value.toLowerCase().includes(needle) : value.includes(needle);
+};
+const isImg = (el: DomEl) => el.name === "img";
+const isSvg = (el: DomEl) => el.name === "svg";
+
+/** Header/nav image candidates, in priority order (was a list of descendant selectors). */
+const HEADER_IMG_RULES: Array<[ContainerKind, (el: DomEl) => boolean]> = [
+  ["header", (el) => isImg(el) && attrIncludes(el, "src", "logo")],
+  ["header", (el) => isImg(el) && attrIncludes(el, "data-src", "logo")],
+  ["header", (el) => isImg(el) && attrIncludes(el, "alt", "logo", true)],
+  ["nav", (el) => isImg(el) && attrIncludes(el, "src", "logo")],
+  ["nav", (el) => isImg(el) && attrIncludes(el, "data-src", "logo")],
+  [".header", (el) => isImg(el) && attrIncludes(el, "src", "logo")],
+  [".header", (el) => isImg(el) && attrIncludes(el, "data-src", "logo")],
+  ['a[href="/"]', isImg],
+];
+
+/** Logo-classed containers outside the header, in priority order. */
+const LOGO_CLASS_RULES: Array<[ContainerKind, (el: DomEl) => boolean]> = [
+  [".logo", isImg],
+  ["#logo", isImg],
+  ['[class*="site-logo"]', isImg],
+  [".logo", isSvg],
+  ["#logo", isSvg],
+];
+
+/** SVGs with more nodes than this are not plausible logos; skip before serializing. */
+const MAX_LOGO_SVG_NODES = 10_000;
+
+function subtreeExceeds(el: DomEl, maxNodes: number): boolean {
+  let count = 0;
+  const stack: DomEl[] = [el];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (++count > maxNodes) return true;
+    const children = node.children ?? [];
+    for (let k = 0; k < children.length; k++) stack.push(children[k]);
+  }
+  return false;
+}
+
+export interface LogoExtractionResult {
+  logos: ExtractedLogo[];
+  /** True when the page exceeded the nesting/element caps and only its prefix was scanned. */
+  truncated: boolean;
+  truncation_reason?: "depth" | "elements";
+}
+
 /**
  * Extract logo candidates from HTML.
  * Returns candidates sorted by confidence (best first).
  * Filters out icons, social media SVGs, and client logo clouds.
  */
 export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
-  const $ = cheerio.load(html);
+  return extractLogosWithDiagnostics(html, baseUrl).logos;
+}
+
+/**
+ * extractLogos plus a truncation report. Untrusted HTML is parsed under
+ * nesting-depth and element-count caps (see markup-guard.ts); an over-cap
+ * page is cut at the offending tag and its prefix is still scanned, so a
+ * hostile page degrades to "fewer candidates" instead of blocking the event
+ * loop or overflowing the stack.
+ */
+export function extractLogosWithDiagnostics(html: string, baseUrl: string): LogoExtractionResult {
+  const bounded = loadHtmlBounded(html);
+  const $ = bounded.$;
   const logos: ExtractedLogo[] = [];
+  const finish = (): LogoExtractionResult => {
+    // Deduplicate by URL
+    const seen = new Set<string>();
+    const unique = logos.filter((l) => {
+      if (seen.has(l.url)) return false;
+      seen.add(l.url);
+      return true;
+    });
+    return bounded.truncated
+      ? { logos: unique, truncated: true, truncation_reason: bounded.reason }
+      : { logos: unique, truncated: false };
+  };
   const base = baseUrl.replace(/\/$/, "");
 
   function resolveUrl(href: string | undefined): string | null {
@@ -172,9 +368,16 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
   // ── 1. Inline SVGs in header/nav (HIGHEST priority) ──────────
   // The first meaningful SVG in header or nav is almost always the company logo
   const cloudCache = new Map<unknown, boolean>();
-  const headerNavSvgs = $("header svg, nav svg, .header svg, .navbar svg, .site-header svg");
-  for (let i = 0; i < Math.min(headerNavSvgs.length, MAX_HEADER_SVGS_SCANNED); i++) {
-    const el = headerNavSvgs[i];
+  const index = indexPage($.root()[0] as unknown as DomEl);
+  const metaLinks = $(index.metaLinks as never[]);
+  const headerNavSvgs = collectDescendants(
+    containersOf(index, HEADER_NAV_KINDS),
+    isSvg,
+    MAX_HEADER_SVGS_SCANNED,
+  );
+  for (const node of headerNavSvgs) {
+    if (subtreeExceeds(node, MAX_LOGO_SVG_NODES)) continue;
+    const el = node as any;
     if (isIconSvg($, el)) continue;
 
     const sizeScore = getSvgWidthScore(el, $);
@@ -201,26 +404,17 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
   }
 
   // ── 2. SVG favicon (clean logomark) ───────────────────────────
-  $('link[rel="icon"][type="image/svg+xml"]').each((_, el) => {
+  metaLinks.filter('link[rel="icon"][type="image/svg+xml"]').each((_, el) => {
     const url = resolveUrl($(el).attr("href"));
     if (url) logos.push({ url, type: "svg-favicon", confidence: "high" });
   });
 
   // ── 3. IMG tags in header/nav with logo indicators ────────────
-  const headerImgSelectors = [
-    'header img[src*="logo"]',
-    'header img[data-src*="logo"]',
-    'header img[alt*="logo" i]',
-    'nav img[src*="logo"]',
-    'nav img[data-src*="logo"]',
-    '.header img[src*="logo"]',
-    '.header img[data-src*="logo"]',
-    'a[href="/"] img',
-  ];
-  for (const sel of headerImgSelectors) {
+  for (const [container, predicate] of HEADER_IMG_RULES) {
     if (logos.length >= MAX_TOTAL_CANDIDATES) break;
-    for (const el of $(sel).toArray().slice(0, MAX_CANDIDATES_PER_SELECTOR)) {
+    for (const node of collectDescendants(containersOf(index, [container]), predicate, MAX_CANDIDATES_PER_SELECTOR)) {
       if (logos.length >= MAX_TOTAL_CANDIDATES) break;
+      const el = node as any;
       if (isInLogoCloud($, el, cloudCache)) continue;
       // Prefer data-src (lazy-loaded) over src
       const url = resolveUrl($(el).attr("data-src") || $(el).attr("src"));
@@ -229,21 +423,15 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
   }
 
   // ── 4. Logo-classed elements (outside header) ─────────────────
-  const logoClassSelectors = [
-    '.logo img',
-    '#logo img',
-    '[class*="site-logo"] img',
-    '.logo svg',
-    '#logo svg',
-  ];
-  for (const sel of logoClassSelectors) {
+  for (const [container, predicate] of LOGO_CLASS_RULES) {
     if (logos.length >= MAX_TOTAL_CANDIDATES) break;
-    for (const el of $(sel).toArray().slice(0, MAX_CANDIDATES_PER_SELECTOR)) {
+    for (const node of collectDescendants(containersOf(index, [container]), predicate, MAX_CANDIDATES_PER_SELECTOR)) {
       if (logos.length >= MAX_TOTAL_CANDIDATES) break;
+      const el = node as any;
       if (isInLogoCloud($, el, cloudCache)) continue;
-      const tagName = (el as any).tagName?.toLowerCase();
 
-      if (tagName === "svg") {
+      if (node.name === "svg") {
+        if (subtreeExceeds(node, MAX_LOGO_SVG_NODES)) continue;
         if (isIconSvg($, el)) continue;
         const svgHtml = $.html(el);
         if (svgHtml && svgHtml.length > 50 && svgHtml.length < 100_000) {
@@ -262,31 +450,25 @@ export function extractLogos(html: string, baseUrl: string): ExtractedLogo[] {
   }
 
   // ── 5. OG image ───────────────────────────────────────────────
-  const ogImage = $('meta[property="og:image"]').attr("content");
+  const ogImage = metaLinks.filter('meta[property="og:image"]').attr("content");
   if (ogImage) {
     const url = resolveUrl(ogImage);
     if (url) logos.push({ url, type: "og-image", confidence: "low" });
   }
 
   // ── 6. Apple touch icon ───────────────────────────────────────
-  $('link[rel="apple-touch-icon"]').each((_, el) => {
+  metaLinks.filter('link[rel="apple-touch-icon"]').each((_, el) => {
     const url = resolveUrl($(el).attr("href"));
     if (url) logos.push({ url, type: "apple-touch-icon", confidence: "low" });
   });
 
   // ── 7. Standard favicon ───────────────────────────────────────
-  $('link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => {
+  metaLinks.filter('link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => {
     const url = resolveUrl($(el).attr("href"));
     if (url) logos.push({ url, type: "favicon", confidence: "low" });
   });
 
-  // Deduplicate by URL
-  const seen = new Set<string>();
-  return logos.filter((l) => {
-    if (seen.has(l.url)) return false;
-    seen.add(l.url);
-    return true;
-  });
+  return finish();
 }
 
 /**

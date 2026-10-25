@@ -1,4 +1,5 @@
 import type { Confidence, Source, ColorEntry, TypographyEntry } from "../types/index.js";
+import { isPlausibleFontName } from "./untrusted-text.js";
 
 /** Legacy source precedence used by existing merge paths */
 const SOURCE_RANK: Record<Source, number> = {
@@ -85,13 +86,31 @@ export function mergeColor(existing: ColorEntry[], incoming: ColorEntry): ColorE
 }
 
 /**
+ * Font names are the one free-text identity field every extractor (web CSS,
+ * computed/visual styles, Figma, PDF) feeds straight into core identity, and
+ * from there into DESIGN.md, brand-runtime.json, and pasteable instruction
+ * blocks. Both typography merges below are therefore the gate: an entry whose
+ * family is not shaped like a font name (see isPlausibleFontName) is kept OUT
+ * of the identity and reported to the optional `rejected` sink so the caller
+ * can route it to needs-clarification instead of losing it silently.
+ */
+function rejectImplausibleFont(incoming: TypographyEntry, rejected?: TypographyEntry[]): boolean {
+  if (isPlausibleFontName(incoming.family)) return false;
+  rejected?.push(incoming);
+  return true;
+}
+
+/**
  * Merge a new typography entry into an existing array.
  * Match by family name (case-insensitive).
+ * Implausible family names are rejected (see rejectImplausibleFont).
  */
 export function mergeTypography(
   existing: TypographyEntry[],
-  incoming: TypographyEntry
+  incoming: TypographyEntry,
+  rejected?: TypographyEntry[],
 ): TypographyEntry[] {
+  if (rejectImplausibleFont(incoming, rejected)) return existing;
   const idx = existing.findIndex(
     (e) => e.family.toLowerCase() === incoming.family.toLowerCase() && e.name === incoming.name
   );
@@ -145,7 +164,9 @@ export function mergeTypographyWithPriority(
   existing: TypographyEntry[],
   incoming: TypographyEntry,
   priority: Source[] = DEFAULT_SOURCE_PRIORITY,
+  rejected?: TypographyEntry[],
 ): TypographyEntry[] {
+  if (rejectImplausibleFont(incoming, rejected)) return existing;
   const idx = existing.findIndex(
     (e) => e.family.toLowerCase() === incoming.family.toLowerCase() && e.name === incoming.name
   );

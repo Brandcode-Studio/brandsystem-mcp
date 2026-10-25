@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
+import { recordRejectedFonts } from "../lib/font-guard.js";
 import { resolveSvg } from "../lib/svg-resolver.js";
 import { ERROR_CODES } from "../types/index.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
@@ -126,6 +127,7 @@ async function handleIngest(input: Params) {
   let logos = [...identity.logo];
   let colorCount = 0;
   let typeCount = 0;
+  const rejectedFonts: TypographyEntry[] = [];
 
   // Source 1: Structured variables
   if (input.variables) {
@@ -158,7 +160,9 @@ async function handleIngest(input: Params) {
       colorCount++;
     }
     for (const { family, size, weight } of parseFontsFromDesignContext(input.design_context)) {
-      typography = mergeTypography(typography, { name: family, family, size, weight: weight === "Bold" ? 700 : weight === "Medium" ? 500 : undefined, source: "figma", confidence: "medium" });
+      const rejectedBefore = rejectedFonts.length;
+      typography = mergeTypography(typography, { name: family, family, size, weight: weight === "Bold" ? 700 : weight === "Medium" ? 500 : undefined, source: "figma", confidence: "medium" }, rejectedFonts);
+      if (rejectedFonts.length > rejectedBefore) continue;
       typeCount++;
     }
   }
@@ -167,7 +171,9 @@ async function handleIngest(input: Params) {
   if (input.styles) {
     for (const s of input.styles) {
       if (s.type === "TEXT" && s.fontFamily) {
-        typography = mergeTypography(typography, { name: s.name.replace(/\//g, " ").trim(), family: s.fontFamily, size: s.fontSize ? s.fontSize + "px" : undefined, weight: s.fontWeight, line_height: s.lineHeight ? String(s.lineHeight) : undefined, source: "figma", confidence: "high", figma_style_id: s.name });
+        const rejectedBefore = rejectedFonts.length;
+        typography = mergeTypography(typography, { name: s.name.replace(/\//g, " ").trim(), family: s.fontFamily, size: s.fontSize ? s.fontSize + "px" : undefined, weight: s.fontWeight, line_height: s.lineHeight ? String(s.lineHeight) : undefined, source: "figma", confidence: "high", figma_style_id: s.name }, rejectedFonts);
+        if (rejectedFonts.length > rejectedBefore) continue;
         typeCount++;
       }
     }
@@ -182,6 +188,7 @@ async function handleIngest(input: Params) {
   }
 
   await brandDir.writeCoreIdentity({ ...identity, colors, typography, logo: logos });
+  await recordRejectedFonts(brandDir, rejectedFonts);
   await upsertSourceCatalog(brandDir, buildSourceCatalogRecords({
     colors: colors.filter(c => c.source === "figma"),
     typography: typography.filter(t => t.source === "figma"),

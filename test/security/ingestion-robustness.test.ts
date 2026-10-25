@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { extractFromCSS } from "../../src/lib/css-parser.js";
-import { extractLogos } from "../../src/lib/logo-extractor.js";
+import { extractLogos, extractLogosWithDiagnostics } from "../../src/lib/logo-extractor.js";
 import { sanitizeSvg, resolveSvg } from "../../src/lib/svg-resolver.js";
 import { BrandDir } from "../../src/lib/brand-dir.js";
 
@@ -143,15 +143,20 @@ describe("logo-extractor extractLogos robustness", () => {
     expect(logos.some((l) => l.url.includes("logo-d"))).toBe(false);
   }, T);
 
-  it("10k-deep nested divs [degrades or controlled-throw]", () => {
+  // Deterministic since the markup depth guard: parse5's open-element stack
+  // is capped (MAX_HTML_DEPTH), so the document is cut before the deep img
+  // and extraction degrades to "no candidates" in milliseconds instead of
+  // racing a quadratic parse against the per-test timeout.
+  it("10k-deep nested divs [degrades, bounded by the depth guard]", () => {
     const depth = 10_000;
     const html = `<html><body>${"<div>".repeat(depth)}<img src="/logo.svg" alt="logo">${"</div>".repeat(depth)}</body></html>`;
-    const outcome = runControlled(() => extractLogos(html, BASE));
-    if (outcome.error !== undefined) {
-      expect(outcome.error).toBeInstanceOf(Error);
-    } else {
-      expect(Array.isArray(outcome.result)).toBe(true);
-    }
+    const started = performance.now();
+    const outcome = runControlled(() => extractLogosWithDiagnostics(html, BASE));
+    expect(outcome.error).toBeUndefined();
+    expect(outcome.result!.truncated).toBe(true);
+    expect(outcome.result!.truncation_reason).toBe("depth");
+    expect(outcome.result!.logos).toEqual([]);
+    expect(performance.now() - started).toBeLessThan(1_000);
   }, T);
 
   it("attribute bomb: single 200KB attribute [degrades]", () => {

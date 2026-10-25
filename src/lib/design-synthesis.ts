@@ -1,6 +1,12 @@
 import { BrandDir } from "./brand-dir.js";
 import { cleanColorName as cleanColorNameShared } from "./color-namer.js";
 import { isTokenWorthy } from "./confidence.js";
+import {
+  MAX_FONT_NAME_LENGTH,
+  PROVISIONAL_ARTIFACT_NOTICE,
+  inlineUntrusted,
+  isPlausibleFontName,
+} from "./untrusted-text.js";
 import type { BrandConfigData, CoreIdentityData, TokensFileData } from "../schemas/index.js";
 import type { Confidence } from "../types/index.js";
 import type { ExtractionEvidenceFile } from "./site-evidence.js";
@@ -349,7 +355,12 @@ function inferTypographyFamilies(identity: CoreIdentityData, elements: ComputedE
     .filter((entry) => isTokenWorthy(entry.confidence))
     .map((entry) => entry.family);
 
-  const families = dedupeStrings([...tokenWorthyIdentityFamilies, ...counts.keys()]);
+  // Evidence font names come straight from rendered pages (computed styles),
+  // bypassing the identity merge gate — apply the same plausibility check
+  // here so injected text never becomes a DESIGN.md "font family".
+  const families = dedupeStrings([...tokenWorthyIdentityFamilies, ...counts.keys()]).filter((family) =>
+    isPlausibleFontName(family),
+  );
 
   return families
     .map((family) => {
@@ -913,29 +924,34 @@ export function renderDesignMarkdown(synthesis: DesignSynthesisFile): string {
   const visualIntro = synthesis.source === "evidence"
     ? `This document is grounded in rendered site evidence across ${synthesis.evidence.pages_sampled} representative page(s) and ${synthesis.evidence.screenshots_analyzed} screenshot(s).`
     : "This document was synthesized from the current brand state because no deeper rendered evidence bundle was available.";
+  // DESIGN.md is an agent-facing brief built from machine-extracted values:
+  // stamp the data-not-instructions notice and keep free text to one line.
+  const clientName = inlineUntrusted(synthesis.brand.client_name, 80) || "This brand";
 
   return [
     "# DESIGN.md",
     "",
-    `Brand: ${synthesis.brand.client_name}`,
+    PROVISIONAL_ARTIFACT_NOTICE,
+    "",
+    `Brand: ${clientName}`,
     visualIntro,
     "",
     "## 1. Visual Theme and Atmosphere",
     "",
-    `${synthesis.brand.client_name} reads as ${synthesis.personality.tone}. The palette skews ${synthesis.colors.mood.temperature} with ${synthesis.colors.mood.contrast} contrast, the corners feel ${synthesis.shape.corner_style}, and the overall elevation language is ${synthesis.depth.elevation_style}. Layout density is ${synthesis.layout.density}, which makes the system feel ${synthesis.personality.positioning}.`,
+    `${clientName} reads as ${synthesis.personality.tone}. The palette skews ${synthesis.colors.mood.temperature} with ${synthesis.colors.mood.contrast} contrast, the corners feel ${synthesis.shape.corner_style}, and the overall elevation language is ${synthesis.depth.elevation_style}. Layout density is ${synthesis.layout.density}, which makes the system feel ${synthesis.personality.positioning}.`,
     "",
     "## 2. Color Palette and Roles",
     "",
     `Primary brand colors: ${synthesis.colors.brand.length > 0 ? synthesis.colors.brand.map((color) => `\`${color.role}\` ${color.value}`).join(", ") : "none confirmed"}.`,
     `Semantic support colors: ${synthesis.colors.semantic.length > 0 ? synthesis.colors.semantic.map((color) => `\`${color.role}\` ${color.value}`).join(", ") : "none confirmed"}.`,
-    `Additional palette notes: ${synthesis.colors.additional.length > 0 ? synthesis.colors.additional.map((color) => `\`${color.name}\` ${color.value}`).join(", ") : "no additional token-worthy colors"}.`,
+    `Additional palette notes: ${synthesis.colors.additional.length > 0 ? synthesis.colors.additional.map((color) => `\`${inlineUntrusted(color.name, 60)}\` ${color.value}`).join(", ") : "no additional token-worthy colors"}.`,
     ...(synthesis.colors.dark.length > 0
       ? [`Dark-theme palette: ${synthesis.colors.dark.map((color) => `\`${color.role}\` ${color.value}`).join(", ")}.`]
       : []),
     "",
     "## 3. Typography Rules",
     "",
-    `Font families: ${synthesis.typography.families.length > 0 ? synthesis.typography.families.map((family) => `${family.family} (${family.role}, ${family.character})`).join(", ") : "no strong typography signal detected"}.`,
+    `Font families: ${synthesis.typography.families.length > 0 ? synthesis.typography.families.map((family) => `${inlineUntrusted(family.family, MAX_FONT_NAME_LENGTH)} (${family.role}, ${family.character})`).join(", ") : "no strong typography signal detected"}.`,
     `Representative scale: ${synthesis.typography.scale.length > 0 ? synthesis.typography.scale.map((step) => `\`${step.selector}\` ${step.size}/${step.line_height ?? "auto"} weight ${step.weight}`).join(", ") : "no reliable scale extracted"}.`,
     "",
     "## 4. Component Styling",

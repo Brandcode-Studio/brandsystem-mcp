@@ -1,6 +1,6 @@
 import type { BrandConfigData, CoreIdentityData, VisualIdentityData, MessagingData } from "../schemas/index.js";
 import { sanitizeSvg } from "./svg-resolver.js";
-import { PROVISIONAL_ARTIFACT_NOTICE } from "./untrusted-text.js";
+import { PROVISIONAL_ARTIFACT_NOTICE, markdownFenceFor } from "./untrusted-text.js";
 import { cleanColorName as cleanColorNameShared } from "./color-namer.js";
 
 /**
@@ -90,9 +90,11 @@ export function generateSystemIntegration(
   lines.push("");
   lines.push("Paste the following block into your AI assistant configuration:");
   lines.push("");
-  lines.push("```");
-  lines.push(renderQuickSetupBlock(config, identity, visual, messaging));
-  lines.push("```");
+  const quickSetup = renderQuickSetupBlock(config, identity, visual, messaging);
+  const quickSetupFence = markdownFenceFor(quickSetup);
+  lines.push(quickSetupFence);
+  lines.push(quickSetup);
+  lines.push(quickSetupFence);
   lines.push("");
 
   // --- Session Start Protocol ---
@@ -599,9 +601,11 @@ function renderQuickSetupBlock(
     const firstLogo = identity.logo[0];
     const firstVariant = firstLogo?.variants[0];
     if (firstVariant?.inline_svg) {
-      lines.push("```svg");
-      lines.push(sanitizeSvg(firstVariant.inline_svg));
-      lines.push("```");
+      const svg = sanitizeSvg(firstVariant.inline_svg);
+      const svgFence = markdownFenceFor(svg);
+      lines.push(`${svgFence}svg`);
+      lines.push(svg);
+      lines.push(svgFence);
       lines.push("");
       lines.push("For dark backgrounds, set all path fills to #ffffff.");
       if (firstVariant.data_uri) {
