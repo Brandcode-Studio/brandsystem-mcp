@@ -214,9 +214,13 @@ function stripProxyHeaders(rawHeaders: string[]): string[] {
   return out;
 }
 
-function refuseSocket(socket: Duplex, status: number, reason: string): void {
+// The page can read same-origin plain-HTTP refusals, so bodies stay generic:
+// the specific reason (resolved IPs, ports) is kept in the decision log only.
+const REFUSAL_BODY = "Blocked by brandsystem browser egress policy";
+
+function refuseSocket(socket: Duplex, status: number): void {
   const text = status === 403 ? "Forbidden" : status === 503 ? "Service Unavailable" : status === 502 ? "Bad Gateway" : "Bad Request";
-  const body = `Blocked by brandsystem browser egress policy: ${reason}`.replace(/[\r\n]/g, " ");
+  const body = REFUSAL_BODY;
   if (!socket.destroyed && socket.writable) {
     socket.end(
       `HTTP/1.1 ${status} ${text}\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`,
@@ -389,7 +393,7 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
   });
 
   server.on("clientError", (_err, socket) => {
-    refuseSocket(socket, 400, "malformed request");
+    refuseSocket(socket, 400);
   });
 
   // CONNECT tunnels (HTTPS / WSS).
@@ -401,14 +405,14 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
     const parsed = parseConnectAuthority(req.url);
     if (!parsed) {
       record({ kind: "connect", target: String(req.url), allowed: false, reason: "malformed CONNECT target" });
-      refuseSocket(client, 400, "malformed CONNECT target");
+      refuseSocket(client, 400);
       return;
     }
     const target = formatTarget(parsed.hostname, parsed.port);
     const release = acquire();
     if (!release) {
       record({ kind: "connect", target, allowed: false, reason: "too many connections" });
-      refuseSocket(client, 503, "too many connections");
+      refuseSocket(client, 503);
       return;
     }
     client.once("close", release);
@@ -421,7 +425,7 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
         const e = err as EgressBlockedError;
         record({ kind: "connect", target, allowed: false, reason: e.message });
         release();
-        refuseSocket(client, e.status ?? 403, e.message);
+        refuseSocket(client, e.status ?? 403);
         return;
       }
       record({ kind: "connect", target, allowed: true, address: pinned.address });
@@ -434,7 +438,7 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
         upstream = await connectUpstream(pinned);
       } catch (err) {
         release();
-        refuseSocket(client, 502, (err as Error).message);
+        refuseSocket(client, 502);
         return;
       }
       if (client.destroyed || closed) {
@@ -457,14 +461,14 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
     const parsed = parseAbsoluteTarget(req.url);
     if (!parsed) {
       record({ kind: "upgrade", target: String(req.url), allowed: false, reason: "not an absolute-form proxy request" });
-      refuseSocket(client, 400, "not an absolute-form proxy request");
+      refuseSocket(client, 400);
       return;
     }
     const target = formatTarget(parsed.hostname, parsed.port);
     const release = acquire();
     if (!release) {
       record({ kind: "upgrade", target, allowed: false, reason: "too many connections" });
-      refuseSocket(client, 503, "too many connections");
+      refuseSocket(client, 503);
       return;
     }
     client.once("close", release);
@@ -477,7 +481,7 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
         const e = err as EgressBlockedError;
         record({ kind: "upgrade", target, allowed: false, reason: e.message });
         release();
-        refuseSocket(client, e.status ?? 403, e.message);
+        refuseSocket(client, e.status ?? 403);
         return;
       }
       record({ kind: "upgrade", target, allowed: true, address: pinned.address });
@@ -486,7 +490,7 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
         upstream = await connectUpstream(pinned);
       } catch (err) {
         release();
-        refuseSocket(client, 502, (err as Error).message);
+        refuseSocket(client, 502);
         return;
       }
       if (client.destroyed || closed) {
@@ -533,7 +537,7 @@ export async function startEgressProxy(options: EgressProxyOptions = {}): Promis
         if (!res.headersSent) {
           res.writeHead(e.status ?? 403, { "content-type": "text/plain", connection: "close" });
         }
-        res.end(`Blocked by brandsystem browser egress policy: ${e.message}`.replace(/[\r\n]/g, " "));
+        res.end(REFUSAL_BODY);
         return;
       }
       record({ kind: "http", target, allowed: true, address: pinned.address });

@@ -130,9 +130,9 @@ describe("browser egress proxy", () => {
         `GET http://127.0.0.1:${origin.port}/secret HTTP/1.1\r\nHost: 127.0.0.1:${origin.port}\r\n\r\n`,
       );
       expect(statusOf(data)).toBe(403);
-      expect(data).toContain("SSRF blocked");
+      expect(data).not.toContain("127.0.0.1");
       expect(origin.hits).toEqual([]);
-      expect(p.decisions.at(-1)).toMatchObject({ kind: "http", allowed: false });
+      expect(p.decisions.at(-1)).toMatchObject({ kind: "http", allowed: false, reason: expect.stringContaining("SSRF blocked") });
     });
 
     it("refuses http://[::ffff:127.0.0.1]/ (IPv4-mapped loopback)", async () => {
@@ -163,7 +163,8 @@ describe("browser egress proxy", () => {
         `CONNECT rebind.attacker.example:${origin.port} HTTP/1.1\r\nHost: rebind.attacker.example\r\n\r\n`,
       );
       expect(statusOf(data)).toBe(403);
-      expect(data).toContain("resolves to private IP 127.0.0.1");
+      expect(data).not.toContain("127.0.0.1");
+      expect(p.decisions.at(-1)).toMatchObject({ allowed: false, reason: expect.stringContaining("resolves to private IP 127.0.0.1") });
       expect(lookup).toHaveBeenCalledWith("rebind.attacker.example");
       expect(connect).not.toHaveBeenCalled();
       expect(origin.hits).toEqual([]);
@@ -226,7 +227,7 @@ describe("browser egress proxy", () => {
       const p = await start({ lookup, connect });
       const { data } = await rawExchange(p.port, `CONNECT public.example:22 HTTP/1.1\r\n\r\n`);
       expect(statusOf(data)).toBe(403);
-      expect(data).toContain("port 22 is not allowed");
+      expect(p.decisions.at(-1)).toMatchObject({ allowed: false, reason: expect.stringContaining("port 22 is not allowed") });
       expect(lookup).not.toHaveBeenCalled();
       expect(connect).not.toHaveBeenCalled();
     });
