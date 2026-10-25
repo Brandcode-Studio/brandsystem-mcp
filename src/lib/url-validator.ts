@@ -151,37 +151,62 @@ export async function validateUrl(url: string): Promise<void> {
   await resolveValidatedAddress(url);
 }
 
-type ResolvedAddress = {
+export type ResolvedAddress = {
   address: string;
   family: 4 | 6;
   hostname: string;
 };
 
-async function resolveValidatedAddress(url: string): Promise<ResolvedAddress> {
-  const parsed = new URL(url); // throws on malformed URLs
+/** Resolve every address for a hostname (the `dns.lookup(..., { all: true })` shape). */
+export type LookupAllFn = (hostname: string) => Promise<ReadonlyArray<{ address: string; family: number }>>;
 
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`SSRF blocked: unsupported protocol "${parsed.protocol}"`);
-  }
+/**
+ * True when an IP address literal (v4 or v6, optionally bracketed) must never
+ * be reached. Anything that is not a parseable IP literal is treated as
+ * blocked (fail closed).
+ */
+export function isBlockedIpAddress(ip: string): boolean {
+  const bare = ip.replace(/^\[|\]$/g, "");
+  const version = isIP(bare);
+  if (version === 4) return isPrivateIPv4(bare);
+  if (version === 6) return isPrivateIPv6(bare);
+  return true;
+}
 
-  const hostname = parsed.hostname.replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+/**
+ * Resolve a bare hostname (or IP literal) and validate EVERY resolved address
+ * against the SSRF blocklist. Returns all validated addresses, in resolver
+ * order. Throws "SSRF blocked: ..." if any address is private/reserved or the
+ * name does not resolve.
+ *
+ * This is the single source of truth for "may this host be connected to",
+ * shared by safeFetch and the browser egress proxy. Callers must connect to a
+ * returned address and never re-resolve the name.
+ */
+export async function resolveValidatedHostAddresses(
+  rawHostname: string,
+  lookup?: LookupAllFn,
+): Promise<ResolvedAddress[]> {
+  const hostname = rawHostname.replace(/^\[|\]$/g, ""); // strip IPv6 brackets
 
   // Direct IP literal check (skip DNS)
   if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
     if (isPrivateIPv4(hostname)) {
       throw new Error(`SSRF blocked: ${hostname} is a private IP`);
     }
-    return { address: hostname, family: 4, hostname };
+    return [{ address: hostname, family: 4, hostname }];
   }
   if (hostname.includes(":")) {
     // IPv6 literal
     if (isPrivateIPv6(hostname)) {
       throw new Error(`SSRF blocked: ${hostname} is a private IP`);
     }
-    return { address: hostname, family: 6, hostname };
+    return [{ address: hostname, family: 6, hostname }];
   }
 
-  const records = await dns.lookup(hostname, { all: true, verbatim: true });
+  const records = lookup
+    ? await lookup(hostname)
+    : await dns.lookup(hostname, { all: true, verbatim: true });
   if (records.length === 0) {
     throw new Error(`SSRF blocked: ${hostname} did not resolve to any IP`);
   }
@@ -195,12 +220,22 @@ async function resolveValidatedAddress(url: string): Promise<ResolvedAddress> {
     }
   }
 
-  const selected = records[0];
-  return {
-    address: selected.address,
-    family: selected.family as 4 | 6,
+  return records.map(({ address, family }) => ({
+    address,
+    family: family as 4 | 6,
     hostname,
-  };
+  }));
+}
+
+async function resolveValidatedAddress(url: string): Promise<ResolvedAddress> {
+  const parsed = new URL(url); // throws on malformed URLs
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`SSRF blocked: unsupported protocol "${parsed.protocol}"`);
+  }
+
+  const [selected] = await resolveValidatedHostAddresses(parsed.hostname);
+  return selected;
 }
 
 const MAX_REDIRECTS = 3;

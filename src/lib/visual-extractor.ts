@@ -13,7 +13,15 @@
 import * as cheerio from "cheerio";
 import { existsSync } from "node:fs";
 import { platform } from "node:os";
-import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, validateUrl } from "./url-validator.js";
+import type { Browser, Page } from "puppeteer-core";
+import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, validateUrl, isBlockedIpAddress } from "./url-validator.js";
+import {
+  DEFAULT_EGRESS_ALLOWED_PORTS,
+  EGRESS_PROXY_HOST,
+  startEgressProxy,
+  type EgressProxy,
+  type EgressProxyOptions,
+} from "./browser-egress-proxy.js";
 import { getVersion } from "./version.js";
 import { summarizeVisualTokens, type VisualTokenSummary } from "./visual-tokens.js";
 
@@ -208,7 +216,7 @@ async function handleBrowserRequest(req: InterceptedRequest): Promise<void> {
   }
 }
 
-function installBrowserRequestPolicy(page: {
+export function installBrowserRequestPolicy(page: {
   on(event: "request", handler: (req: InterceptedRequest) => void): unknown;
   setRequestInterception(enabled: boolean): Promise<void>;
 }): Promise<void> {
@@ -219,6 +227,186 @@ function installBrowserRequestPolicy(page: {
       void handleBrowserRequest(req).catch(() => undefined);
     });
   });
+}
+
+// ── Network egress lockdown ────────────────────────────────────────────────
+//
+// The request interceptor above only checks URLs: Chromium still resolves the
+// hostname itself (DNS rebinding), and service workers, WebSockets, QUIC, and
+// WebRTC never pass through it. The real boundary is the egress proxy
+// (browser-egress-proxy.ts): Chromium is given the proxy as its only route,
+// its own resolver is disabled, and every connection is resolved, validated,
+// and IP-pinned in this process. The interceptor stays as an additive filter.
+
+/**
+ * Chromium flags that force ALL browser networking through the local egress
+ * proxy and turn off every channel that could bypass it.
+ */
+export function egressLockdownArgs(proxyPort: number): string[] {
+  if (!Number.isInteger(proxyPort) || proxyPort < 1 || proxyPort > 65535) {
+    throw new Error(`Invalid egress proxy port: ${proxyPort}`);
+  }
+  return [
+    `--proxy-server=http://${EGRESS_PROXY_HOST}:${proxyPort}`,
+    // Remove Chromium's implicit "never proxy loopback" rule so localhost /
+    // 127.0.0.1 targets also go to the proxy (which refuses them).
+    "--proxy-bypass-list=<-loopback>",
+    // Chromium may not resolve any hostname itself; only the proxy's IP
+    // literal is reachable. Defeats DNS rebinding between check and use.
+    `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE ${EGRESS_PROXY_HOST}`,
+    // QUIC/HTTP3 is UDP and would not traverse an HTTP proxy.
+    "--disable-quic",
+    // WebRTC may only use proxied TCP; no direct UDP/host candidates.
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    // No speculative / background traffic.
+    "--dns-prefetch-disable",
+    "--disable-background-networking",
+    "--disable-component-update",
+    "--disable-domain-reliability",
+    "--disable-sync",
+    "--no-pings",
+  ];
+}
+
+/** Full Chromium argument list for extraction: sandbox policy + egress lockdown. */
+export function browserLaunchArgs(
+  env: NodeJS.ProcessEnv,
+  options: { egressProxyPort: number; includeWindowSize?: boolean },
+): string[] {
+  return [
+    ...chromeLaunchArgs(env, { includeWindowSize: options.includeWindowSize }),
+    ...egressLockdownArgs(options.egressProxyPort),
+  ];
+}
+
+/**
+ * Destination ports the egress proxy may reach for an extraction of `url`:
+ * 80 and 443, plus the explicit port of the requested URL when it is
+ * non-standard. The URL must already pass SSRF validation.
+ */
+export async function egressAllowedPortsFor(url: string): Promise<number[]> {
+  await validateUrl(url);
+  const ports = new Set<number>(DEFAULT_EGRESS_ALLOWED_PORTS);
+  const explicit = new URL(url).port;
+  if (explicit) ports.add(Number(explicit));
+  return [...ports];
+}
+
+export class BrowserEgressViolationError extends Error {
+  constructor(readonly violations: string[]) {
+    super(
+      `Blocked: the page received ${violations.length} response(s) from a private or reserved address ` +
+        `(${violations.slice(0, 3).join("; ")}). Extraction result discarded.`,
+    );
+    this.name = "BrowserEgressViolationError";
+  }
+}
+
+/**
+ * Backstop for the proxy: inspects every response's remote address. With the
+ * proxy in place Chromium reports the proxy itself (127.0.0.1:<proxyPort>),
+ * which is expected. Any other private/reserved remote means traffic reached
+ * an internal service, and the page result must be discarded.
+ */
+export function createRemoteAddressGuard(proxyPort: number) {
+  const violations: string[] = [];
+  return {
+    inspect(url: string, remote: { ip?: string; port?: number } | undefined): void {
+      const ip = remote?.ip?.replace(/^\[|\]$/g, "");
+      if (!ip) return; // cache, data:, about:, service-worker-bypassed, etc.
+      if (ip === EGRESS_PROXY_HOST && remote?.port === proxyPort) return;
+      if (isBlockedIpAddress(ip)) {
+        violations.push(`${url.slice(0, 200)} from ${ip}${remote?.port ? `:${remote.port}` : ""}`);
+      }
+    },
+    get violations(): readonly string[] {
+      return violations;
+    },
+    assertClean(): void {
+      if (violations.length > 0) throw new BrowserEgressViolationError([...violations]);
+    },
+  };
+}
+
+export type RemoteAddressGuard = ReturnType<typeof createRemoteAddressGuard>;
+
+/**
+ * Per-page egress hardening that must run before the first navigation:
+ * bypass service workers (puppeteer-core never sees their requests) and
+ * attach the remote-address backstop.
+ */
+export async function installEgressGuards(
+  page: Pick<Page, "setBypassServiceWorker" | "on">,
+  guard: RemoteAddressGuard,
+): Promise<void> {
+  await page.setBypassServiceWorker(true);
+  page.on("response", (response) => {
+    guard.inspect(response.url(), response.remoteAddress());
+  });
+}
+
+export interface LockedDownBrowserOptions {
+  chromePath: string;
+  /** Destination ports the proxy may reach (see egressAllowedPortsFor). */
+  allowedPorts: readonly number[];
+  includeWindowSize?: boolean;
+  env?: NodeJS.ProcessEnv;
+  /**
+   * TEST ONLY hooks for local integration tests. Production callers must
+   * never set this; a test asserts they do not.
+   */
+  testOnly?: {
+    proxy?: Pick<EgressProxyOptions, "lookup" | "testOnlyAllowedTargets">;
+    extraArgs?: readonly string[];
+  };
+}
+
+/**
+ * Start the egress proxy, launch Chromium locked to it, run `fn`, and always
+ * tear down both (browser first, then proxy) — including when `fn` or the
+ * launch throws.
+ */
+export async function withLockedDownBrowser<T>(
+  options: LockedDownBrowserOptions,
+  fn: (browser: Browser, proxy: EgressProxy) => Promise<T>,
+): Promise<T> {
+  const proxy = await startEgressProxy({
+    allowedPorts: options.allowedPorts,
+    ...options.testOnly?.proxy,
+  });
+  let browser: Browser | null = null;
+  try {
+    // Dynamic import to keep puppeteer-core optional at the module level
+    const puppeteer = await import("puppeteer-core");
+    browser = await puppeteer.default.launch({
+      executablePath: options.chromePath,
+      headless: true,
+      args: [
+        ...browserLaunchArgs(options.env ?? process.env, {
+          egressProxyPort: proxy.port,
+          includeWindowSize: options.includeWindowSize,
+        }),
+        ...(options.testOnly?.extraArgs ?? []),
+      ],
+      timeout: 20000,
+    });
+    return await fn(browser, proxy);
+  } finally {
+    if (browser) {
+      try { await browser.close(); } catch { /* ignore close errors */ }
+    }
+    await proxy.close();
+  }
+}
+
+/** Open a page with every egress guard installed, ready for navigation. */
+async function openGuardedPage(browser: Browser, proxy: EgressProxy): Promise<{ page: Page; guard: RemoteAddressGuard }> {
+  const page = await browser.newPage();
+  const guard = createRemoteAddressGuard(proxy.port);
+  await installEgressGuards(page, guard);
+  // Block heavy resources and reject internal-network pivots before fetch.
+  await installBrowserRequestPolicy(page);
+  return { page, guard };
 }
 
 /** Check if visual extraction is available on this system */
@@ -663,46 +851,41 @@ export async function extractVisual(url: string): Promise<VisualExtractionResult
     };
   }
 
-  let browser;
   try {
-    // Dynamic import to keep puppeteer-core optional at the module level
-    const puppeteer = await import("puppeteer-core");
-    browser = await puppeteer.default.launch({
-      executablePath: chromePath,
-      headless: true,
-      args: chromeLaunchArgs(process.env, { includeWindowSize: true }),
-      timeout: 20000,
-    });
+    const allowedPorts = await egressAllowedPortsFor(url);
+    const { screenshot, extracted } = await withLockedDownBrowser(
+      { chromePath, allowedPorts, includeWindowSize: true },
+      async (browser, proxy) => {
+        const { page, guard } = await openGuardedPage(browser, proxy);
+        // 2x DPR for sharp text — critical for vision model analysis
+        await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 });
 
-    const page = await browser.newPage();
-    // 2x DPR for sharp text — critical for vision model analysis
-    await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 });
+        await page.goto(url, {
+          waitUntil: "networkidle2",
+          timeout: 25000,
+        });
+        guard.assertClean();
 
-    // Block heavy resources and reject internal-network pivots before fetch.
-    await installBrowserRequestPolicy(page);
+        // Small delay for JS-rendered content to settle
+        await new Promise((r) => setTimeout(r, 1500));
 
-    await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: 25000,
-    });
+        // Take viewport screenshot at 2x DPR (2560x1600 actual pixels)
+        const shot = await page.screenshot({
+          type: "png",
+          clip: { x: 0, y: 0, width: 1280, height: 800 },
+        }) as Buffer;
 
-    // Small delay for JS-rendered content to settle
-    await new Promise((r) => setTimeout(r, 1500));
+        // Extract computed styles via in-page JS
+        const result = await page.evaluate(
+          extractionScript,
+          [...ELEMENT_SELECTOR_DEFS],
+        );
 
-    // Take viewport screenshot at 2x DPR (2560x1600 actual pixels)
-    const screenshot = await page.screenshot({
-      type: "png",
-      clip: { x: 0, y: 0, width: 1280, height: 800 },
-    }) as Buffer;
-
-    // Extract computed styles via in-page JS
-    const extracted = await page.evaluate(
-      extractionScript,
-      [...ELEMENT_SELECTOR_DEFS],
+        // Discard everything if any response came from an internal address.
+        guard.assertClean();
+        return { screenshot: shot, extracted: result };
+      },
     );
-
-    await browser.close();
-    browser = null;
 
     const normalized = normalizeComputedElements(extracted.elements);
 
@@ -729,9 +912,6 @@ export async function extractVisual(url: string): Promise<VisualExtractionResult
       visualTokens: normalized.visualTokens,
     };
   } catch (err) {
-    if (browser) {
-      try { await browser.close(); } catch { /* ignore close errors */ }
-    }
     return {
       success: false,
       reason: `Visual extraction failed: ${(err as Error).message}`,
@@ -767,86 +947,87 @@ export async function extractSite(
     };
   }
 
-  let browser;
   try {
-    const puppeteer = await import("puppeteer-core");
-    browser = await puppeteer.default.launch({
-      executablePath: chromePath,
-      headless: true,
-      args: chromeLaunchArgs(),
-      timeout: 20000,
-    });
+    const allowedPorts = await egressAllowedPortsFor(sourceUrl);
+    const selectedPages = await withLockedDownBrowser(
+      { chromePath, allowedPorts },
+      async (browser, proxy) => {
+        const { page, guard } = await openGuardedPage(browser, proxy);
 
-    const page = await browser.newPage();
-    await installBrowserRequestPolicy(page);
+        const selectedPages: SitePageExtraction[] = [];
 
-    const selectedPages: SitePageExtraction[] = [];
+        for (const selectedPage of discovery.selectedPages) {
+          try {
+            const extractedViewports: SiteViewportExtraction[] = [];
+            let pageTitle = "";
 
-    for (const selectedPage of discovery.selectedPages) {
-      try {
-        const extractedViewports: SiteViewportExtraction[] = [];
-        let pageTitle = "";
+            for (const viewportName of viewports) {
+              const viewport = VIEWPORTS[viewportName];
+              await page.setViewport(viewport);
+              await page.goto(selectedPage.url, {
+                waitUntil: "networkidle2",
+                timeout: 25000,
+              });
+              guard.assertClean();
+              await new Promise((resolve) => setTimeout(resolve, 1200));
 
-        for (const viewportName of viewports) {
-          const viewport = VIEWPORTS[viewportName];
-          await page.setViewport(viewport);
-          await page.goto(selectedPage.url, {
-            waitUntil: "networkidle2",
-            timeout: 25000,
-          });
-          await new Promise((resolve) => setTimeout(resolve, 1200));
+              const screenshot = await page.screenshot({
+                type: "png",
+                clip: { x: 0, y: 0, width: viewport.width, height: viewport.height },
+              }) as Buffer;
 
-          const screenshot = await page.screenshot({
-            type: "png",
-            clip: { x: 0, y: 0, width: viewport.width, height: viewport.height },
-          }) as Buffer;
+              const extracted = await page.evaluate(extractionScript, [...ELEMENT_SELECTOR_DEFS]);
+              // Discard everything if any response came from an internal address.
+              guard.assertClean();
+              pageTitle = pageTitle || extracted.title;
 
-          const extracted = await page.evaluate(extractionScript, [...ELEMENT_SELECTOR_DEFS]);
-          pageTitle = pageTitle || extracted.title;
+              const normalized = normalizeComputedElements(extracted.elements, {
+                viewport: viewportName,
+                pageUrl: selectedPage.url,
+                pageType: selectedPage.pageType,
+              });
 
-          const normalized = normalizeComputedElements(extracted.elements, {
-            viewport: viewportName,
-            pageUrl: selectedPage.url,
-            pageType: selectedPage.pageType,
-          });
+              const cssCustomProperties: Record<string, string> = { ...extracted.cssVars };
+              for (const [prop, val] of Object.entries(extracted.cssVars)) {
+                const hex = rgbToHex(val);
+                if (hex) {
+                  normalized.uniqueColors.push(hex);
+                } else if (/^#[0-9a-f]{3,8}$/i.test(val)) {
+                  normalized.uniqueColors.push(val.toLowerCase());
+                }
+              }
 
-          const cssCustomProperties: Record<string, string> = { ...extracted.cssVars };
-          for (const [prop, val] of Object.entries(extracted.cssVars)) {
-            const hex = rgbToHex(val);
-            if (hex) {
-              normalized.uniqueColors.push(hex);
-            } else if (/^#[0-9a-f]{3,8}$/i.test(val)) {
-              normalized.uniqueColors.push(val.toLowerCase());
+              extractedViewports.push({
+                viewport: viewportName,
+                screenshot,
+                computedElements: normalized.computedElements,
+                cssCustomProperties,
+                uniqueColors: [...new Set(normalized.uniqueColors)],
+                uniqueFonts: normalized.uniqueFonts,
+                roleCandidates: inferRolesFromVisual(normalized.computedElements, cssCustomProperties),
+                visualTokens: normalized.visualTokens,
+              });
             }
-          }
 
-          extractedViewports.push({
-            viewport: viewportName,
-            screenshot,
-            computedElements: normalized.computedElements,
-            cssCustomProperties,
-            uniqueColors: [...new Set(normalized.uniqueColors)],
-            uniqueFonts: normalized.uniqueFonts,
-            roleCandidates: inferRolesFromVisual(normalized.computedElements, cssCustomProperties),
-            visualTokens: normalized.visualTokens,
-          });
+            selectedPages.push({
+              url: selectedPage.url,
+              pageType: selectedPage.pageType,
+              selectionReason: selectedPage.selectionReason,
+              priority: selectedPage.priority,
+              title: pageTitle,
+              viewports: extractedViewports,
+            });
+          } catch (err) {
+            // An egress violation taints the whole session: abort and discard
+            // every page, not just this one.
+            if (err instanceof BrowserEgressViolationError) throw err;
+            // Skip pages that fail to render and keep the rest of the evidence bundle
+          }
         }
 
-        selectedPages.push({
-          url: selectedPage.url,
-          pageType: selectedPage.pageType,
-          selectionReason: selectedPage.selectionReason,
-          priority: selectedPage.priority,
-          title: pageTitle,
-          viewports: extractedViewports,
-        });
-      } catch {
-        // Skip pages that fail to render and keep the rest of the evidence bundle
-      }
-    }
-
-    await browser.close();
-    browser = null;
+        return selectedPages;
+      },
+    );
 
     if (selectedPages.length === 0) {
       return {
@@ -862,9 +1043,6 @@ export async function extractSite(
       selectedPages,
     };
   } catch (err) {
-    if (browser) {
-      try { await browser.close(); } catch { /* ignore close errors */ }
-    }
     return {
       success: false,
       reason: `Site extraction failed: ${(err as Error).message}`,
