@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.17.0 (2026-10-25)
+
+Security release. Fixes the privately reported SSRF bypass GHSA-j3rv-rv99-hg74 and every finding from the October 2026 security review of the local package, the hosted Brandcode MCP, and the release pipeline. Upgrade from any earlier version. Requires Node.js 22.13 or newer.
+
 ### Security
 
 - **SSRF guard re-checks IPv4 embedded in IPv6 (GHSA-j3rv-rv99-hg74)**, reported privately by @avishaigonen-pluto and @yotampe-pluto. `isPrivateIPv6` matched four string prefixes, so `http://[::ffff:169.254.169.254]/` reached cloud metadata and `[::ffff:127.0.0.1]` reached loopback while the plain IPv4 forms were blocked. The classifier now parses IPv6 into groups and re-checks the embedded IPv4 for every transition format (IPv4-mapped, IPv4-translated, IPv4-compatible, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`), blocks the remaining non-global ranges (`::`, NAT64 local-use, discard, Teredo, documentation, site-local, multicast), and fails closed on anything unparseable. The IPv4 table gains CGNAT, IETF/benchmark/documentation, 6to4-relay, multicast, and reserved ranges. One choke point covers URL literals, DNS answers, redirect hops, and the headless-browser request interceptor. 61 regression tests, including a real loopback listener that must receive zero requests; 46 of them fail against the previous validator.
