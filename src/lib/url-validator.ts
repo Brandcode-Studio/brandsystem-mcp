@@ -1,17 +1,36 @@
 import dns from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
+import { isIP } from "node:net";
 import type { RequestOptions as NodeRequestOptions } from "node:http";
 
-/** CIDR ranges that must never be reached by outbound fetches. */
-const PRIVATE_RANGES_V4: Array<{ base: number; mask: number }> = [
-  { base: ip4ToInt("127.0.0.0"), mask: prefixToMask(8) },   // loopback
-  { base: ip4ToInt("10.0.0.0"), mask: prefixToMask(8) },    // private
-  { base: ip4ToInt("172.16.0.0"), mask: prefixToMask(12) },  // private
-  { base: ip4ToInt("192.168.0.0"), mask: prefixToMask(16) }, // private
-  { base: ip4ToInt("169.254.0.0"), mask: prefixToMask(16) }, // link-local / cloud metadata
-  { base: ip4ToInt("0.0.0.0"), mask: prefixToMask(8) },     // unspecified
+/**
+ * IPv4 ranges that must never be reached by outbound fetches: everything
+ * IANA marks non-global (RFC 6890 special-purpose registry) plus multicast
+ * and reserved space.
+ */
+const BLOCKED_RANGES_V4: ReadonlyArray<readonly [string, number, string]> = [
+  ["0.0.0.0", 8, "this network / unspecified"],
+  ["10.0.0.0", 8, "private (RFC 1918)"],
+  ["100.64.0.0", 10, "shared address space / CGNAT (RFC 6598)"],
+  ["127.0.0.0", 8, "loopback"],
+  ["169.254.0.0", 16, "link-local / cloud metadata"],
+  ["172.16.0.0", 12, "private (RFC 1918)"],
+  ["192.0.0.0", 24, "IETF protocol assignments"],
+  ["192.0.2.0", 24, "documentation (TEST-NET-1)"],
+  ["192.88.99.0", 24, "6to4 relay anycast"],
+  ["192.168.0.0", 16, "private (RFC 1918)"],
+  ["198.18.0.0", 15, "benchmarking"],
+  ["198.51.100.0", 24, "documentation (TEST-NET-2)"],
+  ["203.0.113.0", 24, "documentation (TEST-NET-3)"],
+  ["224.0.0.0", 4, "multicast"],
+  ["240.0.0.0", 4, "reserved / broadcast"],
 ];
+
+const PRIVATE_RANGES_V4 = BLOCKED_RANGES_V4.map(([base, prefix]) => ({
+  base: ip4ToInt(base),
+  mask: prefixToMask(prefix),
+}));
 
 function ip4ToInt(ip: string): number {
   const parts = ip.split(".").map(Number);
@@ -19,20 +38,108 @@ function ip4ToInt(ip: string): number {
 }
 
 function prefixToMask(prefix: number): number {
-  return (~0 << (32 - prefix)) >>> 0;
+  return prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
 }
 
+function isCanonicalDottedQuad(ip: string): boolean {
+  const parts = ip.split(".");
+  return (
+    parts.length === 4 &&
+    parts.every((p) => /^(0|[1-9]\d{0,2})$/.test(p) && Number(p) <= 255)
+  );
+}
+
+/**
+ * True when an IPv4 address is private, reserved, or otherwise non-global.
+ * Fails closed: anything that is not a canonical dotted quad is treated as
+ * private, so a parser disagreement can never become an allow.
+ */
 export function isPrivateIPv4(ip: string): boolean {
+  if (!isCanonicalDottedQuad(ip)) return true;
   const int = ip4ToInt(ip);
   return PRIVATE_RANGES_V4.some((r) => ((int & r.mask) >>> 0) === r.base);
 }
 
+/**
+ * Parse an IPv6 literal (optionally bracketed, optionally with a trailing
+ * dotted-quad) into eight 16-bit groups. Returns null for anything Node's
+ * own parser rejects or that this expansion cannot represent exactly.
+ */
+function parseIPv6(input: string): number[] | null {
+  let ip = input.toLowerCase().replace(/^\[|\]$/g, "");
+  if (ip.includes("%")) return null; // zone ids never appear in fetchable URLs
+  if (!isIP(ip) || isIP(ip) !== 6) return null;
+
+  // Fold a trailing embedded IPv4 (e.g. ::ffff:1.2.3.4) into two hex groups.
+  const lastColon = ip.lastIndexOf(":");
+  const tail = ip.slice(lastColon + 1);
+  if (tail.includes(".")) {
+    if (!isCanonicalDottedQuad(tail)) return null;
+    const v4 = ip4ToInt(tail);
+    ip = `${ip.slice(0, lastColon + 1)}${(v4 >>> 16).toString(16)}:${(v4 & 0xffff).toString(16)}`;
+  }
+
+  const halves = ip.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - rest.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...rest].map(
+    (g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN),
+  );
+  return groups.length === 8 && groups.every((g) => Number.isInteger(g)) ? groups : null;
+}
+
+function v4FromGroups(hi: number, lo: number): string {
+  return [hi >>> 8, hi & 0xff, lo >>> 8, lo & 0xff].join(".");
+}
+
+/**
+ * True when an IPv6 address is private, reserved, or can reach an IPv4
+ * address that is. Covers every transition format that embeds an IPv4
+ * address (IPv4-mapped, IPv4-compatible, IPv4-translated, NAT64, 6to4) by
+ * re-checking the embedded address with isPrivateIPv4, so a blocked IPv4
+ * destination cannot be reached by rewriting it as IPv6 (GHSA-j3rv-rv99-hg74).
+ * Fails closed on anything unparseable.
+ */
 export function isPrivateIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-  if (normalized === "::1") return true;          // loopback
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true; // fc00::/7
-  if (normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
-      normalized.startsWith("fea") || normalized.startsWith("feb")) return true; // fe80::/10
+  const g = parseIPv6(ip);
+  if (!g) return true;
+
+  const zeroPrefix = (n: number) => g.slice(0, n).every((x) => x === 0);
+
+  // ::/128 unspecified, ::1/128 loopback
+  if (zeroPrefix(7) && (g[7] === 0 || g[7] === 1)) return true;
+  // ::ffff:0:0/96 IPv4-mapped
+  if (zeroPrefix(5) && g[5] === 0xffff) return isPrivateIPv4(v4FromGroups(g[6], g[7]));
+  // ::ffff:0:0:0/96 IPv4-translated (SIIT)
+  if (zeroPrefix(4) && g[4] === 0xffff && g[5] === 0) return isPrivateIPv4(v4FromGroups(g[6], g[7]));
+  // NAT64 prefixes sit inside ::/8, so they are checked before that blanket rule.
+  // 64:ff9b::/96 NAT64 well-known prefix — reaches the embedded IPv4
+  if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) {
+    return isPrivateIPv4(v4FromGroups(g[6], g[7]));
+  }
+  // 64:ff9b:1::/48 NAT64 local-use
+  if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 1) return true;
+  // ::/96 IPv4-compatible (deprecated) and the rest of ::/8 (after NAT64 above) — never global
+  if (g[0] >>> 8 === 0) return true;
+  // 100::/64 discard-only
+  if (g[0] === 0x100 && g.slice(1, 4).every((x) => x === 0)) return true;
+  // 2001::/32 Teredo — embeds an obfuscated client IPv4; never needed here
+  if (g[0] === 0x2001 && g[1] === 0) return true;
+  // 2001:db8::/32 documentation
+  if (g[0] === 0x2001 && g[1] === 0xdb8) return true;
+  // 2002::/16 6to4 — reaches the IPv4 in groups 1-2
+  if (g[0] === 0x2002) return isPrivateIPv4(v4FromGroups(g[1], g[2]));
+  // fc00::/7 unique local
+  if ((g[0] & 0xfe00) === 0xfc00) return true;
+  // fe80::/10 link-local, fec0::/10 deprecated site-local
+  if ((g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xffc0) === 0xfec0) return true;
+  // ff00::/8 multicast
+  if (g[0] >>> 8 === 0xff) return true;
+
   return false;
 }
 
