@@ -189,8 +189,8 @@ describe("verifyPackageSignature", () => {
     ).toMatchObject({ reason: "unsupported_alg" });
   });
 
-  it("ships with an empty pinned key list and unsigned approval allowed by default", () => {
-    expect(PINNED_BRANDCODE_SIGNING_KEYS).toEqual([]);
+  it("pins exactly one active Studio key and allows unsigned approval by default", () => {
+    expect(PINNED_BRANDCODE_SIGNING_KEYS.map((k) => [k.keyId, k.status])).toEqual([["studio-2026-10", "active"]]);
     expect(REQUIRE_SIGNED_APPROVAL_DEFAULT).toBe(false);
     expect(requireSignedApproval({})).toBe(false);
     expect(requireSignedApproval({ [REQUIRE_SIGNED_APPROVAL_ENV]: "true" })).toBe(true);

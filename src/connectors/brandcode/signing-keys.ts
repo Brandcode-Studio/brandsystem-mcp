@@ -16,10 +16,8 @@
  *                          signed before a rotation still verify.
  * A compromised key is deleted from this list outright (never "retired").
  *
- * The list ships empty. It is filled during key provisioning, following
- * docs/SIGNED-PACKAGES.md; until then every package is "unsigned" or, if
- * Studio already signs, "invalid: unknown key", and approval falls back to
- * the trusted-origin rule.
+ * Rotation follows docs/SIGNED-PACKAGES.md: add the new key as "active",
+ * mark the previous one "retired", and release before Studio switches keys.
  */
 
 export type SigningKeyStatus = "active" | "retired";
@@ -30,4 +28,12 @@ export interface PinnedSigningKey {
   status: SigningKeyStatus;
 }
 
-export const PINNED_BRANDCODE_SIGNING_KEYS: readonly PinnedSigningKey[] = Object.freeze([]);
+export const PINNED_BRANDCODE_SIGNING_KEYS: readonly PinnedSigningKey[] = Object.freeze([
+  {
+    keyId: "studio-2026-10",
+    publicKey: `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAOoEEMgh9J0l4HxeIQWZgmYu0v0nZjNEj2S/gPS7ANrY=
+-----END PUBLIC KEY-----`,
+    status: "active",
+  },
+]);
