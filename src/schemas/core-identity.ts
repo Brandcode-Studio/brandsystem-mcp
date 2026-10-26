@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COLOR_ROLES } from "../lib/color-roles.js";
 
 const ConfidenceEnum = z.enum(["confirmed", "high", "medium", "low"]);
 const SourceEnum = z.enum(["web", "visual", "figma", "guidelines", "manual"]);
@@ -6,12 +7,8 @@ const SourceEnum = z.enum(["web", "visual", "figma", "guidelines", "manual"]);
 export const ColorEntrySchema = z.object({
   name: z.string(),
   value: z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "Must be a valid hex color"),
-  role: z.enum([
-    "primary", "secondary", "accent", "neutral",
-    "surface", "text", "action",
-    "tint", "overlay", "border", "gradient", "highlight",
-    "unknown",
-  ]),
+  // Base roles plus variant roles (issue #93) — canonical list in lib/color-roles.ts.
+  role: z.enum(COLOR_ROLES),
   // Optional theme dimension (issue #35 gap 1): absent = theme-agnostic/default.
   theme: z.enum(["light", "dark"]).optional(),
   source: SourceEnum,

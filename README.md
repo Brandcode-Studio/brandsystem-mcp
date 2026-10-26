@@ -575,7 +575,7 @@ Use this when the homepage is not enough to understand the brand system, or when
 
 `brand_compile` transforms `core-identity.yaml` into [Design Tokens Community Group](https://tr.designtokens.org/format/) format:
 
-- Colors become `$type: "color"` tokens keyed by role
+- Colors become `$type: "color"` tokens keyed by role. When a site has two legitimate same-role colors in the same theme (for example a page surface and a muted panel surface), the runner-up is kept as a role variant (`surface-alt`, `text-secondary`, `neutral-alt`, `border-alt`, `accent-alt`, `action-alt`), compiled as a sibling token such as `color.surface-alt` with `variantOf` in its extensions. A variant needs at least `medium` confidence, the same source tier as the base color, and a visible difference from it. Each base role gets at most one variant per theme
 - Typography becomes grouped tokens with `fontFamily`, `dimension` (size), and `fontWeight` entries
 - Spacing becomes `dimension` tokens with scale values
 - Each token includes `$extensions["com.brandsystem"]` with source and confidence metadata

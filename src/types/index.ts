@@ -1,10 +1,25 @@
 export type Confidence = "confirmed" | "high" | "medium" | "low";
 export type Source = "web" | "visual" | "figma" | "guidelines" | "manual";
 
+/** Roles extractors infer. */
+export type BaseColorRole =
+  | "primary" | "secondary" | "accent" | "neutral" | "surface" | "text" | "action"
+  | "tint" | "overlay" | "border" | "gradient" | "highlight" | "unknown";
+
+/**
+ * Variant roles (issue #93): a second legitimate same-role, same-theme color,
+ * promoted by the merge when it has enough independent evidence. At most one
+ * variant per base role per theme. See src/lib/color-roles.ts.
+ */
+export type VariantColorRole =
+  | "surface-alt" | "text-secondary" | "neutral-alt" | "border-alt" | "accent-alt" | "action-alt";
+
+export type ColorRole = BaseColorRole | VariantColorRole;
+
 export interface ColorEntry {
   name: string;
   value: string; // hex
-  role: "primary" | "secondary" | "accent" | "neutral" | "surface" | "text" | "action" | "tint" | "overlay" | "border" | "gradient" | "highlight" | "unknown";
+  role: ColorRole;
   /**
    * Theme dimension (issue #35 gap 1). Absent = theme-agnostic/default —
    * every pre-existing entry stays valid. "dark" entries occupy their own

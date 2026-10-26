@@ -4,7 +4,7 @@
     { "value": "#d90429", "role": "primary", "confidence": "medium", "note": "promoted to primary: most frequent chromatic color" },
     { "value": "#ffffff", "role": "surface", "confidence": "high" },
     { "value": "#212529", "role": "text", "confidence": "medium" },
-    { "value": "#1d3557", "role": ["secondary", "text"], "known_gap": true, "note": "dark navy is now correctly chromatic (saturation-based isChromatic) and surfaces as a chromatic candidate, but still loses the single default-theme text slot to #212529 — same-theme collapse, not addressed by the #35 (role, theme) merge key" }
+    { "value": "#1d3557", "role": ["secondary", "text", "text-secondary"], "known_gap": true, "note": "still a known gap after issue #93, deliberately: the role-variant merge would offer it the text-secondary slot, but the extractor rates it LOW confidence (computed-only color in .masthead-accent, no role keyword), below the variant evidence threshold (>= medium) that keeps noise out of palettes. Closing this needs better role/confidence inference for dark chromatic text (it reads as a secondary brand color), not a looser merge" }
   ],
   "fonts": [
     { "family": "Lora", "confidence": "medium" }
@@ -26,6 +26,6 @@
     "font_recall": 0.95
   },
   "known_gaps": [
-    "#1d3557 reaches chromatic_candidates (dark-chromatic fix) but is still dropped from the merged identity: the one-color-per-(role, theme) merge keeps #212529 in the single default-theme text slot. It is a dark COLOR, not a dark-THEME color, so the issue #35 theme dimension does not apply."
+    "#1d3557 reaches chromatic_candidates (dark-chromatic fix) but is still dropped from the merged identity: #212529 keeps the default-theme text slot, and the issue #93 role-variant promotion (text-secondary) requires >= medium confidence while the extractor rates #1d3557 low (computed-only sighting). The remaining gap is in confidence/role inference, not the merge."
   ]
 }

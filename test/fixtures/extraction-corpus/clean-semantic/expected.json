@@ -6,7 +6,7 @@
     { "value": "#ff7f11", "role": "accent", "confidence": "high" },
     { "value": "#f4f4f4", "role": "surface", "confidence": "high" },
     { "value": "#161616", "role": "text", "confidence": "high" },
-    { "value": "#ffffff", "role": "surface", "known_gap": true, "note": "mergeColor keeps one color per (role, theme) — body white and --surface-muted #f4f4f4 are both default-theme surfaces, so white still folds into the occupied slot (the #35 theme dimension does not apply here)" }
+    { "value": "#ffffff", "role": "surface-alt", "confidence": "high", "note": "issue #93 (flipped from known_gap): body white and --surface-muted #f4f4f4 are both high-confidence default-theme surfaces. #f4f4f4 keeps the base surface slot (unchanged first-wins selection); white clears the variant evidence threshold (>= medium, same source tier, ΔE >= 3) and is promoted to surface-alt instead of being dropped" }
   ],
   "fonts": [
     { "family": "Source Sans Pro", "confidence": "medium" },
@@ -28,7 +28,5 @@
     "font_precision": 0.95,
     "font_recall": 0.95
   },
-  "known_gaps": [
-    "Single slot per (role, theme): #ffffff (body background) is extracted but dropped because #f4f4f4 already occupies the default-theme surface slot. The issue #35 theme dimension only separates dark-scoped colors; two same-theme surfaces still collapse."
-  ]
+  "known_gaps": []
 }

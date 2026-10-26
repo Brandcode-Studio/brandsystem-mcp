@@ -6,6 +6,7 @@ import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES, type ColorEntry, type ClarificationItem } from "../types/index.js";
 import { isChromatic } from "../lib/css-parser.js";
+import { BASE_COLOR_ROLES, VARIANT_COLOR_ROLES } from "../lib/color-roles.js";
 import { fenceUntrusted } from "../lib/untrusted-text.js";
 import { writeApprovalState, computeBrandFingerprint } from "../lib/approval-state.js";
 import type { NeedsClarificationData } from "../schemas/index.js";
@@ -13,18 +14,34 @@ import type { CoreIdentityData } from "../schemas/index.js";
 
 const paramsShape = {
   id: z.string().describe("Clarification item ID from needs-clarification.yaml (e.g. 'clarify-1')"),
-  answer: z.string().describe("The user's answer: a hex color (#ff0000), a role name (primary, secondary, accent, neutral, surface, text, action, tint, overlay, border, gradient, highlight), a font name, 'yes'/'no', or natural language ('the purple one is accent, the pink transparents are tint')"),
+  answer: z.string().describe("The user's answer: a hex color (#ff0000), a role name (primary, secondary, accent, neutral, surface, text, action, tint, overlay, border, gradient, highlight; variants: surface-alt, text-secondary, neutral-alt, border-alt, accent-alt, action-alt), a font name, 'yes'/'no', or natural language ('the purple one is accent, the pink transparents are tint')"),
 };
 
 const ParamsSchema = z.object(paramsShape);
 type Params = z.infer<typeof ParamsSchema>;
 
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
-const VALID_ROLES = ["primary", "secondary", "accent", "neutral", "surface", "text", "action", "tint", "overlay", "border", "gradient", "highlight"] as const;
+// Every assignable role: base roles first (inferDemotedRole relies on that
+// order), then the issue #93 variant roles (surface-alt, text-secondary, ...).
+const VALID_ROLES = [
+  ...BASE_COLOR_ROLES.filter((r) => r !== "unknown"),
+  ...VARIANT_COLOR_ROLES,
+] as readonly Exclude<ColorEntry["role"], "unknown">[];
 type ColorRole = (typeof VALID_ROLES)[number];
 
 function isValidRole(s: string): s is ColorRole {
   return (VALID_ROLES as readonly string[]).includes(s.toLowerCase());
+}
+
+/**
+ * Normalize a captured role token. Hyphenated tokens are kept only when they
+ * name a variant role ("text-secondary"); otherwise fall back to the leading
+ * word so "accent-color" still reads as "accent", as it did before variants.
+ */
+function roleToken(raw: string): string {
+  const token = raw.trim().toLowerCase();
+  if (isValidRole(token) || !token.includes("-")) return token;
+  return token.split("-")[0];
 }
 
 /**
@@ -229,12 +246,13 @@ function parseRoleAssignments(
   const assignments: Array<{ hex: string; role: ColorRole }> = [];
 
   // --- Primary path: exact hex references ---
-  const hexPattern = /(#[0-9a-fA-F]{3,8})\s*(?:is|=|:|-|—)\s*(\w+)/gi;
+  // Role token allows one hyphenated suffix for variant roles ("text-secondary").
+  const hexPattern = /(#[0-9a-fA-F]{3,8})\s*(?:is|=|:|-|—)\s*(\w+(?:-\w+)?)/gi;
   let match: RegExpExecArray | null;
 
   while ((match = hexPattern.exec(answer)) !== null) {
     const hex = match[1].toLowerCase();
-    const roleName = match[2].toLowerCase();
+    const roleName = roleToken(match[2]);
     if (HEX_RE.test(hex) && isValidRole(roleName)) {
       assignments.push({ hex, role: roleName as ColorRole });
     }
@@ -250,12 +268,12 @@ function parseRoleAssignments(
     // Match patterns like "the purple one is primary", "dark color is neutral",
     // "purple = accent", "the light one is surface",
     // "the coral/red ones are secondary"
-    const nlPattern = /(?:the\s+)?(.+?)\s+(?:ones?\s+)?(?:is|are|=|:|-|—)\s*(\w+)/i;
+    const nlPattern = /(?:the\s+)?(.+?)\s+(?:ones?\s+)?(?:is|are|=|:|-|—)\s*(\w+(?:-\w+)?)/i;
     const nlMatch = segment.match(nlPattern);
     if (!nlMatch) continue;
 
     const colorDesc = nlMatch[1].trim();
-    const roleName = nlMatch[2].trim().toLowerCase();
+    const roleName = roleToken(nlMatch[2]);
 
     if (!isValidRole(roleName)) continue;
 

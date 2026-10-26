@@ -1,5 +1,6 @@
 import type { Confidence, Source, ColorEntry, TypographyEntry } from "../types/index.js";
 import { isPlausibleFontName } from "./untrusted-text.js";
+import { colorDeltaE, variantRoleFor } from "./color-roles.js";
 
 /** Legacy source precedence used by existing merge paths */
 const SOURCE_RANK: Record<Source, number> = {
@@ -57,32 +58,109 @@ function colorThemeKey(entry: ColorEntry): "default" | "dark" {
 }
 
 /**
- * Merge a new color entry into an existing array.
- * Slots are keyed on (role, theme) — one color per role per theme.
- * If a color with the same (role, theme) exists and the new source has higher
- * precedence, replace it. If same source, keep the one with higher confidence.
+ * Role-variant promotion (issue #93) — evidence threshold.
+ *
+ * A same-role, same-theme color that loses the base (role, theme) slot is
+ * promoted to that role's variant slot (see lib/color-roles.ts) only when ALL
+ * of these hold, so extraction noise cannot inflate the palette:
+ *  - it carries at least `medium` confidence — the same bar as token-worthiness,
+ *    i.e. independent evidence beyond a single computed/low-signal sighting;
+ *  - it comes from the same source-precedence tier as the base slot holder
+ *    (a lower-precedence source never adds variants to an authoritative
+ *    palette — web sightings don't extend a Figma- or guidelines-defined one);
+ *  - it is perceptually distinct from the base color (CIE76 ΔE >= 3, above the
+ *    ~2.3 just-noticeable difference), so near-duplicates don't double up;
+ *  - its value is not already in the palette for that theme.
+ * Only ONE variant per (base role, theme): a contest for the variant slot is
+ * resolved with the same precedence/confidence rules as the base slot.
  */
-export function mergeColor(existing: ColorEntry[], incoming: ColorEntry): ColorEntry[] {
-  const idx = existing.findIndex(
-    (e) => e.role === incoming.role && e.role !== "unknown" && colorThemeKey(e) === colorThemeKey(incoming)
+export const VARIANT_MIN_CONFIDENCE: Confidence = "medium";
+export const VARIANT_MIN_DELTA_E = 3;
+
+type RankFn = (source: Source) => number;
+
+function sameSlot(e: ColorEntry, role: ColorEntry["role"], theme: "default" | "dark"): boolean {
+  return e.role === role && e.role !== "unknown" && colorThemeKey(e) === theme;
+}
+
+/** Does `incoming` beat `current` for a slot? Source precedence, then confidence. */
+function wins(incoming: ColorEntry, current: ColorEntry, rank: RankFn): boolean {
+  return (
+    rank(incoming.source) > rank(current.source) ||
+    (incoming.source === current.source &&
+      CONFIDENCE_RANK[incoming.confidence] > CONFIDENCE_RANK[current.confidence])
   );
+}
+
+function qualifiesAsVariant(
+  candidate: ColorEntry,
+  base: ColorEntry,
+  palette: ColorEntry[],
+  rank: RankFn,
+): boolean {
+  if (CONFIDENCE_RANK[candidate.confidence] < CONFIDENCE_RANK[VARIANT_MIN_CONFIDENCE]) return false;
+  if (rank(candidate.source) !== rank(base.source)) return false;
+  if (colorDeltaE(candidate.value, base.value) < VARIANT_MIN_DELTA_E) return false;
+  const theme = colorThemeKey(candidate);
+  const value = candidate.value.toLowerCase();
+  return !palette.some((e) => colorThemeKey(e) === theme && e.value.toLowerCase() === value);
+}
+
+/**
+ * Offer the loser of a base-slot contest to the variant slot. Returns the
+ * palette unchanged when the candidate does not clear the evidence threshold
+ * or loses the (single) variant slot to its current holder.
+ */
+function offerVariant(
+  palette: ColorEntry[],
+  candidate: ColorEntry,
+  base: ColorEntry,
+  rank: RankFn,
+): ColorEntry[] {
+  const variantRole = variantRoleFor(candidate.role);
+  if (!variantRole) return palette;
+  if (!qualifiesAsVariant(candidate, base, palette, rank)) return palette;
+
+  const promoted: ColorEntry = { ...candidate, role: variantRole };
+  const theme = colorThemeKey(candidate);
+  const idx = palette.findIndex((e) => sameSlot(e, variantRole, theme));
+  if (idx === -1) return [...palette, promoted];
+  if (!wins(promoted, palette[idx], rank)) return palette;
+  const result = [...palette];
+  result[idx] = promoted;
+  return result;
+}
+
+function mergeColorRanked(existing: ColorEntry[], incoming: ColorEntry, rank: RankFn): ColorEntry[] {
+  const theme = colorThemeKey(incoming);
+  const idx = existing.findIndex((e) => sameSlot(e, incoming.role, theme));
 
   if (idx === -1) {
     return [...existing, incoming];
   }
 
   const current = existing[idx];
-  if (
-    SOURCE_RANK[incoming.source] > SOURCE_RANK[current.source] ||
-    (incoming.source === current.source &&
-      CONFIDENCE_RANK[incoming.confidence] > CONFIDENCE_RANK[current.confidence])
-  ) {
+  if (wins(incoming, current, rank)) {
+    // Base-slot selection is unchanged from the pre-#93 behaviour; the
+    // displaced incumbent may now survive as the variant instead of vanishing.
     const result = [...existing];
     result[idx] = incoming;
-    return result;
+    return offerVariant(result, current, incoming, rank);
   }
 
-  return existing;
+  return offerVariant(existing, incoming, current, rank);
+}
+
+/**
+ * Merge a new color entry into an existing array.
+ * Slots are keyed on (role, theme) — one color per role per theme.
+ * If a color with the same (role, theme) exists and the new source has higher
+ * precedence, replace it. If same source, keep the one with higher confidence.
+ * The losing color may be promoted to the role's variant slot (issue #93)
+ * when it clears the evidence threshold above.
+ */
+export function mergeColor(existing: ColorEntry[], incoming: ColorEntry): ColorEntry[] {
+  return mergeColorRanked(existing, incoming, (s) => SOURCE_RANK[s]);
 }
 
 /**
@@ -138,26 +216,7 @@ export function mergeColorWithPriority(
   incoming: ColorEntry,
   priority: Source[] = DEFAULT_SOURCE_PRIORITY,
 ): ColorEntry[] {
-  const idx = existing.findIndex(
-    (e) => e.role === incoming.role && e.role !== "unknown" && colorThemeKey(e) === colorThemeKey(incoming)
-  );
-
-  if (idx === -1) {
-    return [...existing, incoming];
-  }
-
-  const current = existing[idx];
-  if (
-    sourcePriorityRank(incoming.source, priority) > sourcePriorityRank(current.source, priority) ||
-    (incoming.source === current.source &&
-      CONFIDENCE_RANK[incoming.confidence] > CONFIDENCE_RANK[current.confidence])
-  ) {
-    const result = [...existing];
-    result[idx] = incoming;
-    return result;
-  }
-
-  return existing;
+  return mergeColorRanked(existing, incoming, (s) => sourcePriorityRank(s, priority));
 }
 
 export function mergeTypographyWithPriority(
