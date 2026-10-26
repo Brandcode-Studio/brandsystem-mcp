@@ -26,6 +26,8 @@ npx @brandsystem/mcp install --client claude-code --write
 npx @brandsystem/mcp install --client cline --write
 ```
 
+**Claude Desktop (one-click):** download `brandsystem-mcp-<version>.mcpb` from the [latest GitHub release](https://github.com/Brandcode-Studio/brandsystem-mcp/releases/latest) and double-click it (or drag it into Settings > Extensions). Claude Desktop asks for the folder that holds your `.brand/` directory — no Node install or JSON editing needed.
+
 `install` is a dry run unless you pass `--write`. Replace `claude-code` with `cline`, `cursor`, `windsurf`, or `claude-desktop` as needed. JSON-file targets preserve existing settings; Cline and Codex setup delegate to their official MCP commands so their current schemas remain authoritative. Agents can follow the compact [installation guide](llms-install.md) without reading this entire README.
 
 Already configured? Tell your agent:
@@ -96,6 +98,23 @@ Load `brand-runtime.json` into any sub-agent's context. First output is on-brand
 > Run brand_write for a social-graphic about "Q3 product launch"
 
 The AI now has your full brand context — colors, typography, logo, anti-patterns, voice rules — and generates on-brand content.
+
+### Export to every tool's native format
+
+Encode the brand once, then drop it into each tool in the format that tool already reads. `brand_export` writes to `.brand/exports/`:
+
+| Target | Output | Where it goes |
+|--------|--------|---------------|
+| `agents-md` | `AGENTS.md` section (between `brandsystem:start`/`end` markers) | Project-root `AGENTS.md` — read by Codex, Cursor, and other AGENTS.md-aware agents |
+| `cursor-rules` | `brand.mdc` with `description` / `globs` / `alwaysApply: false` frontmatter | `.cursor/rules/brand.mdc` — auto-attached to UI files |
+| `css-variables` | `:root { --brand-color-*; --brand-font-* }` plus a `[data-theme="dark"]` / `prefers-color-scheme: dark` block when the brand has a dark palette | Any stylesheet |
+| `tailwind` | Tailwind CSS v4 `@theme { --color-brand-*; --font-brand-*; --radius-brand-* }` | After `@import "tailwindcss";` |
+| `shadcn` | shadcn/ui `:root` + `.dark` variables (`--background`, `--primary`, `--ring`, `--radius` …) mapped from brand roles | `globals.css` in a shadcn/ui project |
+| `claude-skill`, `chat`, `code`, `team`, `email`, `pdf` | Skill file, chat upload, CLAUDE.md snippet, guidelines, summary, PDF guide | Claude skills, AI chats, teammates |
+
+> Run brand_export with target="tailwind"
+
+CSS targets are generated from the compiled DTCG tokens; brand strings are validated (hex colors, plausible font names, quoted families) so nothing extracted can break out of a declaration. Instruction targets (`agents-md`, `cursor-rules`) carry the provenance notice and keep brand values in a fenced data block.
 
 ### 5. Go deeper (optional)
 
@@ -239,7 +258,7 @@ Or set `BRANDSYSTEM_PROFILE=full`. Core tools: `brand_start`, `brand_status`, `b
 | `brand_runtime` | Read the compiled brand runtime contract (single-document brand context for AI agents). |
 | `brand_context` | Select a task-scoped slice of the runtime deterministically (task_type → sections, audience → persona match, compact budget). Returns matched selectors and explicit no-match — never silent fallback. |
 | `brand_write` | Load full brand context (visual + voice + strategy) for content generation. |
-| `brand_export` | Generate portable brand files for Chat, Code, team sharing, or email. |
+| `brand_export` | Export the brand in each tool's native format: AGENTS.md, Cursor rules, CSS variables, Tailwind v4 theme, shadcn/ui theme, Claude skill, chat/team/email markdown, or PDF. |
 | `brand_feedback` | Report bugs, friction, or feature ideas to the brandsystem team. |
 
 ### Brandcode Studio Connector
@@ -424,14 +443,17 @@ Create `~/.codeium/windsurf/mcp_config.json`:
 
 ### Claude Desktop
 
-Open Settings > Developer > Edit Config (`claude_desktop_config.json`):
+**One-click:** install the MCP Bundle — download `brandsystem-mcp-<version>.mcpb` from the [latest GitHub release](https://github.com/Brandcode-Studio/brandsystem-mcp/releases/latest) and open it with Claude Desktop. You choose the brand project folder (where `.brand/` lives) and the tool profile (`core` or `full`) in the install dialog. Maintainers build the bundle with `npm run build:mcpb` (→ `build/brandsystem-mcp-<version>.mcpb`); its manifest is generated from `package.json` and the registered Core tools.
+
+**Manual:** open Settings > Developer > Edit Config (`claude_desktop_config.json`). Claude Desktop does not start servers in your project folder, so set `BRANDSYSTEM_PROJECT_DIR` to the folder that holds (or will hold) `.brand/`:
 
 ```json
 {
   "mcpServers": {
     "brandsystem": {
       "command": "npx",
-      "args": ["-y", "@brandsystem/mcp"]
+      "args": ["-y", "@brandsystem/mcp"],
+      "env": { "BRANDSYSTEM_PROJECT_DIR": "/absolute/path/to/your/brand-project" }
     }
   }
 }

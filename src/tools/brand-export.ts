@@ -16,12 +16,35 @@ import type {
 import { ERROR_CODES } from "../types/index.js";
 import type { BrandConfig } from "../types/index.js";
 import { cleanColorName } from "../lib/color-namer.js";
+import type { DesignSynthesisFile } from "../lib/design-synthesis.js";
+import {
+  generateAgentsMd,
+  generateCursorRule,
+  generateCssVariables,
+  generateShadcnTheme,
+  generateTailwindTheme,
+  type NativeExportInput,
+} from "../lib/native-exports.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type ExportTarget = "chat" | "code" | "team" | "email" | "claude-skill" | "pdf";
+const EXPORT_TARGETS = [
+  "chat",
+  "code",
+  "team",
+  "email",
+  "claude-skill",
+  "pdf",
+  "agents-md",
+  "cursor-rules",
+  "css-variables",
+  "tailwind",
+  "shadcn",
+] as const;
+
+type ExportTarget = (typeof EXPORT_TARGETS)[number];
 
 // ---------------------------------------------------------------------------
 // Data loading — graceful degradation for all layers
@@ -32,6 +55,8 @@ interface BrandData {
   identity: CoreIdentityData;
   visual: VisualIdentityData | null;
   messaging: MessagingData | null;
+  /** Design synthesis (radius/shadow/spacing signals) when brand_compile has produced it. */
+  synthesis?: DesignSynthesisFile | null;
 }
 
 async function loadBrandData(brandDir: BrandDir): Promise<BrandData> {
@@ -62,7 +87,26 @@ async function loadBrandData(brandDir: BrandDir): Promise<BrandData> {
     }
   }
 
-  return { config, identity, visual, messaging };
+  let synthesis: DesignSynthesisFile | null = null;
+  if (await brandDir.hasDesignSynthesis()) {
+    try {
+      synthesis = await brandDir.readDesignSynthesis<DesignSynthesisFile>();
+    } catch {
+      // Degrade gracefully: native exports still work from core identity alone
+    }
+  }
+
+  return { config, identity, visual, messaging, synthesis };
+}
+
+function nativeInput(data: BrandData): NativeExportInput {
+  return {
+    clientName: data.config.client_name,
+    identity: data.identity,
+    visual: data.visual,
+    messaging: data.messaging,
+    synthesis: data.synthesis ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -763,6 +807,30 @@ const TARGET_FILES: Record<ExportTarget, string> = {
   email: "exports/brand-summary.md",
   "claude-skill": "exports/brand-skill.md",
   pdf: "exports/brand-guide.pdf",
+  "agents-md": "exports/AGENTS.md",
+  "cursor-rules": "exports/brand.mdc",
+  "css-variables": "exports/brand-variables.css",
+  tailwind: "exports/brand-theme.css",
+  shadcn: "exports/shadcn-theme.css",
+};
+
+const TARGET_NEXT_STEP: Record<ExportTarget, string> = {
+  chat: "Upload .brand/exports/brand-system-chat.md to any AI conversation",
+  code: "Follow the setup instructions in .brand/exports/brand-system-code.md",
+  team: "Share .brand/exports/brand-guidelines.md with your team",
+  email: "Copy the summary from .brand/exports/brand-summary.md into an email or Slack",
+  "claude-skill":
+    "Save .brand/exports/brand-skill.md as SKILL.md in your Claude skills folder. See deployment instructions at the bottom of the file.",
+  pdf: "Share .brand/exports/brand-guide.pdf with your team or attach it to a brief",
+  "agents-md":
+    "Paste .brand/exports/AGENTS.md into the project-root AGENTS.md (Codex, Cursor, and other agents read it); replace the block between the brandsystem:start/end markers on re-export",
+  "cursor-rules": "Copy .brand/exports/brand.mdc to .cursor/rules/brand.mdc so Cursor attaches it to UI files",
+  "css-variables":
+    "Import .brand/exports/brand-variables.css in your global stylesheet and use var(--brand-color-*) / var(--brand-font-*)",
+  tailwind:
+    'Add .brand/exports/brand-theme.css after @import "tailwindcss"; to get bg-brand-*, font-brand-*, rounded-brand-* utilities (Tailwind v4)',
+  shadcn:
+    "Replace the :root and .dark blocks in your shadcn globals.css with .brand/exports/shadcn-theme.css (keep the @theme inline mapping)",
 };
 
 // ---------------------------------------------------------------------------
@@ -825,6 +893,21 @@ async function handler(input: ExportParams) {
       content = `Brand guide PDF generated (${Math.round(pdfBytes.length / 1024)}KB, ${data.identity.colors.length} colors, ${data.identity.typography.length} fonts)`;
       break;
     }
+    case "agents-md":
+      content = generateAgentsMd(nativeInput(data));
+      break;
+    case "cursor-rules":
+      content = generateCursorRule(nativeInput(data));
+      break;
+    case "css-variables":
+      content = generateCssVariables(nativeInput(data));
+      break;
+    case "tailwind":
+      content = generateTailwindTheme(nativeInput(data));
+      break;
+    case "shadcn":
+      content = generateShadcnTheme(nativeInput(data));
+      break;
   }
 
   // Stamp the level-appropriate provenance notice: generators emit the
@@ -850,17 +933,7 @@ async function handler(input: ExportParams) {
 
   return buildResponse({
     what_happened: `Generated "${target}" export for "${data.config.client_name}" → .brand/${filename}`,
-    next_steps: [
-      target === "chat"
-        ? "Upload .brand/exports/brand-system-chat.md to any AI conversation"
-        : target === "code"
-          ? "Follow the setup instructions in .brand/exports/brand-system-code.md"
-          : target === "team"
-            ? "Share .brand/exports/brand-guidelines.md with your team"
-            : target === "claude-skill"
-              ? "Save .brand/exports/brand-skill.md as SKILL.md in your Claude skills folder. See deployment instructions at the bottom of the file."
-              : "Copy the summary from .brand/exports/brand-summary.md into an email or Slack",
-    ],
+    next_steps: [TARGET_NEXT_STEP[target]],
     data: {
       file: `.brand/${filename}`,
       target,
@@ -877,9 +950,9 @@ async function handler(input: ExportParams) {
 
 const paramsShape = {
   target: z
-    .enum(["chat", "code", "team", "email", "claude-skill", "pdf"])
+    .enum(EXPORT_TARGETS)
     .describe(
-      "Where this export will be used. 'chat': upload to AI conversation (Claude/ChatGPT/Gemini). 'code': paste into CLAUDE.md or .cursorrules. 'team': share with designers/writers. 'email': send via Slack or email. 'claude-skill': persistent Claude skill file with embedded logo + brand rules. 'pdf': brand guide PDF with color swatches, typography, visual rules, and voice summary — no browser needed."
+      "Where this export will be used — pick the host's native format. 'chat': upload to AI conversation (Claude/ChatGPT/Gemini). 'code': MCP config + CLAUDE.md snippet. 'team': share with designers/writers. 'email': send via Slack or email. 'claude-skill': persistent Claude skill file with embedded logo + brand rules. 'pdf': brand guide PDF with swatches, type, rules, voice. 'agents-md': AGENTS.md section for Codex/Cursor/any AGENTS.md-reading agent. 'cursor-rules': .cursor/rules/brand.mdc (auto-attached to UI files). 'css-variables': :root { --brand-* } custom properties with a dark-theme block. 'tailwind': Tailwind CSS v4 @theme { --color-brand-*, --font-brand-* }. 'shadcn': shadcn/ui :root + .dark theme variables (--primary, --background, --ring, --radius ...). Example: 'tailwind'."
     ),
   include_logo: z
     .boolean()
@@ -893,7 +966,7 @@ type ExportParams = z.infer<typeof ParamsSchema>;
 export function register(server: McpServer) {
   server.tool(
     "brand_export",
-    "Bundle the compiled brand system into a portable artifact for a specific destination. Use when asked 'share my brand', 'export for ChatGPT/Cursor/team', 'generate brand guidelines', 'make a one-pager', or 'create a brand PDF'. Target 'chat': self-contained markdown for upload to any AI conversation (Claude, ChatGPT, Gemini). Target 'code': MCP server config + CLAUDE.md/.cursorrules snippet. Target 'team': human-readable brand guidelines for designers/writers/marketers. Target 'email': ~500-word summary for Slack or email. Target 'claude-skill': SKILL.md with embedded logo + rules for persistent Claude artifacts. Target 'pdf': branded PDF with swatches, type, anti-patterns, and voice. Set include_logo=false to drop the embedded SVG/data URI when size matters. Writes to .brand/exports/<file> and returns the full content (markdown targets) or a generation summary (pdf). Requires brand_compile to have run first. NOT for previewing one section — use brand_preview.",
+    "Bundle the compiled brand system into a portable artifact in a destination's native format. Use when asked 'share my brand', 'export for ChatGPT/Cursor/Codex/team', 'add the brand to AGENTS.md', 'Cursor rules', 'CSS variables', 'Tailwind theme', 'shadcn theme', 'generate brand guidelines', or 'create a brand PDF'. Targets: 'chat' (markdown for any AI conversation), 'code' (MCP config + CLAUDE.md snippet), 'team' (human guidelines), 'email' (~500-word summary), 'claude-skill' (SKILL.md with embedded logo), 'pdf' (branded guide), 'agents-md' (AGENTS.md section), 'cursor-rules' (.cursor/rules/brand.mdc), 'css-variables' (:root --brand-* + dark block), 'tailwind' (v4 @theme CSS), 'shadcn' (shadcn/ui :root/.dark variables). CSS targets are generated from the compiled DTCG tokens. Writes to .brand/exports/<file> and returns the full content (text targets) or a generation summary (pdf). Requires brand_compile to have run first. NOT for previewing one section — use brand_preview.",
     paramsShape,
     { title: "Export brand guide", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {

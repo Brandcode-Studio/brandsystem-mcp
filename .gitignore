@@ -1,5 +1,7 @@
 node_modules/
 dist/
+build/
+*.mcpb
 .brand/
 !test/fixtures/**/.brand/
 *.tsbuildinfo

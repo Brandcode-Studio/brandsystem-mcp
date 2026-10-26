@@ -12,6 +12,7 @@
     "verify:release-metadata": "node tools/check-release-metadata.mjs",
     "prebuild": "npm run verify:release-metadata",
     "build": "tsc",
+    "build:mcpb": "npm run build && node scripts/build-mcpb.mjs",
     "dev": "tsc --watch",
     "smoke:hosted-mcp": "node scripts/hosted-mcp-smoke.mjs",
     "eval": "node scripts/agent-eval.mjs",
