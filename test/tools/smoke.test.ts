@@ -268,6 +268,22 @@ describe("tools that require .brand/ dir", () => {
     expectValidMetadata(json);
   });
 
+  it("brand_preflight render=true returns a valid envelope", async () => {
+    const json = await callAndParse("brand_preflight", {
+      html: "<div>test</div>",
+      render: true,
+      viewport: "mobile",
+    });
+    expectValidMetadata(json);
+    // Depending on suite order .brand/ may exist; either a rendered result,
+    // a not-initialized error, or a no-browser error is a graceful outcome.
+    if (json.error !== undefined) {
+      expect(["not_initialized", "browser_unavailable"]).toContain(json.error);
+    } else {
+      expect(json.mode).toBe("render");
+    }
+  }, 60000);
+
   it("brand_compile_messaging handles missing .brand/", async () => {
     const json = await callAndParse("brand_compile_messaging", {
       mode: "interview",
