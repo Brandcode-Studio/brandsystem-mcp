@@ -46,3 +46,26 @@ jobs:
       - name: All dependencies (warn-only)
         continue-on-error: true
         run: node scripts/audit-gate.mjs --warn-only
+      # `npm audit signatures` needs an installed tree. No secrets in this job,
+      # and --ignore-scripts keeps dependency lifecycle scripts from running.
+      - run: npm ci --ignore-scripts
+      - name: Registry signatures and provenance attestations (blocking)
+        # Fails if any installed package has an invalid registry signature or an
+        # invalid provenance attestation (packages without attestations pass).
+        run: npm audit signatures
+
+  # Not a required check: proves a release can be rebuilt bit-for-bit. Builds and
+  # packs twice from a clean dist/ and compares tarball sha256 — see
+  # scripts/check-reproducible-pack.mjs for why the pack is deterministic.
+  reproducible-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Build and pack twice, compare sha256
+        run: node scripts/check-reproducible-pack.mjs --out "$RUNNER_TEMP/reproducible-pack"
