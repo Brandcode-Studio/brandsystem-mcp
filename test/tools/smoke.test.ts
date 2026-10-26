@@ -1,20 +1,24 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../../src/server.js";
-import { readdir, unlink } from "node:fs/promises";
+import { mkdtemp, readdir, rm, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 
 // ---------------------------------------------------------------------------
 // Setup: create a real MCP client ↔ server pair over in-memory transport.
-// No .brand/ directory exists in the test working directory, so tools that
-// require one will return a graceful error rather than throwing.
+// The server runs against an empty temporary working directory (never the
+// repository root), so tools that require .brand/ return a graceful error
+// and tools that write .brand/ or .gitignore can't touch the checkout.
 // ---------------------------------------------------------------------------
 
 let client: Client;
+let workDir: string;
 
 beforeAll(async () => {
+  workDir = await mkdtemp(join(tmpdir(), "smoke-suite-"));
+  vi.spyOn(process, "cwd").mockReturnValue(workDir);
   const server = createServer({ profile: "full" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -22,6 +26,11 @@ beforeAll(async () => {
   client = new Client({ name: "smoke-test-client", version: "1.0.0" });
   await server.connect(serverTransport);
   await client.connect(clientTransport);
+});
+
+afterAll(async () => {
+  vi.restoreAllMocks();
+  await rm(workDir, { recursive: true, force: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -143,8 +152,7 @@ describe("tools that need no .brand/ dir", () => {
   });
 
   it("brand_init creates .brand/ (or reports it already exists)", async () => {
-    // brand_init tries to create .brand/ in cwd — it will either succeed
-    // or report "already exists". Either way, it should not throw.
+    // Runs in the suite's temporary working directory, never the repo root.
     const json = await callAndParse("brand_init", {
       client_name: "Smoke Test Brand",
     });
