@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## 0.18.0 (2026-10-26)
+
+Encode a brand once and use it natively in every AI tool, verify what agents actually render, and verify where a brand's approval came from.
+
+### Added
+
+- **Native exports for every host (#130).** `brand_export` gains `agents-md` (an AGENTS.md section for Codex, Cursor, and others), `cursor-rules` (`.cursor/rules` `.mdc`), `css-variables` (with a dark-theme block), `tailwind` (Tailwind v4 `@theme`), and `shadcn` (the full shadcn/ui variable set, foregrounds chosen for ≥ 4.5:1 contrast). All generated from the compiled DTCG tokens; any value that fails validation is dropped, and font names must pass the plausibility check.
+- **One-click Claude Desktop install (#130).** Each release attaches a `brandsystem-mcp-<version>.mcpb` bundle (manifest 0.3) with a project-folder picker, wired through the new `BRANDSYSTEM_PROJECT_DIR` setting.
+- **Rendered compliance checks (#129).** `brand_preflight` with `render: true` renders agent-built HTML (a string or a project `.html` file) in sandboxed headless Chrome with **all network blocked**, then checks what actually renders: off-palette colors by CIEDE2000 distance, the font face that loads, WCAG AA contrast on blended colors, and logo presence. Returns a 0–100 score, per-finding locators with the nearest brand value, and an optional screenshot under `.brand/checks/`. `brand_preflight` is no longer annotated read-only because screenshots write a file.
+- **Signed Brandcode Studio packages (#131).** Studio now signs every pulled package with Ed25519 (key `studio-2026-10`, pinned in this release). A valid signature lets approval be verified end to end and travel with the package; an invalid signature (tampered body, unknown key) never confers approval, even from the trusted origin. Unsigned packages keep the trusted-origin rule unless `BRANDCODE_REQUIRE_SIGNED_APPROVAL` is set. Connect/sync report `package_signature.status`, and `brand_audit` flags a tampered signed package. See `docs/SIGNED-PACKAGES.md`.
+- **Color role variants (#128, closes #93).** A second same-theme color for the same role is no longer dropped: with enough independent evidence it becomes a variant role (`surface-alt`, `text-secondary`, `neutral-alt`, `border-alt`, `accent-alt`, `action-alt`), capped at one per base role per theme, in core identity, tokens, runtime, and design synthesis. Extraction corpus labeled recall 25/29 → 28/29 with precision unchanged at 1.0.
+
+### Security
+
+- **Third-party logo fallback can be turned off (#126).** When a site has no detectable logo, web extraction sends its domain to Clearbit and Google's favicon service; `BRANDSYSTEM_THIRD_PARTY_LOGO_FALLBACK=off` now prevents any such request.
+- **Every outbound destination is declared and enforced (#126).** `security/egress-allowlist.json` lists each host, and a test fails on any undeclared one in source or the built package; `docs/DATA-FLOWS.md` is generated from it.
+- **Figma names are shape-checked (#128).** Style names and color variable names are checked before they become runtime keys, color names, or token extensions; implausible names are replaced with stable hashed keys.
+- **Hosted taste guidance is fenced (#128).** `brand_search` and `brand_check` return human-approved taste guidance as fenced, length-capped, untrusted user content with a data-not-instructions notice.
+
+### Release integrity
+
+- **SBOM and checksums on every release (#126).** A CycloneDX SBOM of production dependencies, `build-info.json`, and `SHA256SUMS` are built in the credential-free job and attached to the GitHub release after hash verification.
+- **CI verifies registry signatures and reproducible packs (#126).** `npm audit signatures` runs in the required audit job; a reproducible-build job packs twice and compares hashes.
+- **The MCP Registry step waits for npm to propagate (#123),** and the MCPB bundle builds in its own credential-free job so its CLI never touches the npm tarball or publish credentials (#130).
+
+### Fixed
+
+- **Hosted MCP smoke now proves what it claims (#124, #125).** Tool payloads' own `status` field overwrote check outcomes, so half the checks were never counted; and an empty timeout secret became an instant `NaN` timeout in CI. The nightly smoke now runs 13 checks against live staging.
+- **Tests no longer write into the checkout (#132).** The smoke suite runs against a temporary working directory instead of creating `.brand/` and editing `.gitignore` in the repository.
+
+
 ## 0.17.0 (2026-10-25)
 
 Security release. Fixes the privately reported SSRF bypass GHSA-j3rv-rv99-hg74 and every finding from the October 2026 security review of the local package, the hosted Brandcode MCP, and the release pipeline. Upgrade from any earlier version. Requires Node.js 22.13 or newer.
