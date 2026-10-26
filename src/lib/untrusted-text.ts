@@ -115,3 +115,34 @@ export function isPlausibleFontName(name: unknown): boolean {
   const words = trimmed.split(/\s+/).filter(Boolean);
   return words.length <= MAX_FONT_NAME_WORDS;
 }
+
+/**
+ * Upper bounds on a plausible design-tool style name ("Heading/H1",
+ * "Body / Large (Mobile)", "Display XL — Bold").
+ */
+export const MAX_STYLE_NAME_LENGTH = 64;
+export const MAX_STYLE_NAME_WORDS = 8;
+
+/**
+ * Decide whether an extracted string is shaped like a text-style name.
+ *
+ * Style names (e.g. Figma text styles) become typography entry names, which
+ * become KEYS in brand-runtime.json and token names in tokens.json — agent-
+ * facing instruction channels. Style names legitimately use more punctuation
+ * than font families (slashes, parentheses, dashes), so this is looser than
+ * isPlausibleFontName, but still structural: printable (no control, format/
+ * zero-width/bidi, or line/paragraph-separator characters), no backticks or
+ * angle brackets, at most MAX_STYLE_NAME_LENGTH characters and
+ * MAX_STYLE_NAME_WORDS words, and at least one letter or digit. Sentences
+ * and smuggled instructions fail on length or word count.
+ */
+export function isPlausibleStyleName(name: unknown): boolean {
+  if (typeof name !== "string") return false;
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > MAX_STYLE_NAME_LENGTH) return false;
+  if (/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(trimmed)) return false;
+  if (/[`<>]/.test(trimmed)) return false;
+  if (!/[\p{L}\p{N}]/u.test(trimmed)) return false;
+  const words = trimmed.split(/[\s/]+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+  return words.length <= MAX_STYLE_NAME_WORDS;
+}

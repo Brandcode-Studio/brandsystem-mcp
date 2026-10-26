@@ -8,7 +8,8 @@ import {
   isPlausibleFontName,
 } from "./untrusted-text.js";
 import type { BrandConfigData, CoreIdentityData, TokensFileData } from "../schemas/index.js";
-import type { Confidence } from "../types/index.js";
+import type { ColorRole, Confidence } from "../types/index.js";
+import { baseRoleOf, isVariantRole } from "./color-roles.js";
 import type { ExtractionEvidenceFile } from "./site-evidence.js";
 import type { ComputedElement } from "./visual-extractor.js";
 import { summarizeVisualTokens, type VisualComponentVariant } from "./visual-tokens.js";
@@ -178,6 +179,13 @@ interface EvidenceSnapshot {
 const BRAND_COLOR_ROLES = new Set(["primary", "secondary", "accent", "action", "highlight", "gradient", "tint"]);
 const SEMANTIC_COLOR_ROLES = new Set(["surface", "text", "neutral", "border", "overlay"]);
 const ROLE_PRIORITY = ["primary", "secondary", "accent", "action", "highlight", "surface", "text", "border", "neutral", "unknown"];
+
+/** Sort key: a variant role (issue #93) sorts immediately after its base role. */
+function rolePriority(role: ColorRole): number {
+  return isVariantRole(role)
+    ? ROLE_PRIORITY.indexOf(baseRoleOf(role)) + 0.5
+    : ROLE_PRIORITY.indexOf(role);
+}
 const SELECTOR_ROLE_PRIORITY: Record<string, number> = {
   hero_heading: 5,
   hero_subheading: 4,
@@ -442,7 +450,7 @@ function buildTypographyScale(identity: CoreIdentityData, elements: ComputedElem
 function buildColorGroups(identity: CoreIdentityData) {
   const tokenWorthy = identity.colors
     .filter((color) => isTokenWorthy(color.confidence))
-    .sort((a, b) => ROLE_PRIORITY.indexOf(a.role) - ROLE_PRIORITY.indexOf(b.role));
+    .sort((a, b) => rolePriority(a.role) - rolePriority(b.role));
 
   const toSignal = (color: CoreIdentityData["colors"][number]) => ({
     role: color.role,
@@ -460,9 +468,11 @@ function buildColorGroups(identity: CoreIdentityData) {
   const darkTheme = tokenWorthy.filter((color) => color.theme === "dark");
 
   return {
-    brand: defaultTheme.filter((color) => BRAND_COLOR_ROLES.has(color.role)).map(toSignal),
-    semantic: defaultTheme.filter((color) => SEMANTIC_COLOR_ROLES.has(color.role)).map(toSignal),
-    additional: defaultTheme.filter((color) => !BRAND_COLOR_ROLES.has(color.role) && !SEMANTIC_COLOR_ROLES.has(color.role)).map(toSignal),
+    // Variant roles (issue #93) group with their base role: surface-alt is
+    // semantic like surface, accent-alt is brand like accent.
+    brand: defaultTheme.filter((color) => BRAND_COLOR_ROLES.has(baseRoleOf(color.role))).map(toSignal),
+    semantic: defaultTheme.filter((color) => SEMANTIC_COLOR_ROLES.has(baseRoleOf(color.role))).map(toSignal),
+    additional: defaultTheme.filter((color) => !BRAND_COLOR_ROLES.has(baseRoleOf(color.role)) && !SEMANTIC_COLOR_ROLES.has(baseRoleOf(color.role))).map(toSignal),
     dark: darkTheme.map(toSignal),
   };
 }

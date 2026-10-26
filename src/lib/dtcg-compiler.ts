@@ -2,6 +2,7 @@ import type { CoreIdentityData } from "../schemas/index.js";
 import { colorTokenKey, cleanColorName } from "./color-namer.js";
 import type { DesignSynthesisFile } from "./design-synthesis.js";
 import { isTokenWorthy } from "./confidence.js";
+import { baseRoleOf, isVariantRole } from "./color-roles.js";
 
 /**
  * Compile core-identity.yaml into DTCG tokens.json format.
@@ -61,6 +62,9 @@ function compileColors(
     // Keys and descriptions are agent-facing: sanitized deterministic key
     // (collision-safe) and sanitized display name — raw extracted names stay
     // in core-identity evidence only (#taint closure).
+    // Variant roles (issue #93) compile to flat sibling keys — color.surface
+    // and color.surface-alt — because a DTCG node is either a token or a
+    // group, so a nested color.surface.alt cannot coexist with color.surface.
     const key = color.role === "unknown" ? colorTokenKey(color) : color.role;
     const token = {
       $value: color.value,
@@ -71,6 +75,7 @@ function compileColors(
           source: color.source,
           confidence: color.confidence,
           ...(color.theme && { theme: color.theme }),
+          ...(isVariantRole(color.role) && { variantOf: baseRoleOf(color.role) }),
           ...(color.figma_variable_id && { figmaVariableId: color.figma_variable_id }),
         },
       },

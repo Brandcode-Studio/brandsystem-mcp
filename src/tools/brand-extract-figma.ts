@@ -3,11 +3,26 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
 import { mergeColor, mergeTypography } from "../lib/confidence.js";
-import { recordRejectedFonts } from "../lib/font-guard.js";
+import { guardStyleName, recordRejectedFonts, recordReplacedStyleNames } from "../lib/font-guard.js";
+import { isPlausibleStyleName } from "../lib/untrusted-text.js";
+import { createHash } from "node:crypto";
 import { resolveSvg } from "../lib/svg-resolver.js";
 import { ERROR_CODES } from "../types/index.js";
 import type { ColorEntry, TypographyEntry } from "../types/index.js";
 import { buildSourceCatalogRecords, upsertSourceCatalog } from "../lib/source-catalog.js";
+
+/**
+ * Figma variable names become color names and the figmaVariableId token
+ * extension. An implausible name (control chars, backticks, angle brackets,
+ * over-long prose) is replaced by a stable hashed key and its id dropped;
+ * the color value itself is kept.
+ */
+function figmaColorIdentity(rawName: string, displayName: string = rawName): { name: string; figma_variable_id?: string } {
+  if (isPlausibleStyleName(rawName)) {
+    return { name: displayName, figma_variable_id: rawName };
+  }
+  return { name: `figma-color-${createHash("sha256").update(rawName).digest("hex").slice(0, 8)}` };
+}
 
 const paramsShape = {
   mode: z.enum(["plan", "ingest"]).describe('"plan" to get extraction instructions, "ingest" to process collected Figma data'),
@@ -128,6 +143,7 @@ async function handleIngest(input: Params) {
   let colorCount = 0;
   let typeCount = 0;
   const rejectedFonts: TypographyEntry[] = [];
+  const replacedStyleKeys: string[] = [];
 
   // Source 1: Structured variables
   if (input.variables) {
@@ -135,7 +151,7 @@ async function handleIngest(input: Params) {
       if (v.resolvedType === "COLOR" && typeof v.value === "string") {
         const hex = normalizeColor(v.value);
         if (!hex) continue;
-        colors = mergeColor(colors, { name: v.name.replace(/\//g, " ").trim(), value: hex, role: inferRoleFromFigmaName(v.name), source: "figma", confidence: "high", figma_variable_id: v.name });
+        colors = mergeColor(colors, { ...figmaColorIdentity(v.name, v.name.replace(/\//g, " ").trim()), value: hex, role: inferRoleFromFigmaName(v.name), source: "figma", confidence: "high" });
         colorCount++;
       }
     }
@@ -146,7 +162,7 @@ async function handleIngest(input: Params) {
     for (const [name, value] of Object.entries(input.variable_map)) {
       const hex = normalizeColor(value);
       if (!hex || colors.some(c => c.value === hex && c.source === "figma")) continue;
-      colors = mergeColor(colors, { name, value: hex, role: inferRoleFromFigmaName(name), source: "figma", confidence: "high", figma_variable_id: name });
+      colors = mergeColor(colors, { ...figmaColorIdentity(name), value: hex, role: inferRoleFromFigmaName(name), source: "figma", confidence: "high" });
       colorCount++;
     }
   }
@@ -172,7 +188,16 @@ async function handleIngest(input: Params) {
     for (const s of input.styles) {
       if (s.type === "TEXT" && s.fontFamily) {
         const rejectedBefore = rejectedFonts.length;
-        typography = mergeTypography(typography, { name: s.name.replace(/\//g, " ").trim(), family: s.fontFamily, size: s.fontSize ? s.fontSize + "px" : undefined, weight: s.fontWeight, line_height: s.lineHeight ? String(s.lineHeight) : undefined, source: "figma", confidence: "high", figma_style_id: s.name }, rejectedFonts);
+        // Style names become typography keys in brand-runtime.json and token
+        // names in tokens.json: shape-check them at the point they enter
+        // identity (font-guard.ts). Implausible names are stored under a
+        // generated safe key and surfaced as a clarification; the family
+        // still goes through the font gate in mergeTypography.
+        const entry = guardStyleName(
+          { name: s.name.replace(/\//g, " ").trim(), family: s.fontFamily, size: s.fontSize ? s.fontSize + "px" : undefined, weight: s.fontWeight, line_height: s.lineHeight ? String(s.lineHeight) : undefined, source: "figma", confidence: "high", figma_style_id: s.name },
+          replacedStyleKeys,
+        );
+        typography = mergeTypography(typography, entry, rejectedFonts);
         if (rejectedFonts.length > rejectedBefore) continue;
         typeCount++;
       }
@@ -189,6 +214,10 @@ async function handleIngest(input: Params) {
 
   await brandDir.writeCoreIdentity({ ...identity, colors, typography, logo: logos });
   await recordRejectedFonts(brandDir, rejectedFonts);
+  // Only keys whose entry actually made it into identity (the family may
+  // have been rejected by the font gate instead).
+  const keptStyleKeys = replacedStyleKeys.filter((k) => typography.some((t) => t.name === k));
+  await recordReplacedStyleNames(brandDir, keptStyleKeys);
   await upsertSourceCatalog(brandDir, buildSourceCatalogRecords({
     colors: colors.filter(c => c.source === "figma"),
     typography: typography.filter(t => t.source === "figma"),
@@ -218,9 +247,16 @@ async function handleIngest(input: Params) {
 
   return buildResponse({
     what_happened: "Ingested Figma data from " + sources.join(" + ") + ": " + colorCount + " colors, " + typeCount + " typography" + (input.logo_svg ? ", 1 logo" : ""),
-    next_steps: ["Run brand_compile to generate tokens, runtime, and interaction policy", "Run brand_status to see the full picture"],
+    next_steps: [
+      "Run brand_compile to generate tokens, runtime, and interaction policy",
+      "Run brand_status to see the full picture",
+      ...(keptStyleKeys.length > 0
+        ? [`${keptStyleKeys.length} text style name(s) were not shaped like style names and were stored under generated keys — resolve the clarification with brand_clarify`]
+        : []),
+    ],
     data: {
       ingested: { colors: colorCount, typography: typeCount, logo: input.logo_svg ? 1 : 0, sources },
+      ...(keptStyleKeys.length > 0 ? { style_names_replaced: keptStyleKeys } : {}),
       total: { colors: colors.length, typography: typography.length, logos: logos.length },
       brandcode_figma_import_artifact: figmaImportArtifact,
       agent_tip: "Figma extraction is the highest-accuracy source. Variables get 'high' confidence. Design context colors get 'medium'. Both outrank web extraction.",

@@ -4,8 +4,8 @@
     { "value": "#ee6633", "role": "primary", "confidence": "medium", "note": "no role naming anywhere — promoted to primary by chromatic frequency" },
     { "value": "#fdf6ec", "role": "surface", "confidence": "high" },
     { "value": "#ffffff", "role": ["text", "surface"], "confidence": "high", "note": "used as text-on-primary; role 'text' is the extractor's defensible read" },
-    { "value": "#222222", "role": "text", "known_gap": true, "note": "body text color loses the single default-theme text slot to the more frequent #ffffff — same-theme collapse, not fixed by the #35 (role, theme) merge key" },
-    { "value": "#40312a", "role": ["neutral", "text"], "known_gap": true, "note": "dark brown reads as near-black neutral; dropped by the one-color-per-(role, theme) merge — no dark-theme scope in this fixture" }
+    { "value": "#222222", "role": "text-secondary", "confidence": "medium", "note": "issue #93 (flipped from known_gap): body text color still loses the base default-theme text slot to the higher-confidence #ffffff (base selection unchanged), but clears the variant evidence threshold and is promoted to text-secondary" },
+    { "value": "#40312a", "role": ["surface-alt", "neutral", "text"], "confidence": "high", "note": "issue #93 (flipped from known_gap): footer background-color — a second high-confidence default-theme surface after body #fdf6ec, promoted to surface-alt. neutral/text stay acceptable reads of the dark brown" }
   ],
   "fonts": [
     { "family": "Work Sans", "confidence": "low" },
@@ -33,7 +33,5 @@
     "font_precision": 0.95,
     "font_recall": 0.95
   },
-  "known_gaps": [
-    "Dark text colors #222222 and #40312a are extracted but lost to the one-color-per-(role, theme) merge. Both are default-theme colors (no dark scope on this site), so the issue #35 theme dimension does not preserve them."
-  ]
+  "known_gaps": []
 }

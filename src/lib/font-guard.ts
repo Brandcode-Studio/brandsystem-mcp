@@ -17,7 +17,8 @@
 import type { BrandDir } from "./brand-dir.js";
 import type { ClarificationItem, TypographyEntry } from "../types/index.js";
 import type { CoreIdentityData, NeedsClarificationData } from "../schemas/index.js";
-import { isPlausibleFontName } from "./untrusted-text.js";
+import { createHash } from "node:crypto";
+import { isPlausibleFontName, isPlausibleStyleName } from "./untrusted-text.js";
 
 export const REJECTED_FONT_CLARIFICATION_ID = "clarify-font-rejected";
 export const FONT_GUARD_SOURCE = "extraction-guard";
@@ -85,10 +86,14 @@ export function partitionTypography(entries: TypographyEntry[]): {
 export async function enforceFontPlausibility(brandDir: BrandDir): Promise<CoreIdentityData> {
   const identity = await brandDir.readCoreIdentity();
   const { kept, rejected } = partitionTypography(identity.typography);
-  if (rejected.length === 0) return identity;
-  const cleaned: CoreIdentityData = { ...identity, typography: kept };
+  // Style-name gate too (identities written before it existed, or hand-edited).
+  const replacedStyleKeys: string[] = [];
+  const guarded = kept.map((entry) => guardStyleName(entry, replacedStyleKeys));
+  if (rejected.length === 0 && replacedStyleKeys.length === 0) return identity;
+  const cleaned: CoreIdentityData = { ...identity, typography: guarded };
   await brandDir.writeCoreIdentity(cleaned);
   await recordRejectedFonts(brandDir, rejected);
+  await recordReplacedStyleNames(brandDir, replacedStyleKeys);
   return cleaned;
 }
 
@@ -99,4 +104,130 @@ export async function enforceFontPlausibility(brandDir: BrandDir): Promise<CoreI
 export async function pendingRejectedFontItem(brandDir: BrandDir): Promise<ClarificationItem | null> {
   const data = await readClarificationsOrEmpty(brandDir);
   return data.items.find((i) => i.id === REJECTED_FONT_CLARIFICATION_ID) ?? null;
+}
+
+// ── Style-name guard ────────────────────────────────────────────
+//
+// Text-style names (Figma styles today) become typography entry NAMES, and
+// entry names become keys in brand-runtime.json (`typography[name]`) and
+// token names in tokens.json. Unlike a bad font family, a bad style name does
+// not make the entry wrong — the family may be perfectly real — so the entry
+// is kept under a generated safe key instead of being dropped. The original
+// name is never echoed into the clarification question or any artifact.
+
+export const REJECTED_STYLE_NAME_CLARIFICATION_ID = "clarify-style-name-rejected";
+export const STYLE_NAME_CLARIFICATION_FIELD = "typography.style_names";
+
+/**
+ * Apply a user's answer to the style-name clarification: rename entries
+ * stored under generated keys. Accepts "style-xxxxxxxx = Name" pairs
+ * (comma/semicolon separated), a bare name when exactly one generated key
+ * exists, or "keep". New names must themselves pass isPlausibleStyleName.
+ * Returns human-readable change lines plus whether anything was unresolved.
+ */
+export function applyStyleNameAnswer(
+  typography: TypographyEntry[],
+  answer: string,
+): { typography: TypographyEntry[]; changes: string[]; unresolved: string[] } {
+  const generated = typography.filter((t) => /^style-[0-9a-f]{8}$/.test(t.name)).map((t) => t.name);
+  const trimmed = answer.trim();
+  if (/^(keep|ok|okay|fine|yes)$/i.test(trimmed)) {
+    return { typography, changes: [`Kept generated style keys: ${generated.join(", ") || "(none)"}`], unresolved: [] };
+  }
+
+  const renames = new Map<string, string>();
+  const pairs = [...trimmed.matchAll(/(style-[0-9a-f]{8})\s*(?:=|:|is|->|→)\s*([^,;]+)/gi)];
+  if (pairs.length > 0) {
+    for (const [, key, name] of pairs) renames.set(key.toLowerCase(), name.trim());
+  } else if (generated.length === 1) {
+    renames.set(generated[0], trimmed);
+  }
+
+  const changes: string[] = [];
+  const unresolved: string[] = [];
+  const next = typography.map((t) => {
+    const name = renames.get(t.name);
+    if (name === undefined) return t;
+    if (!isPlausibleStyleName(name)) {
+      unresolved.push(t.name);
+      return t;
+    }
+    changes.push(`Renamed text style ${t.name} → ${name}`);
+    return { ...t, name };
+  });
+  for (const key of generated) {
+    if (!renames.has(key)) unresolved.push(key);
+  }
+  return { typography: next, changes, unresolved: [...new Set(unresolved)] };
+}
+
+/**
+ * Deterministic safe key for an implausible style name. Stable across
+ * re-ingests (same hostile name → same key) so the typography merge, which
+ * matches on (family, name), does not accumulate duplicates.
+ */
+export function safeStyleKey(rawName: string): string {
+  return `style-${createHash("sha256").update(rawName).digest("hex").slice(0, 8)}`;
+}
+
+/**
+ * Return the entry unchanged when its name (and `figma_style_id`, which
+ * carries the raw Figma style name) are plausible style names; otherwise
+ * return a copy renamed to a safe generated key with `figma_style_id`
+ * removed, and push the key to `replaced` so the caller can raise a
+ * clarification.
+ */
+export function guardStyleName(entry: TypographyEntry, replaced?: string[]): TypographyEntry {
+  const idOk = entry.figma_style_id === undefined || isPlausibleStyleName(entry.figma_style_id);
+  if (idOk && isPlausibleStyleName(entry.name)) return entry;
+  const key = safeStyleKey(entry.figma_style_id ?? entry.name);
+  replaced?.push(key);
+  const { figma_style_id: _dropped, ...rest } = entry;
+  return { ...rest, name: key };
+}
+
+function styleKeysFromQuestion(question: string): string[] {
+  return question.match(/style-[0-9a-f]{8}/g) ?? [];
+}
+
+/** The single clarification item for replaced style names. */
+export function rejectedStyleNameClarification(keys: Iterable<string>): ClarificationItem {
+  const list = [...new Set(keys)].filter((k) => /^style-[0-9a-f]{8}$/.test(k)).sort();
+  return {
+    id: REJECTED_STYLE_NAME_CLARIFICATION_ID,
+    field: STYLE_NAME_CLARIFICATION_FIELD,
+    question:
+      `${list.length} text style name(s) did not look like style names (they may contain injected text) ` +
+      `and were stored under generated keys${list.length ? ` (${list.join(", ")})` : ""}. ` +
+      `The font families were kept. What should these text styles be called? ` +
+      `Answer "style-xxxxxxxx = Heading 1" per key (comma-separated), a single name when there is one key, or "keep" to keep the generated keys.`,
+    source: FONT_GUARD_SOURCE,
+    priority: "medium",
+  };
+}
+
+/**
+ * Upsert the replaced-style-name clarification into needs-clarification.yaml.
+ * No-op when nothing was replaced.
+ */
+export async function recordReplacedStyleNames(brandDir: BrandDir, replacedKeys: string[]): Promise<void> {
+  if (replacedKeys.length === 0) return;
+  const data = await readClarificationsOrEmpty(brandDir);
+  const prior = data.items.find((i) => i.id === REJECTED_STYLE_NAME_CLARIFICATION_ID);
+  const keys = [...(prior ? styleKeysFromQuestion(prior.question) : []), ...replacedKeys];
+  const item = rejectedStyleNameClarification(keys);
+  data.items = [...data.items.filter((i) => i.id !== REJECTED_STYLE_NAME_CLARIFICATION_ID), item];
+  await brandDir.writeClarifications(data);
+}
+
+/**
+ * Pending extraction-guard items (rejected fonts, replaced style names) from
+ * the current needs-clarification.yaml, for compile steps that rebuild the
+ * file from scratch.
+ */
+export async function pendingGuardItems(brandDir: BrandDir): Promise<ClarificationItem[]> {
+  const data = await readClarificationsOrEmpty(brandDir);
+  return data.items.filter(
+    (i) => i.id === REJECTED_FONT_CLARIFICATION_ID || i.id === REJECTED_STYLE_NAME_CLARIFICATION_ID,
+  );
 }

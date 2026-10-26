@@ -12,7 +12,7 @@ import { extractFromCSS, inferColorConfidence, inferColorRole, promotePrimaryCol
 import { extractLogos, fetchLogo, fetchClearbitLogo, probeCommonLogoPaths, fetchGoogleFavicon, fetchAndEncodeLogo } from "../lib/logo-extractor.js";
 import { resolveSvg, resolveImage } from "../lib/svg-resolver.js";
 import { mergeColor, mergeTypography, needsClarification } from "../lib/confidence.js";
-import { enforceFontPlausibility, pendingRejectedFontItem, recordRejectedFonts } from "../lib/font-guard.js";
+import { enforceFontPlausibility, pendingGuardItems, recordRejectedFonts } from "../lib/font-guard.js";
 import { getVersion } from "../lib/version.js";
 import { generateColorName, isCssArtifactName } from "../lib/color-namer.js";
 import { safeFetch, readResponseWithLimit, MAX_HTML_BYTES, MAX_CSS_BYTES } from "../lib/url-validator.js";
@@ -722,7 +722,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
   // compile-time pass also scrubs any implausible name already stored.
   await recordRejectedFonts(brandDir, rejectedFonts);
   const freshIdentity = await enforceFontPlausibility(brandDir);
-  const rejectedFontItem = await pendingRejectedFontItem(brandDir);
+  const guardItems = await pendingGuardItems(brandDir);
   const designArtifacts = await generateAndPersistDesignArtifacts(brandDir, { overwrite: true });
 
   const tokens = compileDTCG(freshIdentity, config.client_name, designArtifacts.synthesis);
@@ -771,7 +771,7 @@ async function handleAutoMode(input: Params, brandDir: BrandDir): Promise<Return
       });
     }
   }
-  if (rejectedFontItem) clarifications.push(rejectedFontItem);
+  clarifications.push(...guardItems);
 
   if (freshIdentity.logo.length === 0) {
     clarifications.push({
