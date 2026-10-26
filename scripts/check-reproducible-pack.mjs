@@ -105,7 +105,7 @@ const second = buildAndPack(join(work, "pack-2"), env);
 const h1 = sha256(first);
 const h2 = sha256(second);
 
-console.log(`SOURCE_DATE_EPOCH=${env.SOURCE_DATE_EPOCH ?? "(unset)"}`);
+console.log(`SOURCE_DATE_EPOCH ${/^\d+$/.test(env.SOURCE_DATE_EPOCH ?? "") ? "set" : "unset"}`);
 console.log(`pack 1: ${h1}  ${first}`);
 console.log(`pack 2: ${h2}  ${second}`);
 
