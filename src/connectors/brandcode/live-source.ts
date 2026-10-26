@@ -119,7 +119,10 @@ export async function ensureLiveFreshness(
       return fallbackFromDisk(cwd, config, ttlSeconds, "empty-package");
     }
 
-    await writePackagePayload(cwd, result.package, { origin: resolved.baseUrl });
+    await writePackagePayload(cwd, result.package, {
+      origin: resolved.baseUrl,
+      signature: result.signature,
+    });
     const updatedConfig: ConnectorConfig = {
       ...config,
       syncToken: result.brand.syncToken,

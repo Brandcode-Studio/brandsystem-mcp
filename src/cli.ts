@@ -19,12 +19,13 @@ import {
 import {
   readConnectorConfig,
   writeConnectorConfig,
-  writePackagePayload,
+  persistPulledPackage,
   appendSyncEvent,
   readSyncHistory,
   readPackagePayload,
   describeApprovalOutcome,
 } from "./connectors/brandcode/persistence.js";
+import { describeSignatureVerification } from "./connectors/brandcode/signature.js";
 import { isTrustedBrandcodeOrigin } from "./connectors/brandcode/trust.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { SCHEMA_VERSION } from "./schemas/index.js";
@@ -165,10 +166,16 @@ async function cmdConnect(url: string, shareToken?: string) {
 
   const now = new Date().toISOString();
 
-  const approvalOutcome = await writePackagePayload(cwd, pullResult.package, {
+  const persisted = await persistPulledPackage(cwd, pullResult.package, {
     origin: resolved.baseUrl,
+    signature: pullResult.signature,
   });
-  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl);
+  console.log(`  ${describeSignatureVerification(persisted.signature)}`);
+  const approvalNote = describeApprovalOutcome(
+    persisted.approval,
+    resolved.baseUrl,
+    persisted.signature,
+  );
   if (approvalNote) console.log(`  ${approvalNote}`);
 
   const connectorConfig: ConnectorConfig = {
@@ -259,10 +266,16 @@ async function cmdSync(shareToken?: string) {
     process.exit(1);
   }
 
-  const syncApprovalOutcome = await writePackagePayload(cwd, pullResult.package, {
+  const syncPersisted = await persistPulledPackage(cwd, pullResult.package, {
     origin: resolved.baseUrl,
+    signature: pullResult.signature,
   });
-  const syncApprovalNote = describeApprovalOutcome(syncApprovalOutcome, resolved.baseUrl);
+  console.log(`  ${describeSignatureVerification(syncPersisted.signature)}`);
+  const syncApprovalNote = describeApprovalOutcome(
+    syncPersisted.approval,
+    resolved.baseUrl,
+    syncPersisted.signature,
+  );
   if (syncApprovalNote) console.log(`  ${syncApprovalNote}`);
 
   const updatedConfig = {

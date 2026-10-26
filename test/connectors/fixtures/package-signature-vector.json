@@ -1,0 +1,64 @@
+{
+  "description": "Shared brand package signature test vector. Must stay identical in UCS (tests/studio/fixtures/brand-package-signature-vector.json) and brandsystem-mcp (test/connectors/fixtures/package-signature-vector.json). The private key that produced `signature.sig` was generated once and discarded; it signs nothing else.",
+  "package": {
+    "slug": "vector-brand",
+    "runtimeVersion": "1.0.0",
+    "approval": "production_approved",
+    "zeta": {
+      "9": "nine",
+      "10": "ten",
+      "b": 2,
+      "a": 1,
+      "B": 3,
+      "_": null,
+      "é": "accent"
+    },
+    "identity": {
+      "name": "Vector \"Quoted\" Brand",
+      "tagline": "line1\nline2\ttab   sep",
+      "emoji": "brand 🎨",
+      "slash": "a/b\\c"
+    },
+    "numbers": [
+      0,
+      -1,
+      1.5,
+      1e+21,
+      1e-7,
+      123456789012,
+      -0.25,
+      3.14159
+    ],
+    "flags": [
+      true,
+      false,
+      null
+    ],
+    "nested": [
+      {
+        "y": [],
+        "x": {}
+      },
+      [
+        [],
+        [
+          {}
+        ]
+      ],
+      "str"
+    ],
+    "empty": ""
+  },
+  "canonical": "{\"approval\":\"production_approved\",\"empty\":\"\",\"flags\":[true,false,null],\"identity\":{\"emoji\":\"brand 🎨\",\"name\":\"Vector \\\"Quoted\\\" Brand\",\"slash\":\"a/b\\\\c\",\"tagline\":\"line1\\nline2\\ttab   sep\"},\"nested\":[{\"x\":{},\"y\":[]},[[],[{}]],\"str\"],\"numbers\":[0,-1,1.5,1e+21,1e-7,123456789012,-0.25,3.14159],\"runtimeVersion\":\"1.0.0\",\"slug\":\"vector-brand\",\"zeta\":{\"10\":\"ten\",\"9\":\"nine\",\"B\":3,\"_\":null,\"a\":1,\"b\":2,\"é\":\"accent\"}}",
+  "digest": "sha256:e3a76e4ad00d2481de6dfc98b42a131cc8f6f1ffc4e5ab4da06e2bba1b694c0e",
+  "signedMessage": "brandcode-package-signature/v1\ntest-vector-2026-10\n2026-10-25T00:00:00.000Z\nsha256:e3a76e4ad00d2481de6dfc98b42a131cc8f6f1ffc4e5ab4da06e2bba1b694c0e",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEASB/N4TzRb8ZaMaivNTfFDfp08+JyIauRukgQeaJBvOE=\n-----END PUBLIC KEY-----\n",
+  "publicKeyBase64": "MCowBQYDK2VwAyEASB/N4TzRb8ZaMaivNTfFDfp08+JyIauRukgQeaJBvOE=",
+  "signature": {
+    "alg": "Ed25519",
+    "keyId": "test-vector-2026-10",
+    "digest": "sha256:e3a76e4ad00d2481de6dfc98b42a131cc8f6f1ffc4e5ab4da06e2bba1b694c0e",
+    "sig": "NgUrgwOxINErITX5/KIHy2WVBTYqPO1BdeIK0CR4gRp37J/mYorNrg/8URRPXhQNa2VD0FeW55pIRCZVEz69Ag==",
+    "signedAt": "2026-10-25T00:00:00.000Z"
+  }
+}
