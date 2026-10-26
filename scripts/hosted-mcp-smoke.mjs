@@ -41,7 +41,9 @@ const timeoutMs = Number.parseInt(
 );
 
 function check(name, status, detail, evidence = {}) {
-  return { name, status, detail, ...evidence };
+  // Evidence is spread first: tool payloads carry their own `status` field,
+  // which must never overwrite the check outcome the counters rely on.
+  return { ...evidence, name, status, detail };
 }
 
 function withTimeout(promise, label) {
