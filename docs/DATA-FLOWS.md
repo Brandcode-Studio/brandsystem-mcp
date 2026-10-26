@@ -98,7 +98,7 @@ To add a destination: add it to `security/egress-allowlist.json`, run
 - **Tools:** brand_start, brand_extract_web
 - **When it is contacted:** During web extraction, only if no usable logo was found on the site itself. Clearbit is tried first; the Google favicon service is the last resort.
 - **What is sent:** The domain of the site being extracted (in the request URL) and a `brandsystem-mcp/<version>` User-Agent. Nothing else.
-- **How to disable:** No switch yet. Avoid it by giving brand_extract_web a `logo_url`, or set the logo afterwards with brand_set_logo (inline SVG or data_uri) and skip web extraction.
+- **How to disable:** Set BRANDSYSTEM_THIRD_PARTY_LOGO_FALLBACK=off (also 0/false/no). You can also give brand_extract_web a `logo_url`, or set the logo afterwards with brand_set_logo.
 - **Hard-coded endpoints:** `https://logo.clearbit.com/`, `https://www.google.com/s2/favicons?domain=`
 - **Source:** `src/lib/logo-extractor.ts`
 
