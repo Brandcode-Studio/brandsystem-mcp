@@ -304,6 +304,8 @@ npx @brandsystem/mcp brandcode status
 
 **Trusted Studio origins.** Credentials (session, admin, and share tokens) are only ever sent to a trusted Brandcode Studio origin — `https://www.brandcode.studio` and `https://brandcode.studio` by default — and only an approval declared by a package from a trusted origin can mark a brand `production_approved`. Other hosts can still be read for public packages (https only, SSRF-guarded, no credentials), but their approval claims are ignored. For local development or staging, add origins with `BRANDCODE_STUDIO_TRUSTED_ORIGINS` (comma-separated; https required, except `http://localhost`, `http://127.0.0.1`, or `http://[::1]` when listed explicitly).
 
+**Signed packages.** When Brandcode Studio signs a package (Ed25519, keys pinned in `src/connectors/brandcode/signing-keys.ts`), the connector verifies the signature and stores it as `.brand/brandcode-package.sig.json`. A valid signature can confer `production_approved` from any origin, so a copied package stays verifiable. An invalid signature never does: tampered body, unknown key, or wrong key. `brand_brandcode_connect` and `brand_brandcode_sync` report `package_signature` as `signed/verified`, `signed/invalid` or `unsigned`, and `brand_audit` flags a signed package that was modified after the pull. Set `BRANDCODE_REQUIRE_SIGNED_APPROVAL=true` to refuse approvals on unsigned packages. See [docs/SIGNED-PACKAGES.md](docs/SIGNED-PACKAGES.md).
+
 ---
 
 ## The `.brand/` Directory
