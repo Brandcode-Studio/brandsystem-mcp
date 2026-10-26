@@ -1,10 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createServer } from "../../src/server.js";
-import { mkdtemp, readdir, rm, unlink } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
+
+// brand_feedback writes to ~/.brandsystem/feedback (resolved at import time)
+// and POSTs to brandcode.studio. Point HOME at a temp dir and answer the
+// feedback endpoint locally so smoke runs never send real feedback.
+const fakeHome = vi.hoisted(() => {
+  const fs = process.getBuiltinModule("node:fs");
+  const os = process.getBuiltinModule("node:os");
+  const path = process.getBuiltinModule("node:path");
+  return fs.mkdtempSync(path.join(os.tmpdir(), "smoke-home-"));
+});
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return { ...actual, homedir: () => fakeHome };
+});
+
+const { createServer } = await import("../../src/server.js");
 
 // ---------------------------------------------------------------------------
 // Setup: create a real MCP client ↔ server pair over in-memory transport.
@@ -19,6 +34,14 @@ let workDir: string;
 beforeAll(async () => {
   workDir = await mkdtemp(join(tmpdir(), "smoke-suite-"));
   vi.spyOn(process, "cwd").mockReturnValue(workDir);
+  const realFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (url.startsWith("https://www.brandcode.studio/api/feedback")) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, id: "smoke-test" }), { status: 200 }));
+    }
+    return realFetch(input, init);
+  });
   const server = createServer({ profile: "full" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -30,7 +53,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   await rm(workDir, { recursive: true, force: true });
+  await rm(fakeHome, { recursive: true, force: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -85,20 +110,6 @@ describe("tool registration", () => {
 // ---------------------------------------------------------------------------
 
 describe("tools that need no .brand/ dir", () => {
-  // Clean up feedback files created by these smoke tests to avoid hitting the rate limiter
-  afterAll(async () => {
-    const feedbackDir = join(homedir(), ".brandsystem", "feedback");
-    try {
-      const files = await readdir(feedbackDir);
-      for (const file of files) {
-        // Only delete files created in the last 60 seconds (test artifacts)
-        const { mtimeMs } = await import("node:fs").then(fs => fs.statSync(join(feedbackDir, file)));
-        if (Date.now() - mtimeMs < 60_000) {
-          await unlink(join(feedbackDir, file)).catch(() => {});
-        }
-      }
-    } catch { /* dir doesn't exist, fine */ }
-  });
 
   it("brand_feedback returns success", async () => {
     const json = await callAndParse("brand_feedback", {
