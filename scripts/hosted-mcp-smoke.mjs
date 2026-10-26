@@ -35,10 +35,11 @@ if (args.has("--help") || args.has("-h")) {
 
 const jsonOnly = args.has("--json");
 const strict = args.has("--strict");
-const timeoutMs = Number.parseInt(
-  process.env.BRANDCODE_MCP_SMOKE_TIMEOUT_MS ?? String(DEFAULT_TIMEOUT_MS),
-  10,
-);
+// Unset secrets reach Actions as empty strings, so blank or non-positive
+// values fall back to the default instead of becoming a NaN (instant) timeout.
+const parsedTimeoutMs = Number.parseInt(process.env.BRANDCODE_MCP_SMOKE_TIMEOUT_MS ?? "", 10);
+const timeoutMs =
+  Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs > 0 ? parsedTimeoutMs : DEFAULT_TIMEOUT_MS;
 
 function check(name, status, detail, evidence = {}) {
   // Evidence is spread first: tool payloads carry their own `status` field,
