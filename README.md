@@ -206,7 +206,7 @@ Or set `BRANDSYSTEM_PROFILE=full`. Core tools: `brand_start`, `brand_status`, `b
 |------|-------------|
 | `brand_deepen_identity` | Define composition rules, patterns, illustration style, and anti-patterns (6 interview sections). |
 | `brand_ingest_assets` | Scan and catalog brand assets with MANIFEST.yaml metadata. |
-| `brand_preflight` | Check HTML/CSS against brand rules -- catches off-brand colors, wrong fonts, anti-pattern violations. |
+| `brand_preflight` | Check HTML/CSS against brand rules -- catches off-brand colors, wrong fonts, anti-pattern violations. Add `render: true` to verify the computed result in sandboxed headless Chrome (see [Checking what you built](#checking-what-you-built)). |
 
 ### Session 3: Messaging
 
@@ -264,6 +264,26 @@ Session 4: brand_build_personas → brand_build_journey → brand_build_themes �
 
 `brand_status` can be called at any point. `brand_preflight` runs after any content generation.
 
+### Checking what you built
+
+Static checks read the source. A page can declare the brand font and still render in a fallback, or use the right hex on a background that makes the text unreadable. `brand_preflight` with `render: true` checks the computed result in a real browser:
+
+```json
+{ "html": "site/index.html", "render": true, "viewport": "mobile", "screenshot": true }
+```
+
+- **Input:** an HTML string, or a path to an `.html` file inside the working directory (symlink-aware containment). Stylesheets, `@import`s, scripts, fonts, and images that live inside the working directory are inlined before rendering.
+- **Sandbox:** the page renders in the same locked-down headless Chrome used for extraction (Chromium sandbox on, service workers bypassed), with all network egress denied. The egress proxy refuses every connection and the request interceptor aborts anything that is not `data:`, `blob:`, or `about:`. Remote fonts and CDN stylesheets do not load. The response lists what was blocked so you can switch to local copies.
+- **What it measures:** for every visible element, the computed text, background, and border colors (alpha-composited), the font face that actually renders (the first available family in the stack), font sizes and weights, and whether a logo renders.
+- **What it checks:**
+  - `R-COLOR`: CIEDE2000 distance to the nearest brand color. ≤2.3 matches, ≤6 is reported as info ("use the exact value"), above that is a warning, and above 15 is an error. Low-chroma neutrals are always allowed. While `clarify-primary` is open, color errors are advisory.
+  - `R-FONT`: the rendered face must be a brand font. Generic and system fallbacks after the brand font are fine. A brand font that is declared first but cannot load is reported as info.
+  - `R-CONTRAST`: WCAG AA (4.5:1, or 3:1 for large text), measured on the real foreground and background. Text over images or gradients is counted as indeterminate.
+  - `R-LOGO`: the brand name renders as text but no logo SVG or image renders.
+- **Output:** `overall` (PASS/WARN/FAIL), a 0–100 `score` (color 40 / typography 30 / contrast 30), and findings sorted by severity. Each finding has a locator, the measured value, the nearest brand value or required threshold, and an occurrence count, capped by `max_findings`. The response also carries the measured palette and type scale, a compact `static_preflight` summary, and, with `screenshot: true`, a PNG path under `.brand/checks/` to show the user. Hard anti-pattern failures from the static rules also fail the rendered check.
+
+Requires a local Chrome or Chromium install. Without one, the tool says so and points you back to the static check.
+
 ### CLI Commands
 
 The npm package ships a CLI entrypoint for setup, diagnostics, and the hosted-brand connector:
@@ -314,6 +334,7 @@ After running the full pipeline, your `.brand/` directory looks like this:
     illustrations/               # Brand illustrations with MANIFEST.yaml
     stickers/                    # Brand stickers with MANIFEST.yaml
     patterns/                    # Brand patterns with MANIFEST.yaml
+  checks/                        # Rendered-check screenshots (brand_preflight render=true, screenshot=true)
 ```
 
 ### File Details

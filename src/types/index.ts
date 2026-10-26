@@ -382,6 +382,8 @@ export const ERROR_CODES = {
   // Processing errors
   PARSE_FAILED: "parse_failed",
   PATH_OUTSIDE_CWD: "path_outside_cwd",
+  BROWSER_UNAVAILABLE: "browser_unavailable",
+  RENDER_FAILED: "render_failed",
   NO_CHANGES: "no_changes",
 
   // Validation-specific

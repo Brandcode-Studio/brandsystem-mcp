@@ -2,9 +2,21 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse, safeParseParams } from "../lib/response.js";
-import { isRealPathWithinBase } from "../lib/path-security.js";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { assertPathWithinBase, isRealPathWithinBase } from "../lib/path-security.js";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { writeBrandFileSafe } from "../lib/safe-write.js";
+import { flattenUntrusted } from "../lib/untrusted-text.js";
+import { COLOR_ADVISORY_NOTE, hasOpenColorClarification } from "../lib/brand-check-engine.js";
+import { evaluateRenderedCompliance } from "../lib/rendered-compliance.js";
+import {
+  BrowserUnavailableError,
+  MAX_RENDER_HTML_BYTES,
+  RENDER_VIEWPORTS,
+  inlineLocalResources,
+  renderAndMeasure,
+  type RenderViewportName,
+} from "../lib/render-check.js";
 import * as cheerio from "cheerio";
 import type { CoreIdentityData } from "../schemas/index.js";
 import { ERROR_CODES, type AntiPatternRule } from "../types/index.js";
@@ -734,7 +746,24 @@ async function handleRules(brandDir: BrandDir) {
   });
 }
 
-async function handleCheck(brandDir: BrandDir, html: string) {
+interface StaticPreflightResult {
+  overall: "PASS" | "WARN" | "FAIL";
+  summary: { pass: number; warn: number; fail: number; info: number };
+  checks: PreflightCheck[];
+}
+
+async function readClientName(brandDir: BrandDir): Promise<string> {
+  try {
+    const config = await brandDir.readConfig();
+    return config.client_name || "";
+  } catch {
+    // Non-critical — logo checks just won't match by name
+    return "";
+  }
+}
+
+/** Run the static (source-level) checks. Shared by check mode and render mode. */
+async function runStaticChecks(brandDir: BrandDir, html: string): Promise<StaticPreflightResult> {
   const identity = await brandDir.readCoreIdentity();
 
   let antiPatterns: AntiPatternRule[] = [];
@@ -743,13 +772,7 @@ async function handleCheck(brandDir: BrandDir, html: string) {
     antiPatterns = vi.anti_patterns || [];
   }
 
-  let clientName = "";
-  try {
-    const config = await brandDir.readConfig();
-    clientName = config.client_name || "";
-  } catch {
-    // Non-critical — logo checks just won't match by name
-  }
+  const clientName = await readClientName(brandDir);
 
   // Parse HTML
   const $ = cheerio.load(html);
@@ -787,6 +810,12 @@ async function handleCheck(brandDir: BrandDir, html: string) {
   // "content is brand-compliant" (adjacent-edge fix, 0.14.2).
   const hasUnresolved = checks.some((c) => c.id === "V-UNRESOLVED" && c.status === "info");
   const overall = fail > 0 ? "FAIL" : warn > 0 || hasUnresolved ? "WARN" : "PASS";
+  return { overall, summary: { pass, warn, fail, info }, checks };
+}
+
+async function handleCheck(brandDir: BrandDir, html: string) {
+  const { overall, summary, checks } = await runStaticChecks(brandDir, html);
+  const { pass, warn, fail, info } = summary;
 
   const nextSteps: string[] = [];
   if (fail > 0) nextSteps.push("Fix failing checks (hard anti-patterns) before shipping");
@@ -795,14 +824,153 @@ async function handleCheck(brandDir: BrandDir, html: string) {
   if (overall === "WARN" && fail === 0 && warn === 0) {
     nextSteps.push("Unresolved CSS variables prevented full verification — define the missing custom properties (or inline the values) and re-run before treating this as brand-compliant");
   }
+  nextSteps.push("Re-run with render=true to verify the computed result in a real browser (actual colors, rendered fonts, WCAG contrast)");
 
   return buildResponse({
     what_happened: `Preflight ${overall}: ${pass} pass, ${warn} warn, ${fail} fail${info > 0 ? `, ${info} info` : ""}${overall === "WARN" && fail === 0 && warn === 0 ? " (unresolved CSS variables — some rules could not be verified)" : ""}`,
     next_steps: nextSteps,
     data: {
       overall,
-      summary: { pass, warn, fail, info },
+      summary,
       checks: checks as unknown as Record<string, unknown>[],
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Render mode — computed-style compliance in sandboxed headless Chrome
+// ---------------------------------------------------------------------------
+
+async function saveScreenshot(cwd: string, png: Buffer, viewport: string): Promise<string> {
+  const brandRoot = join(cwd, ".brand");
+  // Containment first (a cloned repo could ship .brand/checks as a symlink),
+  // then create the folder; writeBrandFileSafe re-checks and refuses links.
+  assertPathWithinBase(join(brandRoot, "checks"), brandRoot, "checks");
+  await mkdir(join(brandRoot, "checks"), { recursive: true });
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "").replace("T", "-");
+  const filename = `checks/render-${stamp}-${viewport}.png`;
+  await writeBrandFileSafe(cwd, filename, png);
+  return `.brand/${filename}`;
+}
+
+async function handleRender(
+  brandDir: BrandDir,
+  input: { html: string; baseDir: string; viewport: RenderViewportName; screenshot: boolean; maxFindings: number },
+) {
+  const cwd = process.cwd();
+  const identity = await brandDir.readCoreIdentity();
+  const clientName = await readClientName(brandDir);
+
+  const { html, report: resources } = await inlineLocalResources(input.html, { baseDir: input.baseDir, cwd });
+  if (Buffer.byteLength(html, "utf-8") > MAX_RENDER_HTML_BYTES) {
+    return buildResponse({
+      what_happened: "HTML is too large to render (over 16 MB after inlining local resources)",
+      next_steps: ["Check a smaller page or component", "Or run brand_preflight without render for static source checks"],
+      data: { error: ERROR_CODES.VALIDATION_FAILED },
+    });
+  }
+
+  const viewport = RENDER_VIEWPORTS[input.viewport];
+  let outcome;
+  try {
+    outcome = await renderAndMeasure(html, { viewport, clientName, screenshot: input.screenshot });
+  } catch (err) {
+    if (err instanceof BrowserUnavailableError) {
+      return buildResponse({
+        what_happened: "Rendered check unavailable: no Chrome/Chromium installation found",
+        next_steps: [
+          "Install Google Chrome or Chromium to enable render=true",
+          "Run brand_preflight without render for static source checks in the meantime",
+        ],
+        data: { error: ERROR_CODES.BROWSER_UNAVAILABLE },
+      });
+    }
+    return buildResponse({
+      what_happened: "Rendered check failed: the page could not be rendered",
+      next_steps: [
+        "Check the HTML renders standalone (no required network resources, no endless script loops)",
+        "Run brand_preflight without render for static source checks",
+      ],
+      data: { error: ERROR_CODES.RENDER_FAILED, detail: flattenUntrusted((err as Error).message, 200) },
+    });
+  }
+
+  const colorAdvisory = await hasOpenColorClarification(cwd);
+  const result = evaluateRenderedCompliance(outcome.measurement, {
+    palette: identity.colors.map((c) => ({ name: c.name, hex: c.value.toLowerCase() })),
+    fonts: [...new Set(identity.typography.map((t) => t.family))],
+    clientName,
+    colorAdvisory,
+  });
+
+  // Static source checks ride along so render mode is the one "check my
+  // output" call. Only hard anti-pattern failures escalate the verdict —
+  // source-level color/font heuristics are superseded by the measurements.
+  const staticResult = await runStaticChecks(brandDir, html);
+  const overall = result.overall === "FAIL" || staticResult.overall === "FAIL" ? "FAIL" : result.overall;
+
+  let screenshotPath: string | undefined;
+  let screenshotError: string | undefined;
+  if (outcome.screenshot) {
+    try {
+      screenshotPath = await saveScreenshot(cwd, outcome.screenshot, input.viewport);
+    } catch (err) {
+      screenshotError = flattenUntrusted((err as Error).message, 160);
+    }
+  }
+
+  const findings = result.findings.slice(0, input.maxFindings);
+  const has = (rule: string, severity?: string) =>
+    result.findings.some((f) => f.rule === rule && (!severity || f.severity === severity));
+
+  const nextSteps: string[] = [];
+  if (has("R-CONTRAST")) nextSteps.push("Fix R-CONTRAST errors: raise text/background contrast to the expected WCAG AA ratio");
+  if (has("R-COLOR", "error") || has("R-COLOR", "warning")) {
+    nextSteps.push("Replace off-palette colors with the nearest brand value given in each R-COLOR finding's expected field");
+  }
+  if (has("R-FONT", "warning")) nextSteps.push("Put a brand font first in the font-family stack of the flagged elements");
+  if (has("R-FONT", "info") || outcome.blockedRequests.count > 0) {
+    nextSteps.push("Remote files are blocked in rendered checks — reference font/CSS files inside the project (or data: URIs) so they render and can be verified");
+  }
+  if (has("R-LOGO", "warning")) {
+    nextSteps.push("Use the brand logo (inline SVG or <img>) instead of styling the brand name as text — brand_runtime has the logo asset");
+  }
+  if (staticResult.overall === "FAIL") nextSteps.push("Fix the hard anti-pattern failures listed in static_preflight.issues");
+  if (overall === "PASS") nextSteps.push("Rendered output is on-brand — ready to ship");
+  if (screenshotPath) nextSteps.push(`Show the user the rendered screenshot at ${screenshotPath}`);
+  if (findings.length < result.findings.length) {
+    nextSteps.push(`Showing ${findings.length} of ${result.findings.length} findings — re-run with a higher max_findings to see the rest`);
+  }
+  if (nextSteps.length === 0) nextSteps.push("Review the remaining findings — some may be intentional deviations");
+
+  const staticIssues = staticResult.checks
+    .filter((c) => c.status === "fail" || c.status === "warn")
+    .slice(0, 6)
+    .map((c) => ({ id: c.id, status: c.status, message: c.message }));
+
+  return buildResponse({
+    what_happened: `Rendered preflight ${overall}: score ${result.score ?? "n/a"}/100 — ${result.counts.error} error, ${result.counts.warning} warning, ${result.counts.info} info (${input.viewport} ${viewport.width}x${viewport.height}, network blocked)`,
+    next_steps: nextSteps,
+    data: {
+      mode: "render",
+      overall,
+      score: result.score,
+      subscores: result.subscores,
+      counts: result.counts,
+      findings: findings as unknown as Record<string, unknown>[],
+      findings_total: result.findings.length,
+      measured: result.measured,
+      render: {
+        viewport: `${input.viewport} ${viewport.width}x${viewport.height}`,
+        network: "deny-all",
+        blocked_requests: outcome.blockedRequests,
+        local_resources: { inlined: resources.inlined, remote: resources.remote, skipped: resources.skipped },
+        ...(resources.markup_truncated ? { markup_truncated: true } : {}),
+        ...(colorAdvisory ? { color_advisory: COLOR_ADVISORY_NOTE } : {}),
+      },
+      static_preflight: { overall: staticResult.overall, summary: staticResult.summary, issues: staticIssues },
+      ...(screenshotPath ? { screenshot_path: screenshotPath } : {}),
+      ...(screenshotError ? { screenshot_error: screenshotError } : {}),
     },
   });
 }
@@ -823,6 +991,27 @@ const paramsShape = {
     .describe(
       "'check' (default): validates HTML against all brand rules. 'rules': lists all active rules without running checks."
     ),
+  render: z
+    .boolean()
+    .default(false)
+    .describe(
+      "true: render the HTML in sandboxed headless Chrome with ALL network blocked and check the computed result — actual colors vs the palette (CIEDE2000), the font face that really renders, WCAG AA text contrast, logo presence. Local CSS/JS/fonts/images inside the working directory are inlined first. Requires Chrome/Chromium. Default false (static source checks)."
+    ),
+  viewport: z
+    .enum(["desktop", "tablet", "mobile"])
+    .default("desktop")
+    .describe("Viewport for render=true: 'desktop' 1280x800 (default), 'tablet' 768x1024, 'mobile' 390x844"),
+  screenshot: z
+    .boolean()
+    .default(false)
+    .describe("With render=true: save a PNG of the rendered page under .brand/checks/ and return its path so you can show the user"),
+  max_findings: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .default(12)
+    .describe("With render=true: maximum findings returned, most severe first (default 12, max 50)"),
 };
 
 const ParamsSchema = z.object(paramsShape);
@@ -847,6 +1036,7 @@ async function handler(input: Params) {
 
   // Resolve HTML: if it looks like a file path, read it
   let html = input.html;
+  let baseDir = process.cwd();
   if (
     !html.includes("<") &&
     (html.endsWith(".html") || html.endsWith(".htm") || html.startsWith("/"))
@@ -861,6 +1051,7 @@ async function handler(input: Params) {
     }
     try {
       html = await readFile(resolvedPath, "utf-8");
+      baseDir = dirname(resolvedPath);
     } catch {
       return buildResponse({
         what_happened: `Could not read file: ${input.html}`,
@@ -870,15 +1061,26 @@ async function handler(input: Params) {
     }
   }
 
+  if (input.render) {
+    return handleRender(brandDir, {
+      html,
+      baseDir,
+      viewport: input.viewport ?? "desktop",
+      screenshot: input.screenshot ?? false,
+      maxFindings: input.max_findings ?? 12,
+    });
+  }
+
   return handleCheck(brandDir, html);
 }
 
 export function register(server: McpServer) {
   server.tool(
     "brand_preflight",
-    "Check HTML/CSS against brand rules — catches off-brand colors, wrong fonts, missing logo, and anti-pattern violations (drop shadows, gradients, etc.). Pass an HTML string or file path. Mode 'check' (default) runs all compliance checks and returns pass/warn/fail per rule. Mode 'rules' lists all active preflight rules without checking content. Use after generating any visual content to validate brand compliance. Returns overall status and per-check details. NOT for scoring content copy — use brand_audit_content. NOT for brand directory validation — use brand_audit.",
+    "Check HTML/CSS against brand rules — catches off-brand colors, wrong fonts, missing logo, and anti-pattern violations (drop shadows, gradients, etc.). Pass an HTML string or file path. Mode 'check' (default) runs static source checks. Add render=true to render the page in sandboxed headless Chrome (all network blocked) and verify the COMPUTED result: actual colors vs palette (CIEDE2000), the font face that really renders, WCAG AA text contrast, logo presence, optional screenshot to .brand/checks/. Use after building any page or component, or when the user asks 'does this look on-brand?', 'check my page', or 'verify the design'. Mode 'rules' lists active rules. Returns overall PASS/WARN/FAIL, a score, and per-finding details (locator, measured value, nearest brand value, severity). NOT for scoring content copy — use brand_audit_content. NOT for brand directory validation — use brand_audit.",
     paramsShape,
-    { title: "Preflight brand check", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Not read-only: render=true with screenshot=true writes a PNG under .brand/checks/.
+    { title: "Preflight brand check", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async (args) => {
       const parsed = safeParseParams(ParamsSchema, args);
       if (!parsed.success) return parsed.response;

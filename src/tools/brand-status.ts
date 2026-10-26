@@ -123,6 +123,7 @@ async function handler() {
             "Session 3 — Messaging": "brand_extract_messaging → brand_compile_messaging → messaging.yaml, brand-story.md.",
             "Session 4 — Content Strategy": "personas → journey → themes → matrix.",
           },
+          check_output: "After building a page or component, run brand_preflight; add render=true to verify what actually renders in sandboxed Chrome (palette ΔE, rendered fonts, WCAG contrast, logo).",
           // Tool-by-tool descriptions intentionally omitted: agents already
           // have them from listTools, and tool_sessions carries the taxonomy.
         },
