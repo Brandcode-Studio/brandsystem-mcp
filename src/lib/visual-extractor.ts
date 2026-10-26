@@ -216,6 +216,33 @@ async function handleBrowserRequest(req: InterceptedRequest): Promise<void> {
   }
 }
 
+/**
+ * Deny-all request policy for rendering local content: only in-document
+ * schemes (about:, blob:, data:) load; every network or file: request is
+ * aborted before Chromium fetches it. `onBlocked` sees each refused URL.
+ * Pair with `denyAllEgress` so the egress proxy refuses everything too.
+ */
+export function installOfflineRequestPolicy(
+  page: {
+    on(event: "request", handler: (req: InterceptedRequest) => void): unknown;
+    setRequestInterception(enabled: boolean): Promise<void>;
+  },
+  onBlocked?: (url: string) => void,
+): Promise<void> {
+  return page.setRequestInterception(true).then(() => {
+    page.on("request", (req) => {
+      let local = false;
+      try {
+        local = LOCAL_BROWSER_PROTOCOLS.has(new URL(req.url()).protocol);
+      } catch {
+        local = false;
+      }
+      if (!local) onBlocked?.(req.url());
+      void (local ? req.continue() : req.abort("blockedbyclient")).catch(() => undefined);
+    });
+  });
+}
+
 export function installBrowserRequestPolicy(page: {
   on(event: "request", handler: (req: InterceptedRequest) => void): unknown;
   setRequestInterception(enabled: boolean): Promise<void>;
@@ -349,6 +376,12 @@ export interface LockedDownBrowserOptions {
   chromePath: string;
   /** Destination ports the proxy may reach (see egressAllowedPortsFor). */
   allowedPorts: readonly number[];
+  /**
+   * Refuse every proxied connection regardless of `allowedPorts` (the proxy
+   * gets an empty port allowlist). For rendering local content that must
+   * not fetch anything.
+   */
+  denyAllEgress?: boolean;
   includeWindowSize?: boolean;
   env?: NodeJS.ProcessEnv;
   /**
@@ -371,7 +404,7 @@ export async function withLockedDownBrowser<T>(
   fn: (browser: Browser, proxy: EgressProxy) => Promise<T>,
 ): Promise<T> {
   const proxy = await startEgressProxy({
-    allowedPorts: options.allowedPorts,
+    allowedPorts: options.denyAllEgress ? [] : options.allowedPorts,
     ...options.testOnly?.proxy,
   });
   let browser: Browser | null = null;

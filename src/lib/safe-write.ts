@@ -52,7 +52,7 @@ async function assertNotLink(target: string, filename: string): Promise<void> {
 export async function writeBrandFileSafe(
   cwd: string,
   filename: string,
-  content: string,
+  content: string | Uint8Array,
   options?: { mode?: number },
 ): Promise<void> {
   const dir = brandPath(cwd);
@@ -64,7 +64,7 @@ export async function writeBrandFileSafe(
   // "wx" = O_CREAT | O_EXCL: fails rather than following a pre-planted link.
   const handle = await open(tmp, "wx", options?.mode ?? 0o644);
   try {
-    await handle.writeFile(content, "utf-8");
+    await handle.writeFile(content, typeof content === "string" ? "utf-8" : undefined);
     await handle.close();
     // Re-check immediately before the swap to narrow the race window; rename
     // itself never writes through a link even if one appears afterwards.
