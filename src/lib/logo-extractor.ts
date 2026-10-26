@@ -472,10 +472,22 @@ export function extractLogosWithDiagnostics(html: string, baseUrl: string): Logo
 }
 
 /**
+ * Third-party logo fallbacks (Clearbit, Google favicons) send the extracted
+ * site's domain off-box. They're on by default; setting
+ * BRANDSYSTEM_THIRD_PARTY_LOGO_FALLBACK to off/0/false/no keeps extraction
+ * strictly to the sources the user pointed at.
+ */
+export function thirdPartyLogoFallbackEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.BRANDSYSTEM_THIRD_PARTY_LOGO_FALLBACK?.trim().toLowerCase();
+  return !(value === "off" || value === "0" || value === "false" || value === "no");
+}
+
+/**
  * Try to find a logo via Clearbit's free Logo API.
  * Returns a high-quality company logo PNG for most domains.
  */
 export async function fetchClearbitLogo(domain: string): Promise<ExtractedLogo | null> {
+  if (!thirdPartyLogoFallbackEnabled()) return null;
   const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
   const url = `https://logo.clearbit.com/${cleanDomain}`;
 
@@ -561,6 +573,7 @@ export async function probeCommonLogoPaths(baseUrl: string): Promise<ExtractedLo
  * Returns a 256x256 favicon. This is the floor — we always get at least this.
  */
 export async function fetchGoogleFavicon(domain: string): Promise<ExtractedLogo | null> {
+  if (!thirdPartyLogoFallbackEnabled()) return null;
   const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
   const url = `https://www.google.com/s2/favicons?domain=${cleanDomain}&sz=256`;
 
