@@ -14,6 +14,8 @@ npx @brandsystem/mcp install --client cline --write
 
 Supported installer clients: codex, claude-code, cline, cursor, windsurf, claude-desktop. Install is a dry run without --write.
 
+Claude Desktop one-click: download brandsystem-mcp-<version>.mcpb (MCP Bundle) from https://github.com/Brandcode-Studio/brandsystem-mcp/releases/latest and open it; pick the brand project folder at install.
+
 Or start the server directly:
 npx @brandsystem/mcp
 

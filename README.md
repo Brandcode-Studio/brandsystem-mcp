@@ -26,6 +26,8 @@ npx @brandsystem/mcp install --client claude-code --write
 npx @brandsystem/mcp install --client cline --write
 ```
 
+**Claude Desktop (one-click):** download `brandsystem-mcp-<version>.mcpb` from the [latest GitHub release](https://github.com/Brandcode-Studio/brandsystem-mcp/releases/latest) and double-click it (or drag it into Settings > Extensions). Claude Desktop asks for the folder that holds your `.brand/` directory — no Node install or JSON editing needed.
+
 `install` is a dry run unless you pass `--write`. Replace `claude-code` with `cline`, `cursor`, `windsurf`, or `claude-desktop` as needed. JSON-file targets preserve existing settings; Cline and Codex setup delegate to their official MCP commands so their current schemas remain authoritative. Agents can follow the compact [installation guide](llms-install.md) without reading this entire README.
 
 Already configured? Tell your agent:
@@ -441,14 +443,17 @@ Create `~/.codeium/windsurf/mcp_config.json`:
 
 ### Claude Desktop
 
-Open Settings > Developer > Edit Config (`claude_desktop_config.json`):
+**One-click:** install the MCP Bundle — download `brandsystem-mcp-<version>.mcpb` from the [latest GitHub release](https://github.com/Brandcode-Studio/brandsystem-mcp/releases/latest) and open it with Claude Desktop. You choose the brand project folder (where `.brand/` lives) and the tool profile (`core` or `full`) in the install dialog. Maintainers build the bundle with `npm run build:mcpb` (→ `build/brandsystem-mcp-<version>.mcpb`); its manifest is generated from `package.json` and the registered Core tools.
+
+**Manual:** open Settings > Developer > Edit Config (`claude_desktop_config.json`). Claude Desktop does not start servers in your project folder, so set `BRANDSYSTEM_PROJECT_DIR` to the folder that holds (or will hold) `.brand/`:
 
 ```json
 {
   "mcpServers": {
     "brandsystem": {
       "command": "npx",
-      "args": ["-y", "@brandsystem/mcp"]
+      "args": ["-y", "@brandsystem/mcp"],
+      "env": { "BRANDSYSTEM_PROJECT_DIR": "/absolute/path/to/your/brand-project" }
     }
   }
 }
