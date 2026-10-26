@@ -94,3 +94,17 @@ export async function readBrandFileSafe(
     return null;
   }
 }
+
+/**
+ * Remove `.brand/<filename>` if present, refusing escapes. A symlink is
+ * removed itself (unlink never follows it); a directory is refused.
+ */
+export async function removeBrandFileSafe(cwd: string, filename: string): Promise<void> {
+  const target = guardedTarget(cwd, filename);
+  try {
+    await unlink(target);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw err;
+  }
+}

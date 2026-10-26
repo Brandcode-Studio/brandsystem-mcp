@@ -171,6 +171,12 @@ export interface PullResult {
   brand: HostedBrandRecord;
   delta: HostedBrandDelta | null;
   package: BrandPackagePayload | null;
+  /**
+   * Ed25519 signature over the canonical `package`, served next to it (never
+   * inside it). Absent when the Studio does not sign. Untrusted input: it is
+   * verified by signature.ts before it can confer anything.
+   */
+  signature?: unknown;
 }
 
 // ---------------------------------------------------------------------------

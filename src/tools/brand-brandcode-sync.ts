@@ -12,10 +12,14 @@ import {
 import {
   readConnectorConfig,
   writeConnectorConfig,
-  writePackagePayload,
+  persistPulledPackage,
   appendSyncEvent,
   describeApprovalOutcome,
 } from "../connectors/brandcode/persistence.js";
+import {
+  describeSignatureVerification,
+  signatureLabel,
+} from "../connectors/brandcode/signature.js";
 import {
   isTrustedBrandcodeOrigin,
   trustedOriginsHint,
@@ -137,10 +141,13 @@ async function handlePull(input: Params) {
   // Capture old package for diff before overwriting
   const oldPackage = await readPackagePayload(cwd);
 
-  const approvalOutcome = await writePackagePayload(cwd, pullResult.package, {
+  const persisted = await persistPulledPackage(cwd, pullResult.package, {
     origin: resolved.baseUrl,
+    signature: pullResult.signature,
   });
-  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl);
+  const approvalOutcome = persisted.approval;
+  const signatureCheck = persisted.signature;
+  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl, signatureCheck);
   const originTrusted = isTrustedBrandcodeOrigin(resolved.baseUrl);
 
   // Update connector config with new sync token
@@ -192,7 +199,12 @@ async function handlePull(input: Params) {
   ];
   if (!originTrusted) {
     nextSteps.unshift(
-      `${resolved.baseUrl} is not a trusted Brandcode Studio origin: any approval it declares is ignored and credentials are never sent to it. ${trustedOriginsHint()}`,
+      `${resolved.baseUrl} is not a trusted Brandcode Studio origin: any approval it declares is ignored unless it carries a valid Brandcode Studio signature, and credentials are never sent to it. ${trustedOriginsHint()}`,
+    );
+  }
+  if (signatureCheck.status === "invalid") {
+    nextSteps.unshift(
+      `${describeSignatureVerification(signatureCheck)} Do not treat this package as Studio-approved; re-pull from Brandcode Studio and run brand_audit to check provenance.`,
     );
   }
 
@@ -205,6 +217,12 @@ async function handlePull(input: Params) {
       origin: resolved.baseUrl,
       origin_trusted: originTrusted,
       approval_outcome: approvalOutcome,
+      package_signature: {
+        status: signatureLabel(signatureCheck),
+        ...(signatureCheck.key_id ? { key_id: signatureCheck.key_id } : {}),
+        ...(signatureCheck.reason ? { reason: signatureCheck.reason } : {}),
+        detail: describeSignatureVerification(signatureCheck),
+      },
       sync_token: pullResult.brand.syncToken,
       previous_sync_token: config.syncToken,
       changed_areas: changedAreas,

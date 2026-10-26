@@ -13,10 +13,14 @@ import {
 } from "../connectors/brandcode/client.js";
 import {
   writeConnectorConfig,
-  writePackagePayload,
+  persistPulledPackage,
   appendSyncEvent,
   describeApprovalOutcome,
 } from "../connectors/brandcode/persistence.js";
+import {
+  describeSignatureVerification,
+  signatureLabel,
+} from "../connectors/brandcode/signature.js";
 import {
   isTrustedBrandcodeOrigin,
   trustedOriginsHint,
@@ -145,11 +149,15 @@ async function handlePull(input: Params) {
   const cwd = process.cwd();
   const now = new Date().toISOString();
 
-  // Save the raw package (approval honored only for trusted origins)
-  const approvalOutcome = await writePackagePayload(cwd, pullResult.package, {
+  // Save the raw package and its signature. Approval is honored only for a
+  // verified Studio signature or, unsigned, a trusted origin.
+  const persisted = await persistPulledPackage(cwd, pullResult.package, {
     origin: resolved.baseUrl,
+    signature: pullResult.signature,
   });
-  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl);
+  const approvalOutcome = persisted.approval;
+  const signatureCheck = persisted.signature;
+  const approvalNote = describeApprovalOutcome(approvalOutcome, resolved.baseUrl, signatureCheck);
 
   // Save connector config
   const connectorConfig: ConnectorConfig = {
@@ -185,7 +193,12 @@ async function handlePull(input: Params) {
   ];
   if (!originTrusted) {
     nextSteps.unshift(
-      `${resolved.baseUrl} is not a trusted Brandcode Studio origin: the package was read as public data only, any approval it declares is ignored, and credentials will never be sent to it. ${trustedOriginsHint()}`,
+      `${resolved.baseUrl} is not a trusted Brandcode Studio origin: the package was read as public data only, any approval it declares is ignored unless it carries a valid Brandcode Studio signature, and credentials will never be sent to it. ${trustedOriginsHint()}`,
+    );
+  }
+  if (signatureCheck.status === "invalid") {
+    nextSteps.unshift(
+      `${describeSignatureVerification(signatureCheck)} Do not treat this package as Studio-approved; re-pull from Brandcode Studio and run brand_audit to check provenance.`,
     );
   }
 
@@ -201,6 +214,12 @@ async function handlePull(input: Params) {
       origin: resolved.baseUrl,
       origin_trusted: originTrusted,
       approval_outcome: approvalOutcome,
+      package_signature: {
+        status: signatureLabel(signatureCheck),
+        ...(signatureCheck.key_id ? { key_id: signatureCheck.key_id } : {}),
+        ...(signatureCheck.reason ? { reason: signatureCheck.reason } : {}),
+        detail: describeSignatureVerification(signatureCheck),
+      },
       sync_mode: "first_sync",
       sync_token: pullResult.brand.syncToken,
       readiness_stage: pullResult.brand.readinessStage,
