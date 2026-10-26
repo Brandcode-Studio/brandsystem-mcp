@@ -3,7 +3,7 @@ import { BrandDir } from "../lib/brand-dir.js";
 import { buildResponse } from "../lib/response.js";
 import { compileDTCG } from "../lib/dtcg-compiler.js";
 import { needsClarification } from "../lib/confidence.js";
-import { enforceFontPlausibility, pendingRejectedFontItem } from "../lib/font-guard.js";
+import { enforceFontPlausibility, pendingGuardItems } from "../lib/font-guard.js";
 import { generateVIM, generateSystemIntegration } from "../lib/vim-generator.js";
 import { compileRuntime } from "../lib/runtime-compiler.js";
 import { compileInteractionPolicy } from "../lib/interaction-policy-compiler.js";
@@ -82,7 +82,7 @@ async function handler(server: McpServer) {
   // stored identity before any artifact is generated from it, and keep the
   // rejected-font clarification across this rebuild of needs-clarification.
   identity = await enforceFontPlausibility(brandDir);
-  const rejectedFontItem = await pendingRejectedFontItem(brandDir);
+  const guardItems = await pendingGuardItems(brandDir);
 
   const designArtifacts = await generateAndPersistDesignArtifacts(brandDir, { overwrite: true });
 
@@ -135,7 +135,7 @@ async function handler(server: McpServer) {
       });
     }
   }
-  if (rejectedFontItem) clarifications.push(rejectedFontItem);
+  clarifications.push(...guardItems);
 
   if (identity.logo.length === 0) {
     clarifications.push({

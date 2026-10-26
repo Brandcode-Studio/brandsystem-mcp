@@ -7,6 +7,7 @@ import { buildResponse, safeParseParams } from "../lib/response.js";
 import { ERROR_CODES, type ColorEntry, type ClarificationItem } from "../types/index.js";
 import { isChromatic } from "../lib/css-parser.js";
 import { BASE_COLOR_ROLES, VARIANT_COLOR_ROLES } from "../lib/color-roles.js";
+import { STYLE_NAME_CLARIFICATION_FIELD, applyStyleNameAnswer } from "../lib/font-guard.js";
 import { fenceUntrusted } from "../lib/untrusted-text.js";
 import { writeApprovalState, computeBrandFingerprint } from "../lib/approval-state.js";
 import type { NeedsClarificationData } from "../schemas/index.js";
@@ -530,6 +531,25 @@ async function handler(input: Params) {
         changes.push(`Applied freeform answer for "${item.field}"`);
       }
     }
+  } else if (item.field === STYLE_NAME_CLARIFICATION_FIELD) {
+    // Text-style names replaced by generated keys (font-guard.ts). Must come
+    // before the generic typography branch, which would treat the answer as
+    // a font family.
+    const result = applyStyleNameAnswer(identity.typography, input.answer);
+    if (result.unresolved.length > 0) {
+      identity.typography = result.typography;
+      await brandDir.writeCoreIdentity(identity);
+      return buildResponse({
+        what_happened: `Renamed ${result.changes.length} text style(s); ${result.unresolved.length} still need a name`,
+        next_steps: [
+          `Answer again for: ${result.unresolved.join(", ")} — e.g. "${result.unresolved[0]} = Heading 1", or "keep" to keep the generated keys`,
+          "New names must be short labels (<= 64 chars, <= 8 words, no backticks or angle brackets).",
+        ],
+        data: { error: ERROR_CODES.PARSE_FAILED, changes: result.changes, unresolved: result.unresolved },
+      });
+    }
+    identity.typography = result.typography;
+    changes.push(...result.changes);
   } else if (item.field.startsWith("typography.") || item.field === "typography") {
     const familyName = item.field === "typography" ? null : item.field.replace("typography.", "");
     const answerLower = input.answer.trim().toLowerCase();
