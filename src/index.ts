@@ -32,6 +32,10 @@ if (cliArgs.length > 0) {
   await runCli(cliArgs);
 } else {
   try {
+    // Hosts without a meaningful cwd (Claude Desktop / MCPB) pass the brand
+    // project folder via BRANDSYSTEM_PROJECT_DIR.
+    const { applyProjectDir } = await import("./lib/project-dir.js");
+    applyProjectDir();
     const { resolveProfile } = await import("./lib/tool-profile.js");
     const server = createServer({ profile: resolveProfile(profileArg) });
     const transport = new StdioServerTransport();
