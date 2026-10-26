@@ -37,7 +37,7 @@ covered here.
 | `BRANDSYSTEM_TELEMETRY` | unset (off) | `true`/`1`/`yes` sends anonymous tool-call telemetry. |
 | `FIRECRAWL_API_KEY` | unset (off) | Routes web extraction through Firecrawl's API. |
 | `BRANDCODE_STUDIO_TRUSTED_ORIGINS` | unset | Adds Studio origins (staging, self-hosted, localhost) the connector may send credentials to. |
-| `BRANDSYSTEM_PROFILE` | `core` | `full` also registers `brand_feedback`, which can POST feedback. |
+| `BRANDSYSTEM_PROFILE` | `core` | `full` always lists `brand_feedback`, which can POST feedback when called; `core` lists it only after a tool failure in that session. |
 
 ## How this is enforced
 
@@ -76,7 +76,7 @@ To add a destination: add it to `security/egress-allowlist.json`, run
 | [Logo fallback services (Clearbit, Google favicons)](#logo-fallbacks) | `logo.clearbit.com`, `www.google.com` | default-on fallback | brand_start, brand_extract_web |
 | [Firecrawl rendering API](#firecrawl) | `api.firecrawl.dev` | opt-in | brand_start, brand_extract_web |
 | [Brandcode Studio connector](#brandcode-studio-connector) | `www.brandcode.studio`, `brandcode.studio` | user-initiated | brand_brandcode_auth, brand_brandcode_connect, brand_brandcode_sync, brand_brandcode_live, brand_connect_repo, brand_repo_status, CLI: brandsystem-mcp brandcode connect\|sync |
-| [brand_feedback reports](#feedback) | `www.brandcode.studio` | user-initiated | brand_feedback (full profile only) |
+| [brand_feedback reports](#feedback) | `www.brandcode.studio` | user-initiated | brand_feedback (full profile; in core, offered only after a failure) |
 | [Anonymous usage telemetry](#telemetry) | `www.brandcode.studio` | opt-in | all tools (when enabled) |
 | [Hosted MCP entry (not used by the local server)](#hosted-entry) | `www.brandcode.studio` | not used locally | none — dist/index-http.js is the hosted Brandcode MCP adapter |
 
@@ -128,10 +128,10 @@ To add a destination: add it to `security/egress-allowlist.json`, run
 
 - **Hosts:** `www.brandcode.studio`
 - **Consent:** user-initiated
-- **Tools:** brand_feedback (full profile only)
-- **When it is contacted:** Only when brand_feedback is called. It also retries earlier reports in ~/.brandsystem/feedback/ that never reached the server. Not registered in the default `core` tool profile.
+- **Tools:** brand_feedback (full profile; in core, offered only after a failure)
+- **When it is contacted:** Only when brand_feedback is called. It also retries earlier reports in ~/.brandsystem/feedback/ that never reached the server. In the default `core` profile the tool stays hidden until a tool response in that session reports a failure (an error, an elided oversized response, or a LOW/empty extraction); revealing it sends nothing — a report is sent only when an agent calls it.
 - **What is sent:** The feedback item: category, severity, summary/detail text (sanitized), tool name, error context; for `agent_signal` items also the brand's client_name, session number and schema version from .brand/brand.config.yaml. Saved locally first.
-- **How to disable:** Use the default `core` profile (BRANDSYSTEM_PROFILE unset or `core`), or don't call brand_feedback. brand_feedback_review and brand_feedback_triage are local-only.
+- **How to disable:** Don't call brand_feedback (in the default `core` profile it is not even listed until a failure). brand_feedback_review and brand_feedback_triage are local-only.
 - **Hard-coded endpoints:** `https://www.brandcode.studio/api/feedback`
 - **Source:** `src/tools/brand-feedback.ts`
 
