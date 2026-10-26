@@ -19,7 +19,7 @@ export const DOC_PATH = "docs/DATA-FLOWS.md";
 export const BEGIN = "<!-- BEGIN GENERATED FROM security/egress-allowlist.json — edit that file, then run `node scripts/render-data-flows.mjs --write` -->";
 export const END = "<!-- END GENERATED -->";
 
-const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
+const cell = (s) => String(s).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 const code = (s) => `\`${s}\``;
 
 function hostsOf(d) {
