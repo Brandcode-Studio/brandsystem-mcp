@@ -181,6 +181,8 @@ The `.brand/` directory is engineered as a first-class input for [Claude Design]
 
 By default the server registers the **Core profile** — 12 tools covering the complete loop: adopt → runtime/context → create → check → export, plus the Studio connector entry points and the clarify/promote path. This keeps first-tool selection sharp for agents.
 
+Core also offers `brand_feedback` automatically after a failure. It stays out of the tool list until a tool in the session errors, has to elide an oversized response, or reports a LOW or empty extraction. Then the server lists it (via `notifications/tools/list_changed`) and the failing response's `next_steps` points to it, for clients that don't refresh their tool list. Nothing is sent automatically: a report goes to the Brandcode team only when an agent calls `brand_feedback`, and it contains the note the agent writes, never `.brand/` files. See [docs/DATA-FLOWS.md](docs/DATA-FLOWS.md#feedback).
+
 The **full profile** registers the entire authoring system (all tools below). Opt in via env or args:
 
 ```json

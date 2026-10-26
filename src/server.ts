@@ -1,8 +1,14 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getVersion } from "./lib/version.js";
 import { CORE_TOOL_NAMES, resolveProfile, type ToolProfile } from "./lib/tool-profile.js";
 import { RESPONSE_ENVELOPE_SCHEMA, buildResponse, setActiveProfile } from "./lib/response.js";
 import { fenceUntrusted } from "./lib/untrusted-text.js";
+import {
+  FAILURE_REVEALED_TOOL_NAMES,
+  FEEDBACK_TOOL_NAME,
+  appendFeedbackOffer,
+  detectFailureSignal,
+} from "./lib/failure-signals.js";
 import { strictInputSchema } from "./lib/tool-schema.js";
 import { BrandDir } from "./lib/brand-dir.js";
 import { checkOnramp } from "./lib/response.js";
@@ -99,16 +105,33 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
   //   2. translate to registerTool() so every tool declares the response
   //      envelope outputSchema — buildResponse always supplies a matching
   //      structuredContent, so declared-schema validation always passes.
+  //   3. offer brand_feedback after failures: in core it is registered but
+  //      disabled until a response carries a failure signal, then enabled for
+  //      the rest of the session (the SDK emits tools/list_changed). Failing
+  //      responses in either profile also get one next_steps line, for
+  //      clients that ignore list_changed. Nothing is sent automatically —
+  //      feedback only leaves the machine when an agent calls the tool.
   const registerToolBound = server.registerTool.bind(server) as (
     name: string,
     config: Record<string, unknown>,
     cb: unknown
-  ) => unknown;
+  ) => RegisteredTool;
+  const revealable = new Map<string, RegisteredTool>();
+  const offerFeedbackOnFailure = <T>(toolName: string, result: T): T => {
+    // Never offer feedback about the feedback tools themselves.
+    if (toolName.startsWith(FEEDBACK_TOOL_NAME)) return result;
+    if (!detectFailureSignal(toolName, result)) return result;
+    for (const tool of revealable.values()) {
+      if (!tool.enabled) tool.enable(); // stays enabled for the session
+    }
+    return appendFeedbackOffer(result);
+  };
   (server as unknown as { tool: (...args: unknown[]) => unknown }).tool = (
     ...args: unknown[]
   ) => {
     const name = args[0] as string;
-    if (profile === "core" && !CORE_TOOL_NAMES.has(name)) return undefined;
+    const hiddenUntilFailure = profile === "core" && FAILURE_REVEALED_TOOL_NAMES.has(name);
+    if (profile === "core" && !CORE_TOOL_NAMES.has(name) && !hiddenUntilFailure) return undefined;
     const description = args[1] as string;
     const cb = args[args.length - 1];
     const config: Record<string, unknown> = {
@@ -133,16 +156,15 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
     const handler = cb as (...cbArgs: unknown[]) => unknown;
     const fencedCb = async (...cbArgs: unknown[]) => {
       try {
-        return await handler(...cbArgs);
+        return offerFeedbackOnFailure(name, await handler(...cbArgs));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return {
+        return offerFeedbackOnFailure(name, {
           ...buildResponse({
             what_happened: `${name} could not complete: an input could not be parsed or read`,
             next_steps: [
               "Check .brand/ files and any provided sources for corruption or truncation",
               "Run brand_audit to validate the .brand/ directory",
-              "If this keeps happening, run brand_feedback to report the issue.",
             ],
             data: {
               error: "tool_execution_failed",
@@ -151,10 +173,16 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
             },
           }),
           isError: true,
-        };
+        });
       }
     };
-    return registerToolBound(name, config, fencedCb);
+    const registered = registerToolBound(name, config, fencedCb);
+    if (hiddenUntilFailure) {
+      // Not connected yet, so disabling here sends no notification.
+      registered.disable();
+      revealable.set(name, registered);
+    }
+    return registered;
   };
 
   // ── Entry points (register first — agents see these first) ──
@@ -217,7 +245,7 @@ export function createServer(options?: { profile?: ToolProfile }): McpServer {
   registerWrite(server);       // Load brand context for content gen
   registerExport(server);      // Generate portable brand files
   registerEnrichSkill(server); // Enrich an auto-SKILL.md against .brand/governance/
-  registerFeedback(server);    // Bug reports + feature ideas
+  registerFeedback(server);    // Bug reports + feature ideas (core: revealed after a failure)
 
   // ── Resources (read-only, subscribable brand data) ──
   const brandDir = new BrandDir(process.cwd());
