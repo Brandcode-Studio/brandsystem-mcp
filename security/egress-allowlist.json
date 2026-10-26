@@ -1,0 +1,106 @@
+{
+  "$comment": "Every outbound network destination of the published @brandsystem/mcp package (local stdio server + CLI; dist/hosted is excluded from the package). Enforced by test/security/egress-allowlist.test.ts: any hard-coded http(s)/ws(s) host in src/ or the built dist/ that is not listed here (or explicitly ignored, with a reason, in that test) fails CI. docs/DATA-FLOWS.md is generated from this file: run `node scripts/render-data-flows.mjs --write` after editing it.",
+  "version": 1,
+  "destinations": [
+    {
+      "id": "user-sources",
+      "name": "Sources you point a tool at",
+      "hosts": [],
+      "dynamic_hosts": "Any http(s) URL you pass to a tool (website, page list, logo URL), plus same-site stylesheets, sitemap.xml, common logo paths and pages linked from it.",
+      "consent": "user-initiated",
+      "tools": ["brand_start", "brand_extract_web", "brand_extract_site", "brand_extract_visual", "brand_extract_messaging", "brand_set_logo"],
+      "when": "Only when you call one of these tools with a URL. Rendered extraction launches your local Chrome with this package's loopback egress proxy as its only network path.",
+      "data_sent": "Plain GET/HEAD requests with a `brandsystem-mcp/<version>` (or headless Chrome) User-Agent. No cookies, credentials, or local brand data. Private, loopback, link-local and metadata addresses are refused (SSRF guard, re-checked on every redirect and every browser connection).",
+      "disable": "Don't pass URLs; use brand_extract_pdf / brand_extract_figma / brand_set_logo with inline SVG or data_uri instead.",
+      "modules": ["lib/url-validator", "lib/visual-extractor", "lib/browser-egress-proxy", "lib/logo-extractor", "lib/site-evidence"],
+      "evidence": []
+    },
+    {
+      "id": "logo-fallbacks",
+      "name": "Logo fallback services (Clearbit, Google favicons)",
+      "hosts": ["logo.clearbit.com", "www.google.com"],
+      "consent": "default-on fallback",
+      "tools": ["brand_start", "brand_extract_web"],
+      "when": "During web extraction, only if no usable logo was found on the site itself. Clearbit is tried first; the Google favicon service is the last resort.",
+      "data_sent": "The domain of the site being extracted (in the request URL) and a `brandsystem-mcp/<version>` User-Agent. Nothing else.",
+      "disable": "No switch yet. Avoid it by giving brand_extract_web a `logo_url`, or set the logo afterwards with brand_set_logo (inline SVG or data_uri) and skip web extraction.",
+      "modules": ["lib/logo-extractor"],
+      "evidence": [
+        { "module": "lib/logo-extractor", "literal": "https://logo.clearbit.com/" },
+        { "module": "lib/logo-extractor", "literal": "https://www.google.com/s2/favicons?domain=" }
+      ]
+    },
+    {
+      "id": "firecrawl",
+      "name": "Firecrawl rendering API",
+      "hosts": ["api.firecrawl.dev"],
+      "consent": "opt-in",
+      "tools": ["brand_start", "brand_extract_web"],
+      "when": "Only when the FIRECRAWL_API_KEY environment variable is set; used instead of a direct fetch to render JavaScript-heavy sites.",
+      "data_sent": "The URL you asked to extract, plus your FIRECRAWL_API_KEY as a bearer token.",
+      "disable": "Leave FIRECRAWL_API_KEY unset (the default).",
+      "modules": ["lib/firecrawl"],
+      "evidence": [
+        { "module": "lib/firecrawl", "literal": "https://api.firecrawl.dev/v1/scrape" }
+      ]
+    },
+    {
+      "id": "brandcode-studio-connector",
+      "name": "Brandcode Studio connector",
+      "hosts": ["www.brandcode.studio", "brandcode.studio"],
+      "consent": "user-initiated",
+      "tools": ["brand_brandcode_auth", "brand_brandcode_connect", "brand_brandcode_sync", "brand_brandcode_live", "brand_connect_repo", "brand_repo_status", "CLI: brandsystem-mcp brandcode connect|sync"],
+      "when": "Only when you call a connector tool, or — after you turn on Live Mode with brand_brandcode_live — when brand_status, brand_check, brand_check_compliance, brand_runtime, brand_preview or brand_audit_content refresh an expired cached package. Additional Studio origins (staging, self-hosted, localhost) are trusted only if you list them in BRANDCODE_STUDIO_TRUSTED_ORIGINS. A brand URL on any other (custom) domain is read only as a public package: https only, through the SSRF guard, with no credentials.",
+      "data_sent": "Brand slug and share token (pull); email address (sign-in: magic link / device code); session token; the compiled brand package (push/save); repo owner/name, branch and path (repo connect). Credentials are sent only to trusted Studio origins, and never to a different origin (redirects included).",
+      "disable": "Don't call the connector tools and leave Live Mode off (the default). `brand_brandcode_live mode=\"off\"` stops background refreshes.",
+      "modules": ["connectors/brandcode/trust", "connectors/brandcode/resolve", "tools/brand-brandcode-auth", "tools/brand-repo-connect", "tools/brand-repo-status"],
+      "evidence": [
+        { "module": "connectors/brandcode/trust", "literal": "https://www.brandcode.studio" },
+        { "module": "connectors/brandcode/trust", "literal": "https://brandcode.studio" },
+        { "module": "connectors/brandcode/resolve", "literal": "https://www.brandcode.studio" }
+      ]
+    },
+    {
+      "id": "feedback",
+      "name": "brand_feedback reports",
+      "hosts": ["www.brandcode.studio"],
+      "consent": "user-initiated",
+      "tools": ["brand_feedback (full profile only)"],
+      "when": "Only when brand_feedback is called. It also retries earlier reports in ~/.brandsystem/feedback/ that never reached the server. Not registered in the default `core` tool profile.",
+      "data_sent": "The feedback item: category, severity, summary/detail text (sanitized), tool name, error context; for `agent_signal` items also the brand's client_name, session number and schema version from .brand/brand.config.yaml. Saved locally first.",
+      "disable": "Use the default `core` profile (BRANDSYSTEM_PROFILE unset or `core`), or don't call brand_feedback. brand_feedback_review and brand_feedback_triage are local-only.",
+      "modules": ["tools/brand-feedback"],
+      "evidence": [
+        { "module": "tools/brand-feedback", "literal": "https://www.brandcode.studio/api/feedback" }
+      ]
+    },
+    {
+      "id": "telemetry",
+      "name": "Anonymous usage telemetry",
+      "hosts": ["www.brandcode.studio"],
+      "consent": "opt-in",
+      "tools": ["all tools (when enabled)"],
+      "when": "Only when BRANDSYSTEM_TELEMETRY is `true`, `1` or `yes`. Off by default.",
+      "data_sent": "Tool name, success/error code, duration, extraction-quality grade, session number, package version, a random per-process session id, and the MCP_CLIENT env value. No brand content, URLs, file paths, or user data.",
+      "disable": "Leave BRANDSYSTEM_TELEMETRY unset (the default).",
+      "modules": ["lib/telemetry"],
+      "evidence": [
+        { "module": "lib/telemetry", "literal": "https://www.brandcode.studio/api/telemetry" }
+      ]
+    },
+    {
+      "id": "hosted-entry",
+      "name": "Hosted MCP entry (not used by the local server)",
+      "hosts": ["www.brandcode.studio"],
+      "consent": "not used locally",
+      "tools": ["none — dist/index-http.js is the hosted Brandcode MCP adapter"],
+      "when": "Never by `brandsystem-mcp` / `npx @brandsystem/mcp`. The file ships in dist/ but its hosted router (dist/hosted) is excluded from the package, so it cannot start from an installed copy.",
+      "data_sent": "Nothing from a local install.",
+      "disable": "Nothing to disable.",
+      "modules": ["index-http"],
+      "evidence": [
+        { "module": "index-http", "literal": "https://www.brandcode.studio" }
+      ]
+    }
+  ]
+}
