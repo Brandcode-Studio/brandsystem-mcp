@@ -74,11 +74,44 @@ jobs:
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
           echo "Packed $tarball sha256=$sha256" >> "$GITHUB_STEP_SUMMARY"
+      - name: SBOM (CycloneDX, production dependencies) and checksums
+        # Release evidence is produced here, in the credential-free job, and
+        # only attached to the GitHub release later by `release-assets`.
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          node scripts/generate-sbom.mjs --out release-evidence/brandsystem-mcp.cdx.json
+          jq -n \
+            --arg package "$(node -p "require('./package.json').name")" \
+            --arg version "$(node -p "require('./package.json').version")" \
+            --arg commit "$GITHUB_SHA" \
+            --arg ref "$GITHUB_REF" \
+            --arg node "$(node --version)" \
+            --arg npm "$(npm --version)" \
+            --arg run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{package: $package, version: $version, commit: $commit, ref: $ref, node: $node, npm: $npm, workflow_run: $run}' \
+            > release-evidence/build-info.json
+          cp "$TARBALL" release-evidence/
+          (cd release-evidence && sha256sum "$TARBALL" brandsystem-mcp.cdx.json build-info.json > SHA256SUMS && rm "$TARBALL")
+          {
+            echo '### Release evidence'
+            echo '```'
+            cat release-evidence/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: npm-tarball
           path: ${{ steps.pack.outputs.tarball }}
           retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence
+          path: release-evidence/
+          retention-days: 90
           if-no-files-found: error
 
   npm-publish:
@@ -106,6 +139,45 @@ jobs:
         env:
           TARBALL: ${{ needs.build.outputs.tarball }}
         run: npm publish "./${TARBALL}" --provenance --access public
+
+  # Attach the SBOM, build info, and SHA256SUMS (tarball + SBOM) to the GitHub
+  # release. contents: write only — no id-token, no checkout, no repo code:
+  # it downloads the build job's artifacts, re-checks the hashes, and uploads.
+  release-assets:
+    needs: [build, npm-publish]
+    if: ${{ github.event_name == 'release' && needs.npm-publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-tarball
+          path: tarball
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-evidence
+          path: release-evidence
+      - name: Verify evidence against the build job's tarball hash
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          echo "${EXPECTED_SHA256}  tarball/${TARBALL}" | sha256sum --check
+          grep -qxF "${EXPECTED_SHA256}  ${TARBALL}" release-evidence/SHA256SUMS
+          cp "tarball/${TARBALL}" release-evidence/
+          (cd release-evidence && sha256sum --check SHA256SUMS && rm "${TARBALL}")
+      - name: Upload SBOM and checksums to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$GITHUB_REF_NAME" \
+            release-evidence/brandsystem-mcp.cdx.json \
+            release-evidence/build-info.json \
+            release-evidence/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --clobber
 
   registry-publish:
     needs: npm-publish
