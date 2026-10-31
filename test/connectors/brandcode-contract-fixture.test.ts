@@ -277,7 +277,7 @@ describe("hosted brand_runtime consumes the fixture end to end", () => {
     expect((strategy.strategy_moves as unknown[]).length).toBeGreaterThan(0);
   });
 
-  it("minimal slice surfaces the primary color and first typography role from the fixture", async () => {
+  it("minimal slice surfaces key colors by role and heading/body fonts from the fixture", async () => {
     const fixture = loadFixture();
     const pkg = fixture.package as BrandPackagePayload;
     const { client } = await connectClient(buildContext(pkg));
@@ -285,7 +285,16 @@ describe("hosted brand_runtime consumes the fixture end to end", () => {
     const json = await call(client, "brand_runtime", { slice: "minimal" });
     const runtime = json.runtime as Record<string, unknown>;
     const identity = runtime.identity as Record<string, unknown>;
-    expect(identity.colors).toEqual({ primary: "#1d4ed8" });
+    expect(identity.colors).toEqual({
+      primary: "#1d4ed8",
+      secondary: "#0f172a",
+      accent: "#f97316",
+      surface: "#f8fafc",
+    });
+    expect(Object.keys(identity.typography as Record<string, unknown>)).toEqual([
+      "display",
+      "body",
+    ]);
   });
 
   it("brand_search finds fixture narratives and proof points without exposing raw provenance", async () => {

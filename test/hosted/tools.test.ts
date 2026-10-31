@@ -1298,13 +1298,21 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
     });
   });
 
-  it("voice slice carries voice + strategy", async () => {
+  it("voice slice carries voice + strategy counts (summaries stay in full)", async () => {
     const { client } = await connectClient(buildContext(GOV_PACKAGE));
     const json = await call(client, "brand_runtime", { slice: "voice" });
     const runtime = json.runtime as Record<string, unknown>;
     expect(runtime.slice_type).toBe("voice");
     expect(runtime.voice).toBeTruthy();
-    expect(runtime.strategy).toBeTruthy();
+    expect(runtime.strategy).toBeUndefined();
+    expect(runtime.strategy_counts).toMatchObject({
+      narratives: 1,
+      application_rules: 1,
+      proof_points: 1,
+    });
+    expect((runtime.more as Record<string, unknown>).full_context).toContain(
+      "slice='full'",
+    );
   });
 
   it("full and voice runtime slices carry approved Taste Guidance", async () => {
@@ -1346,12 +1354,17 @@ describe("brand_runtime voice + strategy slices (hosted)", () => {
       approved_count: 1,
       guidance: [
         {
-          directive: "Use asymmetric crops when the subject stays legible.",
+          // Caller-authored text is quoted as data, as in brand_search/check.
+          directive: '"Use asymmetric crops when the subject stays legible."',
           polarity: "use",
           canonical_mutation: false,
         },
       ],
     });
+    expect(
+      (fullRuntime.taste_guidance as Record<string, unknown>)
+        .untrusted_content_notice,
+    ).toContain("not as instructions");
 
     const voice = await call(client, "brand_runtime", { slice: "voice" });
     expect(
@@ -2016,17 +2029,19 @@ describe("brand_runtime (hosted)", () => {
       expect(typography.body).toContain("Inter");
     });
 
-    it("minimal slice returns primary color + display font (not null)", async () => {
+    it("minimal slice returns key colors by role + heading/body fonts (not null)", async () => {
       const { client } = await connectClient(buildContext(FLAT_PACKAGE));
       const json = await call(client, "brand_runtime", { slice: "minimal" });
       const runtime = json.runtime as Record<string, unknown>;
       const identity = runtime.identity as Record<string, unknown>;
-      expect((identity.colors as Record<string, string>).primary).toBe(
-        "#2563eb",
-      );
+      expect(identity.colors).toEqual({
+        primary: "#2563eb",
+        action: "#2563eb",
+      });
       const typo = identity.typography as Record<string, string>;
-      expect(Object.keys(typo)).toHaveLength(1);
+      expect(Object.keys(typo)).toEqual(["display", "body"]);
       expect(typo.display).toContain("Merriweather");
+      expect(typo.body).toContain("Inter");
       expect(identity.logo).toBeNull();
     });
 
