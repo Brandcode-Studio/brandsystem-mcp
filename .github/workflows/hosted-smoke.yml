@@ -11,10 +11,20 @@ permissions:
 
 jobs:
   smoke:
+    name: smoke (${{ matrix.target }})
     runs-on: ubuntu-latest
-    # Live-proof secrets belong in this environment (deployments limited to main),
-    # not in repo secrets, so a workflow_dispatch from another branch can't read them.
-    environment: hosted-smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: staging
+            environment: hosted-smoke
+          - target: production
+            environment: hosted-smoke-production
+    # Live-proof secrets live in per-target environments (deployments limited to
+    # main), not in repo secrets, so a workflow_dispatch from another branch
+    # can't read them. Feedback writes are skipped via BRANDCODE_MCP_SMOKE_SKIP_FEEDBACK.
+    environment: ${{ matrix.environment }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,12 +59,12 @@ jobs:
         run: |
           if [ -f smoke-output.json ]; then
             {
-              echo "### Hosted MCP smoke result"
+              echo "### Hosted MCP smoke result (${{ matrix.target }})"
               echo '```json'
               cat smoke-output.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### Hosted MCP smoke result" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Hosted MCP smoke result (${{ matrix.target }})" >> "$GITHUB_STEP_SUMMARY"
             echo "No output captured (smoke step likely failed before producing JSON)." >> "$GITHUB_STEP_SUMMARY"
           fi
