@@ -45,7 +45,7 @@
     "@types/node": "^22.19.17",
     "pdf-lib": "^1.17.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.5"
   },
   "files": [
     "dist",
