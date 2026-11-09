@@ -297,9 +297,15 @@ function measurePage(opts: { maxElements: number; clientName: string }): PageMea
   // Font availability: a loaded FontFace, or a canvas width probe that differs
   // from every generic baseline (an installed system face).
   const loadedFaces = new Set<string>();
-  document.fonts.forEach((face) => {
-    if (face.status === "loaded") loadedFaces.add(face.family.replace(/^['"]|['"]$/g, "").trim().toLowerCase());
-  });
+  // Iterate a snapshot: a page that tears down its own context mid-measure
+  // makes FontFaceSet.forEach throw "callback is no longer runnable".
+  try {
+    for (const face of Array.from(document.fonts)) {
+      if (face.status === "loaded") loadedFaces.add(face.family.replace(/^['"]|['"]$/g, "").trim().toLowerCase());
+    }
+  } catch {
+    // Font availability then falls back to the canvas probe below.
+  }
   const probe = document.createElement("canvas").getContext("2d");
   const SAMPLE = "mmmmmmmmmmlli1WWQ@#0Oo";
   const availCache = new Map<string, boolean>();
@@ -576,11 +582,23 @@ export async function renderAndMeasure(html: string, options: RenderOptions): Pr
       ).catch(() => undefined);
       await new Promise((r) => setTimeout(r, 200));
 
-      const measured = await withDeadline(
-        page.evaluate(measurePage, { maxElements: MAX_MEASURED_ELEMENTS, clientName: options.clientName }),
-        stepMs,
-        "Measurement",
-      );
+      const measure = () =>
+        withDeadline(
+          page.evaluate(measurePage, { maxElements: MAX_MEASURED_ELEMENTS, clientName: options.clientName }),
+          stepMs,
+          "Measurement",
+        );
+      // A page can navigate, reload, or tear down its own execution context
+      // while we measure. Retry once after it settles; a second failure is
+      // reported as a render failure rather than an opaque evaluate error.
+      let measured: Awaited<ReturnType<typeof measure>>;
+      try {
+        measured = await measure();
+      } catch (err) {
+        if (!/context was destroyed|no longer runnable|detached/i.test(String((err as Error)?.message ?? err))) throw err;
+        await new Promise((r) => setTimeout(r, 300));
+        measured = await measure();
+      }
 
       let screenshot: Buffer | undefined;
       if (options.screenshot) {

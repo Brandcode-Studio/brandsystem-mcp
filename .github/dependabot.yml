@@ -9,6 +9,11 @@ updates:
       # Types track the oldest supported runtime (engines: >=22.13.0), not the newest Node.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # Must match the major that cheerio depends on: src/lib/markup-guard.ts
+      # hooks cheerio's parse5 tree adapter, so a mismatched major could
+      # silently stop the markup depth guard from applying.
+      - dependency-name: "parse5-htmlparser2-tree-adapter"
+        update-types: ["version-update:semver-major"]
     groups:
       # Batch in-range bumps into one weekly PR; majors stay individual so
       # migrations (zod 4, @types/node) remain deliberate decisions.
