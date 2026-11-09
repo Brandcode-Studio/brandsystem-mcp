@@ -2,6 +2,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { HOSTED_TOOL_ORDER as LOCKED_TOOL_ORDER } from "../src/hosted/tool-order.mjs";
+import { evaluateRuntimeSlice } from "./hosted-runtime-checks.mjs";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -306,23 +307,25 @@ async function run() {
         }),
     );
 
-    const runtime = await callTool(fullConnection.client, "brand_runtime", {
-      slice: "minimal",
-    });
-    const runtimeError = assertNoToolError("brand_runtime", runtime);
-    checks.push(
-      runtimeError ??
-        check(
-          "brand_runtime",
-          runtime.runtime_origin === "hosted" || Boolean(runtime.runtime)
-            ? "pass"
-            : "fail",
-          runtime.runtime_origin === "hosted" || Boolean(runtime.runtime)
-            ? "brand_runtime returned hosted runtime data"
-            : "brand_runtime did not report hosted runtime data",
-          summarizePayload(runtime),
-        ),
-    );
+    // Every slice must carry real content: a visual slice without identity
+    // colors, or a full runtime elided by the response cap, is a failure.
+    for (const slice of ["minimal", "visual", "voice", "full"]) {
+      const name = slice === "minimal" ? "brand_runtime" : `brand_runtime_${slice}`;
+      const runtime = await callTool(fullConnection.client, "brand_runtime", {
+        slice,
+      });
+      const runtimeError = assertNoToolError(name, runtime);
+      const verdict = evaluateRuntimeSlice(slice, runtime);
+      checks.push(
+        runtimeError ??
+          check(
+            name,
+            verdict.ok ? "pass" : "fail",
+            verdict.detail,
+            summarizePayload(runtime),
+          ),
+      );
+    }
 
     const search = await callTool(fullConnection.client, "brand_search", {
       query: "brand",

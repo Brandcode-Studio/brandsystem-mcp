@@ -59,3 +59,55 @@ describe("hosted MCP smoke harness", () => {
     });
   });
 });
+
+describe("hosted smoke brand_runtime slice checks", () => {
+  // The checks live in a zero-dependency .mjs shared with the smoke script.
+  const load = () => import("../../scripts/hosted-runtime-checks.mjs");
+
+  it("fails a visual slice that returns no identity colors (2026-10 regression)", async () => {
+    const { evaluateRuntimeSlice } = await load();
+    const verdict = evaluateRuntimeSlice("visual", {
+      runtime: { slice_type: "visual" },
+      runtime_origin: "hosted",
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.detail).toContain("no identity colors");
+  });
+
+  it("fails a full slice whose runtime was elided by the response cap", async () => {
+    const { evaluateRuntimeSlice } = await load();
+    const verdict = evaluateRuntimeSlice("full", {
+      runtime_origin: "hosted",
+      response_overflow: { runtime: { elided: true, original_chars: 277084 } },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.detail).toContain("elided");
+  });
+
+  it("fails a voice slice with no voice section", async () => {
+    const { evaluateRuntimeSlice } = await load();
+    const verdict = evaluateRuntimeSlice("voice", {
+      runtime: { slice_type: "voice", taste_workflow: {} },
+    });
+    expect(verdict.ok).toBe(false);
+  });
+
+  it("passes slices that carry identity and voice", async () => {
+    const { evaluateRuntimeSlice } = await load();
+    const runtime = {
+      identity: { colors: { primary: "#0b6e4f" } },
+      voice: { verbal_identity: "Calm." },
+    };
+    for (const slice of ["minimal", "visual", "voice", "full"]) {
+      expect(evaluateRuntimeSlice(slice, { runtime }).ok, slice).toBe(true);
+    }
+  });
+
+  it("accepts a UCS runtime contract without legacy identity keys", async () => {
+    const { evaluateRuntimeSlice } = await load();
+    const verdict = evaluateRuntimeSlice("visual", {
+      runtime: { schemaVersion: "brandcode-runtime-contract/v1", manifest: {} },
+    });
+    expect(verdict.ok).toBe(true);
+  });
+});
