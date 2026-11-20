@@ -294,7 +294,7 @@ describe("checkAuthGitignore", () => {
     expect(checks[0].message).toContain("is gitignored");
   });
 
-  it("warns when the credential file is already tracked, even if ignored now", async () => {
+  it("fails when the credential file is already tracked, even if ignored now", async () => {
     git(["init", "-q"]);
     await writeCreds();
     git(["add", "--", ".brand/brandcode-auth.json"]);
@@ -302,7 +302,7 @@ describe("checkAuthGitignore", () => {
     const checks = await checkAuthGitignore(dir);
     expect(checks.find((c) => c.message.includes("is gitignored"))?.status).toBe("ok");
     const tracked = checks.find((c) => c.message.includes("tracked by git"));
-    expect(tracked?.status).toBe("warn");
+    expect(tracked?.status).toBe("fail");
     expect(tracked?.message).toContain("git rm --cached .brand/brandcode-auth.json");
   });
 

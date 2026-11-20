@@ -258,7 +258,7 @@ export async function checkAuthFile(cwd: string): Promise<DoctorCheck[]> {
 /**
  * Check that .brand/brandcode-auth.json cannot be committed: when the
  * directory is inside a git work tree the credential file must be ignored
- * (fail otherwise) and must not already be tracked (warn). Local git only —
+ * (fail otherwise) and must not already be tracked (fail). Local git only —
  * no network, and the token is never read.
  */
 export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
@@ -304,7 +304,7 @@ export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
   const tracked = await runGit(cwd, ["ls-files", "--error-unmatch", "--", rel]);
   if (tracked.code === 0) {
     checks.push({
-      status: "warn",
+      status: "fail",
       message: `${rel} is tracked by git, so ignore rules cannot protect it — run: git rm --cached ${rel} and commit, then sign in again for a fresh token; treat any token in git history as exposed until it expires`,
     });
   }
