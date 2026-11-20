@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.18.1 (2026-11-20)
+
+Security patch. Upgrade recommended for anyone who connects to Brandcode Studio.
+
+### Security
+
+- **Studio credentials can no longer be committed to git (#151).** `.brand/brandcode-auth.json` holds a 30-day Studio session token; it was only gitignored when a project started with `brand_init`, not the recommended `brand_start`. Saving or reading credentials now ensures `.brand/.gitignore` and the project `.gitignore` cover it, asks git whether the file is actually ignored (a later negation rule can't re-include it), and refuses to save a token git would commit or already tracks. `doctor` fails in either case. Ignore-rule text from the repository is never echoed into tool output.
+- **Device-code activation hardened (#151).** Users now type the code at Brandcode Studio's `/activate` page (a link can no longer approve on its own), the tool checks the approving account matches the requested email, and nothing is stored on a mismatch. Brandcode Studio deployed matching protections the same day.
+- **Hosted dependency updates (#142, #148, #149):** `hono` 4.13.18 and `@hono/node-server` 2.1.8 resolve 7 medium advisories in the hosted runtime.
+
+### Fixed
+
+- **`activate` sign-in works again (#151).** The tool polled with the short user code, which Studio stopped accepting in May; it now polls with the secret device code.
+- **Hosted `brand_runtime` serves real Studio packages (#144).** On large production packages every slice was empty or elided; slices are now bounded and populated (visual ~690 tokens, full ~4,400 on a real brand), and the nightly smoke fails if a slice comes back empty.
+- **`brand_feedback` is offered after failures in the Core profile (#135),** without adding a tool to the default list; nothing is sent unless the agent calls it.
+- **Rendered checks survive pages that tear down their own context (#145).**
+
+
 ## 0.18.0 (2026-10-26)
 
 Encode a brand once and use it natively in every AI tool, verify what agents actually render, and verify where a brand's approval came from.
