@@ -232,6 +232,15 @@ export interface SaveBrandResponse {
 
 export interface DeviceCodeResponse {
   ok: true;
+  /** Short human-readable code the user checks at /activate (e.g. "BRAND-7K4X"). */
+  user_code?: string;
+  /**
+   * High-entropy polling secret. Only this value is accepted by the poll
+   * endpoint. It is held in memory by the MCP and never shown to the user or
+   * echoed in tool output. Absent on Studios that predate the split.
+   */
+  device_code?: string;
+  /** Compatibility alias for user_code. */
   code: string;
   activate_url: string;
   expires_at: string;
@@ -239,14 +248,16 @@ export interface DeviceCodeResponse {
 }
 
 // ---------------------------------------------------------------------------
-// API Response: GET /api/auth/device-code/poll
+// API Response: GET /api/auth/device-code/poll?device_code=<secret>
 // ---------------------------------------------------------------------------
 
 export type DeviceCodePollResponse =
   | { status: "pending" }
   | { status: "expired" }
   | { status: "not_found" }
-  | { status: "complete"; token: string; email: string; expiresAt: string };
+  | { status: "complete"; token: string; email: string; expiresAt: string }
+  /** Rejections (e.g. approver email mismatch) a newer Studio may report in-band. */
+  | { status: "denied" | "email_mismatch" | "rejected"; error?: string };
 
 // ---------------------------------------------------------------------------
 // Local Persistence: .brand/brandcode-auth.json (gitignored)

@@ -428,12 +428,18 @@ export async function requestDeviceCode(
 
 /**
  * Poll for device code completion. Returns the session JWT when approved.
+ *
+ * `deviceCode` is the high-entropy `device_code` secret from the create
+ * response — never the short user code. `legacyParam` polls a Studio that
+ * predates the split (no `device_code` in the create response) with `?code=`.
  */
 export async function pollDeviceCode(
   baseUrl: string,
-  code: string,
+  deviceCode: string,
+  legacyParam = false,
 ): Promise<DeviceCodePollResponse> {
+  const param = legacyParam ? "code" : "device_code";
   return request<DeviceCodePollResponse>(
-    `${baseUrl}/api/auth/device-code/poll?code=${encodeURIComponent(code)}`,
+    `${baseUrl}/api/auth/device-code/poll?${param}=${encodeURIComponent(deviceCode)}`,
   );
 }
