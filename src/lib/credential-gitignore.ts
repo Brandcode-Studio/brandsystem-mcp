@@ -22,9 +22,9 @@
  * writes a token git would commit.
  */
 
-import { appendFile, lstat, readFile } from "node:fs/promises";
+import { appendFile, lstat, readFile, realpath } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { readBrandFileSafe, writeBrandFileSafe } from "./safe-write.js";
 
 export const AUTH_FILE_NAME = "brandcode-auth.json";
@@ -83,11 +83,52 @@ export async function credentialIgnoreVerdict(cwd: string): Promise<IgnoreVerdic
   return "unknown";
 }
 
-/** The rule git says decides the credential path (`source:line:pattern`), if any. */
-export async function decidingIgnoreRule(cwd: string): Promise<string | null> {
+/** True when git tracks `.brand/brandcode-auth.json` (ignore rules then have no effect). */
+export async function isCredentialFileTracked(cwd: string): Promise<boolean> {
+  const res = await runGit(cwd, ["ls-files", "--error-unmatch", "--", ROOT_IGNORE_ENTRY]);
+  return res.code === 0;
+}
+
+export interface IgnoreRuleLocation {
+  /** Ignore file holding the deciding rule, relative to the repo root. */
+  source: string;
+  line: number;
+}
+
+const SAFE_SOURCE = /^[A-Za-z0-9._\/-]{1,200}$/;
+
+/**
+ * Where the rule deciding the credential path lives — file and line only.
+ * The pattern text itself is repository content an attacker can author, so it
+ * is never returned. The source must resolve inside the repo root, look like
+ * a plain path, and the line must be a number; otherwise null.
+ */
+export async function decidingIgnoreRule(cwd: string): Promise<IgnoreRuleLocation | null> {
   const res = await runGit(cwd, ["check-ignore", "-v", "--no-index", "--", ROOT_IGNORE_ENTRY]);
-  const line = res.stdout.split("\n")[0]?.split("\t")[0]?.trim();
-  return line ? line.slice(0, 200) : null;
+  const head = res.stdout.split("\n")[0]?.split("\t")[0] ?? "";
+  const match = /^(.+?):(\d+):/.exec(head);
+  if (!match || !/^\d+$/.test(match[2])) return null;
+  const [, rawSource, rawLine] = match;
+  if (!SAFE_SOURCE.test(rawSource)) return null;
+
+  const top = await runGit(cwd, ["rev-parse", "--show-toplevel"]);
+  if (top.code !== 0) return null;
+  try {
+    const root = await realpath(top.stdout.trim());
+    const base = await realpath(cwd);
+    const rel = relative(root, resolve(base, rawSource));
+    if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null;
+    return { source: rel.split("\\").join("/"), line: Number(rawLine) };
+  } catch {
+    return null;
+  }
+}
+
+/** Human wording for a deciding rule, safe to put in tool/CLI output. */
+export function describeIgnoreRule(rule: IgnoreRuleLocation | null): string {
+  return rule
+    ? `a rule in ${rule.source} line ${rule.line} re-includes it`
+    : "a gitignore rule re-includes it";
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +196,15 @@ export async function ensureCredentialsGitignored(cwd: string): Promise<void> {
   await writeBrandIgnoreEntry(cwd, false).catch(() => {});
   await ensureGitignoreEntry(join(cwd, ".gitignore"), ROOT_IGNORE_ENTRY).catch(() => {});
 
+  // Ignore rules do nothing for a tracked file, and its history may already
+  // hold a token: refuse rather than write a new one into the index's path.
+  if (await isCredentialFileTracked(cwd)) {
+    throw new CredentialGitignoreError(
+      `Refusing to store Studio credentials: git already tracks ${ROOT_IGNORE_ENTRY}, so ignore rules cannot protect it and a token may already be in git history. ` +
+        `Run: git rm --cached ${ROOT_IGNORE_ENTRY} and commit, then sign in again to get a fresh token (treat any token in history as exposed until it expires).`,
+    );
+  }
+
   // Outside a work tree (or without git) nothing can commit the file.
   if ((await credentialIgnoreVerdict(cwd)) !== "not_ignored") return;
 
@@ -164,8 +214,7 @@ export async function ensureCredentialsGitignored(cwd: string): Promise<void> {
 
   const rule = await decidingIgnoreRule(cwd);
   throw new CredentialGitignoreError(
-    `Refusing to store Studio credentials: git would commit ${ROOT_IGNORE_ENTRY}` +
-      (rule ? ` because the ignore rule ${rule} re-includes it` : " and no ignore entry could be added") +
-      `. Remove or narrow that rule (a symlinked .brand/.gitignore is not read by git — replace it with a regular file containing "${BRAND_DIR_IGNORE_ENTRY}"), then sign in again.`,
+    `Refusing to store Studio credentials: git would commit ${ROOT_IGNORE_ENTRY} because ${describeIgnoreRule(rule)}. ` +
+      `Remove or narrow that rule (a symlinked .brand/.gitignore is not read by git; replace it with a regular file containing "${BRAND_DIR_IGNORE_ENTRY}"), then sign in again.`,
   );
 }

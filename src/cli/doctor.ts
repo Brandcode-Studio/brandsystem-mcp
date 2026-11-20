@@ -12,7 +12,7 @@ import { homedir } from "node:os";
 import { parse as parseYaml } from "yaml";
 import { getVersion } from "../lib/version.js";
 import { resolveProfile, CORE_TOOL_NAMES } from "../lib/tool-profile.js";
-import { runGit, decidingIgnoreRule } from "../lib/credential-gitignore.js";
+import { runGit, decidingIgnoreRule, describeIgnoreRule } from "../lib/credential-gitignore.js";
 
 export type DoctorStatus = "ok" | "warn" | "fail";
 
@@ -291,8 +291,8 @@ export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
       message:
         `${rel} holds a Studio session token but is NOT gitignored and could be committed — ` +
         (rule
-          ? `the rule ${rule} re-includes it; remove or narrow that rule`
-          : `add the line "brandcode-auth.json" to .brand/.gitignore`),
+          ? `${describeIgnoreRule(rule)}; remove or narrow that rule`
+          : `add the line "brandcode-auth.json" to .brand/.gitignore and make sure no rule re-includes it`),
     });
   } else {
     checks.push({
@@ -305,7 +305,7 @@ export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
   if (tracked.code === 0) {
     checks.push({
       status: "warn",
-      message: `${rel} is tracked by git — run: git rm --cached ${rel} and commit; if that commit was ever pushed, treat the session token as exposed until it expires`,
+      message: `${rel} is tracked by git, so ignore rules cannot protect it — run: git rm --cached ${rel} and commit, then sign in again for a fresh token; treat any token in git history as exposed until it expires`,
     });
   }
 
