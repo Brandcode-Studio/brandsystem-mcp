@@ -27,7 +27,7 @@ const paramsShape = {
   mode: z
     .enum(["status", "activate", "login", "set_key", "logout"])
     .describe(
-      'Auth action. "activate" (recommended) starts the device code flow: call with email to get a short code and an activation link the user opens, checks that it shows their email, and clicks Approve; then call again with key=<that short code> to finish. No token copy-paste. "status" checks if authenticated. "login" starts magic link flow (fallback). "set_key" stores token manually. "logout" removes credentials.',
+      'Auth action. "activate" (recommended) starts the device code flow: call with email to get a short code; the user opens brandcode.studio/activate, types that code, checks that it shows their email, and clicks Approve; then call again with key=<that short code> to finish. No token copy-paste. "status" checks if authenticated. "login" starts magic link flow (fallback). "set_key" stores token manually. "logout" removes credentials.',
     ),
   email: z
     .string()
@@ -187,16 +187,18 @@ function jwtEmailClaim(token: string): string | null {
   }
 }
 
-/** Only show the human a link on the Studio origin we trust; otherwise build it. */
-function safeActivateUrl(raw: unknown, studioUrl: string, userCode: string): string {
-  if (typeof raw === "string" && originOf(raw) === studioUrl) return raw;
-  return `${studioUrl}/activate?code=${encodeURIComponent(userCode)}`;
+/**
+ * Always the bare activation page on the trusted Studio origin: the user types
+ * the code there, so a link can never carry an approvable code.
+ */
+function safeActivateUrl(_raw: unknown, studioUrl: string, _userCode: string): string {
+  return `${studioUrl}/activate`;
 }
 
 const USER_CODE_PATTERN = /^[A-Za-z0-9-]{4,32}$/;
 
 function approveInstruction(url: string, userCode: string, email: string): string {
-  return `Open ${url}, sign in to Brandcode Studio as ${email}, check that the page shows code ${userCode} and email ${email}, then click Approve.`;
+  return `Open ${url}, sign in to Brandcode Studio as ${email}, type the code ${userCode}, check that the page shows ${email}, then click Approve.`;
 }
 
 function emailMismatchResponse(entry: PendingActivation) {
@@ -393,7 +395,7 @@ async function pollActivation(cwd: string, entry: PendingActivation) {
       return buildResponse({
         what_happened: `Waiting for the user to approve code ${userCode} in Brandcode Studio`,
         next_steps: [
-          `Ask the user whether they opened the activation link, checked that it shows ${email}, and clicked Approve`,
+          `Ask the user whether they opened the activation page, typed the code, checked that it shows ${email}, and clicked Approve`,
           `Then check again: ${again}`,
         ],
         data: { status: "pending", code: userCode, email },
@@ -665,7 +667,7 @@ async function handleLogout(cwd: string) {
 export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_auth",
-    'Activate Brandcode Studio connection for saving and pushing brands. Preferred mode: "activate" gives a short code (e.g. BRAND-7K4X) and a brandcode.studio/activate link; the user checks the email shown and clicks Approve — no copy-paste of tokens needed. Also supports: "status" (check auth), "login" (magic link fallback), "set_key" (manual token), "logout" (clear credentials). Use when the user wants to save their brand to Studio or says "activate", "connect to Brandcode", or "save my brand online". NOT needed for extraction, preview, or brand_check — those work without auth.',
+    'Activate Brandcode Studio connection for saving and pushing brands. Preferred mode: "activate" gives a short code (e.g. BRAND-7K4X); the user types it at brandcode.studio/activate, checks the email shown, and clicks Approve — no copy-paste of tokens needed. Also supports: "status" (check auth), "login" (magic link fallback), "set_key" (manual token), "logout" (clear credentials). Use when the user wants to save their brand to Studio or says "activate", "connect to Brandcode", or "save my brand online". NOT needed for extraction, preview, or brand_check — those work without auth.',
     paramsShape,
     { title: "Brandcode Studio auth", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async (args) => {

@@ -116,7 +116,7 @@ describe("brand_brandcode_auth activate (device code)", () => {
     const { text, body } = await call({ mode: "activate", email: EMAIL });
     expect(text).not.toContain(DEVICE_CODE);
     expect(body.code).toBe(USER_CODE);
-    expect(body.activate_url).toBe(`${STUDIO}/activate?code=${USER_CODE}`);
+    expect(body.activate_url).toBe(`${STUDIO}/activate`);
     expect(text).toContain("Approve");
     expect(text).toContain(EMAIL);
     expect(text).toContain(`key=\\"${USER_CODE}\\"`);
@@ -210,7 +210,7 @@ describe("brand_brandcode_auth activate (device code)", () => {
   it("never shows the user an activation link off the Studio origin", async () => {
     createHandler = () => createResponse({ activate_url: "https://evil.example/activate" });
     const { text, body } = await call({ mode: "activate", email: EMAIL });
-    expect(body.activate_url).toBe(`${STUDIO}/activate?code=${USER_CODE}`);
+    expect(body.activate_url).toBe(`${STUDIO}/activate`);
     expect(text).not.toContain("evil.example");
   });
 
