@@ -8,11 +8,11 @@
 
 import { readFile, stat, access } from "node:fs/promises";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { parse as parseYaml } from "yaml";
 import { getVersion } from "../lib/version.js";
 import { resolveProfile, CORE_TOOL_NAMES } from "../lib/tool-profile.js";
+import { runGit, decidingIgnoreRule } from "../lib/credential-gitignore.js";
 
 export type DoctorStatus = "ok" | "warn" | "fail";
 
@@ -255,36 +255,6 @@ export async function checkAuthFile(cwd: string): Promise<DoctorCheck[]> {
   return checks;
 }
 
-interface GitResult {
-  /** Process exit code; null when git could not be run at all. */
-  code: number | null;
-  stdout: string;
-}
-
-/**
- * Run git with an argument vector (no shell). Never rejects. Repository
- * location overrides are dropped so git discovers the repo from `cwd`
- * (e.g. when doctor runs from inside a git hook that exports GIT_DIR).
- */
-function runGit(cwd: string, args: string[]): Promise<GitResult> {
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
-  for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) {
-    delete env[key];
-  }
-  return new Promise((resolve) => {
-    execFile(
-      "git",
-      args,
-      { cwd, timeout: 10_000, windowsHide: true, env },
-      (err, stdout) => {
-        if (!err) return resolve({ code: 0, stdout: String(stdout) });
-        const code = (err as NodeJS.ErrnoException & { code?: unknown }).code;
-        resolve({ code: typeof code === "number" ? code : null, stdout: String(stdout ?? "") });
-      },
-    );
-  });
-}
-
 /**
  * Check that .brand/brandcode-auth.json cannot be committed: when the
  * directory is inside a git work tree the credential file must be ignored
@@ -315,9 +285,14 @@ export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
   if (ignored.code === 0) {
     checks.push({ status: "ok", message: `${rel} is gitignored` });
   } else if (ignored.code === 1) {
+    const rule = await decidingIgnoreRule(cwd);
     checks.push({
       status: "fail",
-      message: `${rel} holds a Studio session token but is NOT gitignored and could be committed — add the line "brandcode-auth.json" to .brand/.gitignore and make sure no "!" rule re-includes it`,
+      message:
+        `${rel} holds a Studio session token but is NOT gitignored and could be committed — ` +
+        (rule
+          ? `the rule ${rule} re-includes it; remove or narrow that rule`
+          : `add the line "brandcode-auth.json" to .brand/.gitignore`),
     });
   } else {
     checks.push({

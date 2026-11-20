@@ -7,6 +7,7 @@ import {
   writeAuthCredentials,
   clearAuthCredentials,
 } from "../lib/auth-state.js";
+import { CredentialGitignoreError } from "../lib/credential-gitignore.js";
 import {
   requestMagicLink,
   verifyMagicLink,
@@ -82,6 +83,18 @@ async function handler(input: Params) {
     case "logout":
       return handleLogout(cwd);
   }
+}
+
+/** Credentials were not stored because git would commit them. */
+function gitignoreRefusal(err: CredentialGitignoreError) {
+  return buildResponse({
+    what_happened: err.message,
+    next_steps: [
+      "Fix the ignore rule named above so git ignores .brand/brandcode-auth.json",
+      "Run `npx @brandsystem/mcp doctor` to confirm, then sign in again",
+    ],
+    data: { error: ERROR_CODES.AUTH_FAILED, reason: "credentials_not_gitignored" },
+  });
 }
 
 async function handleActivate(cwd: string, studioUrl: string, email?: string, deviceCode?: string) {
@@ -306,6 +319,7 @@ async function handleLogin(cwd: string, studioUrl: string, email?: string) {
       },
     });
   } catch (err) {
+    if (err instanceof CredentialGitignoreError) return gitignoreRefusal(err);
     if (err instanceof BrandcodeClientError) {
       return buildResponse({
         what_happened: `Login failed: ${err.message}`,
@@ -395,6 +409,7 @@ async function handleSetKey(cwd: string, studioUrl: string, key?: string) {
       },
     });
   } catch (err) {
+    if (err instanceof CredentialGitignoreError) return gitignoreRefusal(err);
     return buildResponse({
       what_happened: `Failed to process token: ${(err as Error).message}`,
       next_steps: [

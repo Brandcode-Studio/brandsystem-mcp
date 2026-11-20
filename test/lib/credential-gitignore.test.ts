@@ -4,7 +4,7 @@
  * root .gitignore step, so credentials written after it were committable.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile, symlink, access } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -14,6 +14,7 @@ import { createServer } from "../../src/server.js";
 import {
   ensureGitignoreEntry,
   ensureCredentialsGitignored,
+  CredentialGitignoreError,
 } from "../../src/lib/credential-gitignore.js";
 import { readAuthCredentials, writeAuthCredentials } from "../../src/lib/auth-state.js";
 
@@ -106,6 +107,88 @@ describe("credential storage is self-protecting", () => {
     });
     await rm(join(dir, ".gitignore"));
     expect(git(["check-ignore", "-q", ".brand/brandcode-auth.json"]).code).toBe(0);
+  });
+
+  it("outside a git work tree keeps plain append-if-missing behavior", async () => {
+    await mkdir(join(dir, ".brand"), { recursive: true });
+    await writeFile(join(dir, ".brand", ".gitignore"), "brandcode-auth.json\n!*.json\n");
+    await ensureCredentialsGitignored(dir);
+    expect(await readFile(join(dir, ".brand", ".gitignore"), "utf-8")).toBe(
+      "brandcode-auth.json\n!*.json\n",
+    );
+  });
+
+  it("never writes through a symlinked root .gitignore", async () => {
+    const outside = join(dir, "outside.txt");
+    await writeFile(outside, "untouched\n");
+    await mkdir(join(dir, ".brand"), { recursive: true });
+    await symlink(outside, join(dir, ".gitignore"));
+    await ensureCredentialsGitignored(dir);
+    expect(await readFile(outside, "utf-8")).toBe("untouched\n");
+  });
+});
+
+describe("git decides, not line presence", () => {
+  const creds = {
+    email: "a@b.c",
+    token: "session-secret",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    studioUrl: "https://www.brandcode.studio",
+  };
+
+  for (const negation of ["!brandcode-auth.json", "!*.json"]) {
+    it(`re-appends the entry after a later "${negation}" so git ignores the file`, async () => {
+      expect(git(["init", "-q"]).code).toBe(0);
+      await mkdir(join(dir, ".brand"), { recursive: true });
+      await writeFile(join(dir, ".brand", ".gitignore"), `brandcode-auth.json\n${negation}\n`);
+      await writeAuthCredentials(dir, creds);
+      expect(await readFile(join(dir, ".brand", ".gitignore"), "utf-8")).toBe(
+        `brandcode-auth.json\n${negation}\nbrandcode-auth.json\n`,
+      );
+      expect(git(["check-ignore", "-q", "--no-index", ".brand/brandcode-auth.json"]).code).toBe(0);
+    });
+  }
+
+  it("refuses to write credentials git would still commit, naming the deciding rule", async () => {
+    expect(git(["init", "-q"]).code).toBe(0);
+    await mkdir(join(dir, ".brand"), { recursive: true });
+    // git does not read a symlinked .gitignore, so only the root rules count,
+    // and the root re-includes the file after excluding it.
+    const outside = join(dir, "outside-ignore");
+    await writeFile(outside, "brandcode-auth.json\n");
+    await symlink(outside, join(dir, ".brand", ".gitignore"));
+    await writeFile(join(dir, ".gitignore"), ".brand/brandcode-auth.json\n!.brand/brandcode-auth.json\n");
+
+    const attempt = writeAuthCredentials(dir, creds);
+    await expect(attempt).rejects.toBeInstanceOf(CredentialGitignoreError);
+    await expect(attempt).rejects.toThrow(/\.gitignore:2:!\.brand\/brandcode-auth\.json/);
+    await expect(access(join(dir, ".brand", "brandcode-auth.json"))).rejects.toThrow();
+    // The symlink target was not written through.
+    expect(await readFile(outside, "utf-8")).toBe("brandcode-auth.json\n");
+
+    // The auth tool surfaces the refusal instead of a generic token error.
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const server = createServer({ profile: "full" });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "cred-gitignore", version: "1.0.0" });
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      const jwt = `${b64url({ alg: "none" })}.${b64url({ email: "owner@example.com" })}.sig`;
+      const result = await client.callTool({
+        name: "brand_brandcode_auth",
+        arguments: { mode: "set_key", key: jwt },
+      });
+      await client.close();
+      const text = (result.content as Array<{ text: string }>)[0].text;
+      const body = JSON.parse(text) as Record<string, unknown>;
+      expect(body.reason).toBe("credentials_not_gitignored");
+      expect(text).not.toContain(jwt);
+    } finally {
+      process.chdir(prevCwd);
+    }
+    await expect(access(join(dir, ".brand", "brandcode-auth.json"))).rejects.toThrow();
   });
 
   it("credentials written after brand_start are ignored by git", async () => {

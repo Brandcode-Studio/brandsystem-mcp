@@ -259,6 +259,16 @@ describe("checkAuthGitignore", () => {
     for (const check of checks) expect(check.message).not.toContain("super-secret-token");
   });
 
+  it("fails and names the rule when a later negation re-includes the file", async () => {
+    git(["init", "-q"]);
+    await writeCreds();
+    await writeFile(join(dir, ".brand", ".gitignore"), "brandcode-auth.json\n!*.json\n");
+    const checks = await checkAuthGitignore(dir);
+    const ignoreCheck = checks.find((c) => c.message.includes("NOT gitignored"));
+    expect(ignoreCheck?.status).toBe("fail");
+    expect(ignoreCheck?.message).toContain(".brand/.gitignore:2:!*.json");
+  });
+
   it("passes when .brand/.gitignore covers the credential file", async () => {
     git(["init", "-q"]);
     await writeCreds();
