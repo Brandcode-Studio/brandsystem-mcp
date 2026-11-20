@@ -8,6 +8,7 @@
 
 import { readFile, stat, access } from "node:fs/promises";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { parse as parseYaml } from "yaml";
 import { getVersion } from "../lib/version.js";
@@ -254,6 +255,88 @@ export async function checkAuthFile(cwd: string): Promise<DoctorCheck[]> {
   return checks;
 }
 
+interface GitResult {
+  /** Process exit code; null when git could not be run at all. */
+  code: number | null;
+  stdout: string;
+}
+
+/**
+ * Run git with an argument vector (no shell). Never rejects. Repository
+ * location overrides are dropped so git discovers the repo from `cwd`
+ * (e.g. when doctor runs from inside a git hook that exports GIT_DIR).
+ */
+function runGit(cwd: string, args: string[]): Promise<GitResult> {
+  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
+  for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) {
+    delete env[key];
+  }
+  return new Promise((resolve) => {
+    execFile(
+      "git",
+      args,
+      { cwd, timeout: 10_000, windowsHide: true, env },
+      (err, stdout) => {
+        if (!err) return resolve({ code: 0, stdout: String(stdout) });
+        const code = (err as NodeJS.ErrnoException & { code?: unknown }).code;
+        resolve({ code: typeof code === "number" ? code : null, stdout: String(stdout ?? "") });
+      },
+    );
+  });
+}
+
+/**
+ * Check that .brand/brandcode-auth.json cannot be committed: when the
+ * directory is inside a git work tree the credential file must be ignored
+ * (fail otherwise) and must not already be tracked (warn). Local git only —
+ * no network, and the token is never read.
+ */
+export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
+  const rel = ".brand/brandcode-auth.json";
+  if (!(await fileExists(join(cwd, ".brand", "brandcode-auth.json")))) return [];
+
+  const inside = await runGit(cwd, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.code === null) {
+    return [
+      {
+        status: "warn",
+        message: `could not run git — unable to verify ${rel} is gitignored; make sure it is never committed`,
+      },
+    ];
+  }
+  if (inside.code !== 0 || inside.stdout.trim() !== "true") {
+    return [{ status: "ok", message: `not inside a git work tree — ${rel} cannot be committed from here` }];
+  }
+
+  const checks: DoctorCheck[] = [];
+
+  // --no-index: evaluate ignore rules even when the file is already tracked.
+  const ignored = await runGit(cwd, ["check-ignore", "-q", "--no-index", "--", rel]);
+  if (ignored.code === 0) {
+    checks.push({ status: "ok", message: `${rel} is gitignored` });
+  } else if (ignored.code === 1) {
+    checks.push({
+      status: "fail",
+      message: `${rel} holds a Studio session token but is NOT gitignored and could be committed — add the line "brandcode-auth.json" to .brand/.gitignore and make sure no "!" rule re-includes it`,
+    });
+  } else {
+    checks.push({
+      status: "warn",
+      message: `git check-ignore failed — unable to verify ${rel} is gitignored`,
+    });
+  }
+
+  const tracked = await runGit(cwd, ["ls-files", "--error-unmatch", "--", rel]);
+  if (tracked.code === 0) {
+    checks.push({
+      status: "warn",
+      message: `${rel} is tracked by git — run: git rm --cached ${rel} and commit; if that commit was ever pushed, treat the session token as exposed until it expires`,
+    });
+  }
+
+  return checks;
+}
+
 /**
  * Check MCP client configs for a "brandsystem" server entry.
  */
@@ -361,6 +444,7 @@ export async function gatherDoctorChecks(cwd: string): Promise<DoctorCheck[]> {
     checkProfile(),
     ...(await checkBrandDir(cwd)),
     ...(await checkAuthFile(cwd)),
+    ...(await checkAuthGitignore(cwd)),
     ...(await checkClientConfigs(cwd)),
   ];
 }

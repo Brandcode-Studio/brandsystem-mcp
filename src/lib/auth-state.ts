@@ -4,16 +4,18 @@
  * File managed:
  *   .brand/brandcode-auth.json — session token + email (gitignored)
  *
- * This file contains secrets and MUST be gitignored.
- * brand_init auto-adds it to .gitignore.
+ * This file contains secrets and MUST be gitignored. Writing (and finding)
+ * credentials ensures the ignore entries exist regardless of which tool
+ * created .brand/ — see credential-gitignore.ts.
  */
 
 import { readFile, writeFile, unlink, mkdir, rename, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import type { AuthCredentials } from "../connectors/brandcode/types.js";
+import { AUTH_FILE_NAME, ensureCredentialsGitignored } from "./credential-gitignore.js";
 
-const AUTH_FILE = "brandcode-auth.json";
+const AUTH_FILE = AUTH_FILE_NAME;
 
 function authPath(cwd: string): string {
   return join(cwd, ".brand", AUTH_FILE);
@@ -29,6 +31,9 @@ export async function readAuthCredentials(
     const raw = await readFile(authPath(cwd), "utf-8");
     // Tighten files written by versions that predate owner-only mode.
     await chmod(authPath(cwd), 0o600).catch(() => {});
+    // Heal credentials written by versions that only gitignored them via
+    // brand_init (brand_start never did).
+    await ensureCredentialsGitignored(cwd).catch(() => {});
     const creds = JSON.parse(raw) as AuthCredentials;
 
     // Check expiry
@@ -53,6 +58,8 @@ export async function writeAuthCredentials(
 ): Promise<void> {
   const dir = join(cwd, ".brand");
   await mkdir(dir, { recursive: true });
+  // Ignore before the secret exists on disk, whichever tool created .brand/.
+  await ensureCredentialsGitignored(cwd);
   const target = authPath(cwd);
   // Owner-only from the first byte: create a 0600 temp file in the same
   // directory, then atomically rename over the target. A plain writeFile

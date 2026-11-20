@@ -310,7 +310,7 @@ Requires a local Chrome or Chromium install. Without one, the tool says so and p
 The npm package ships a CLI entrypoint for setup, diagnostics, and the hosted-brand connector:
 
 ```bash
-npx @brandsystem/mcp doctor                      # local checkup: Node, profile, .brand/ state, credential permissions, client configs
+npx @brandsystem/mcp doctor                      # local checkup: Node, profile, .brand/ state, credential permissions + gitignore, client configs
 npx @brandsystem/mcp install --client claude-code # write MCP config (dry-run by default; add --write to apply, existing config backed up)
 npx @brandsystem/mcp install --client cline --write
 npx @brandsystem/mcp install --client cursor --profile full
@@ -794,7 +794,7 @@ The `eval/` directory ships fixtures, methodology, and a runnable harness measur
 
 - **Report vulnerabilities privately** via the repository's Security page → Advisories → "Report a vulnerability". See [SECURITY.md](SECURITY.md). Please don't open public issues for suspected vulnerabilities.
 - **Local-first by design.** Extraction and compilation run on your machine. Network activity is limited to: fetching the sources you point the tools at (websites, Figma via your own Figma MCP), optional Brandcode Studio connector calls when you connect a hosted brand, and optional `brand_feedback` reports.
-- **What gets written locally:** everything lands in `.brand/` inside your working directory. Connector credentials are stored in `.brand/brandcode-auth.json` (gitignored).
+- **What gets written locally:** everything lands in `.brand/` inside your working directory. Connector credentials are stored in `.brand/brandcode-auth.json` (owner-only, and gitignored via `.brand/.gitignore` plus the project `.gitignore` whenever they are written; `doctor` fails if git would still pick the file up).
 
 ## License
 

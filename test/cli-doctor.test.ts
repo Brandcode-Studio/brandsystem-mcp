@@ -2,12 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import {
   checkNodeVersion,
   checkPackageVersion,
   checkProfile,
   checkBrandDir,
   checkAuthFile,
+  checkAuthGitignore,
   checkClientConfigs,
   runDoctor,
 } from "../src/cli/doctor.js";
@@ -212,6 +214,81 @@ describe("checkAuthFile", () => {
     const checks = await checkAuthFile(dir);
     for (const check of checks) {
       expect(check.message).not.toContain("super-secret-token");
+    }
+  });
+});
+
+describe("checkAuthGitignore", () => {
+  const future = new Date(Date.now() + 86_400_000).toISOString();
+
+  function git(args: string[]) {
+    const env = { ...process.env };
+    for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) delete env[key];
+    return execFileSync("git", args, { cwd: dir, env, stdio: "pipe" });
+  }
+
+  async function writeCreds() {
+    await mkdir(join(dir, ".brand"), { recursive: true });
+    await writeFile(
+      join(dir, ".brand", "brandcode-auth.json"),
+      JSON.stringify({ token: "super-secret-token", expiresAt: future }),
+      { mode: 0o600 },
+    );
+  }
+
+  it("adds no checks when there is no credential file", async () => {
+    git(["init", "-q"]);
+    expect(await checkAuthGitignore(dir)).toEqual([]);
+  });
+
+  it("is ok outside a git work tree", async () => {
+    await writeCreds();
+    const checks = await checkAuthGitignore(dir);
+    expect(checks).toHaveLength(1);
+    expect(checks[0].status).toBe("ok");
+    expect(checks[0].message).toContain("not inside a git work tree");
+  });
+
+  it("fails when the credential file is not gitignored", async () => {
+    git(["init", "-q"]);
+    await writeCreds();
+    const checks = await checkAuthGitignore(dir);
+    const ignoreCheck = checks.find((c) => c.message.includes("gitignored"));
+    expect(ignoreCheck?.status).toBe("fail");
+    expect(ignoreCheck?.message).toContain(".brand/.gitignore");
+    for (const check of checks) expect(check.message).not.toContain("super-secret-token");
+  });
+
+  it("passes when .brand/.gitignore covers the credential file", async () => {
+    git(["init", "-q"]);
+    await writeCreds();
+    await writeFile(join(dir, ".brand", ".gitignore"), "brandcode-auth.json\n");
+    const checks = await checkAuthGitignore(dir);
+    expect(checks).toHaveLength(1);
+    expect(checks[0].status).toBe("ok");
+    expect(checks[0].message).toContain("is gitignored");
+  });
+
+  it("warns when the credential file is already tracked, even if ignored now", async () => {
+    git(["init", "-q"]);
+    await writeCreds();
+    git(["add", "--", ".brand/brandcode-auth.json"]);
+    await writeFile(join(dir, ".brand", ".gitignore"), "brandcode-auth.json\n");
+    const checks = await checkAuthGitignore(dir);
+    expect(checks.find((c) => c.message.includes("is gitignored"))?.status).toBe("ok");
+    const tracked = checks.find((c) => c.message.includes("tracked by git"));
+    expect(tracked?.status).toBe("warn");
+    expect(tracked?.message).toContain("git rm --cached .brand/brandcode-auth.json");
+  });
+
+  it("makes runDoctor exit 1 for an unignored credential file", async () => {
+    git(["init", "-q"]);
+    await writeCreds();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      expect(await runDoctor(dir)).toBe(1);
+    } finally {
+      log.mockRestore();
     }
   });
 });
