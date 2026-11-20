@@ -7,6 +7,7 @@ import {
   writeAuthCredentials,
   clearAuthCredentials,
 } from "../lib/auth-state.js";
+import { CredentialGitignoreError } from "../lib/credential-gitignore.js";
 import {
   requestMagicLink,
   verifyMagicLink,
@@ -26,7 +27,7 @@ const paramsShape = {
   mode: z
     .enum(["status", "activate", "login", "set_key", "logout"])
     .describe(
-      'Auth action. "activate" (recommended) starts device code flow — displays a short code for the user to enter at brandcode.studio/activate, then polls for completion. No copy-paste needed. "status" checks if authenticated. "login" starts magic link flow (fallback). "set_key" stores token manually. "logout" removes credentials.',
+      'Auth action. "activate" (recommended) starts the device code flow: call with email to get a short code; the user opens brandcode.studio/activate, types that code, checks that it shows their email, and clicks Approve; then call again with key=<that short code> to finish. No token copy-paste. "status" checks if authenticated. "login" starts magic link flow (fallback). "set_key" stores token manually. "logout" removes credentials.',
     ),
   email: z
     .string()
@@ -37,7 +38,7 @@ const paramsShape = {
     .string()
     .optional()
     .describe(
-      'Session token from magic link verification. Required when mode="set_key". Format: JWT from /api/auth/verify.',
+      'mode="set_key": session token (JWT) from magic link verification. mode="activate": the short activation code (e.g. "BRAND-7K4X") returned by the first activate call, to check whether the user approved it.',
     ),
   studio_url: z
     .string()
@@ -84,7 +85,138 @@ async function handler(input: Params) {
   }
 }
 
-async function handleActivate(cwd: string, studioUrl: string, email?: string, deviceCode?: string) {
+/** Credentials were not stored because git would commit them. */
+function gitignoreRefusal(err: CredentialGitignoreError) {
+  return buildResponse({
+    what_happened: err.message,
+    next_steps: [
+      "Fix the ignore rule named above so git ignores .brand/brandcode-auth.json",
+      "Run `npx @brandsystem/mcp doctor` to confirm, then sign in again",
+    ],
+    data: { error: ERROR_CODES.AUTH_FAILED, reason: "credentials_not_gitignored" },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Device-code activation
+//
+// Studio returns two codes: a short `user_code` the human checks at
+// /activate, and a high-entropy `device_code` secret that is the only value
+// the poll endpoint accepts. The secret is held here, in this process's
+// memory, keyed by the short code; it is never written to tool output, so an
+// agent transcript cannot be replayed to claim the session.
+// ---------------------------------------------------------------------------
+
+interface PendingActivation {
+  cwd: string;
+  studioUrl: string;
+  userCode: string;
+  deviceCode: string;
+  /** Studio predates the device_code split: poll with ?code=<user code>. */
+  legacyParam: boolean;
+  email: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
+const MAX_PENDING_ACTIVATIONS = 16;
+const pendingActivations = new Map<string, PendingActivation>();
+
+function normalizeUserCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function pendingKey(cwd: string, studioUrl: string, userCode: string): string {
+  return `${cwd}\0${studioUrl}\0${normalizeUserCode(userCode)}`;
+}
+
+function prunePendingActivations(now = Date.now()): void {
+  for (const [key, entry] of pendingActivations) {
+    if (entry.expiresAt <= now) pendingActivations.delete(key);
+  }
+  while (pendingActivations.size > MAX_PENDING_ACTIVATIONS) {
+    const oldest = pendingActivations.keys().next().value;
+    if (oldest === undefined) break;
+    pendingActivations.delete(oldest);
+  }
+}
+
+function rememberActivation(entry: PendingActivation): void {
+  const key = pendingKey(entry.cwd, entry.studioUrl, entry.userCode);
+  pendingActivations.delete(key);
+  pendingActivations.set(key, entry);
+  prunePendingActivations();
+}
+
+function forgetActivation(entry: PendingActivation): void {
+  pendingActivations.delete(pendingKey(entry.cwd, entry.studioUrl, entry.userCode));
+}
+
+/** Look up by short code, or (no code) the most recent activation for this cwd + Studio. */
+function findActivation(cwd: string, studioUrl: string, userCode?: string): PendingActivation | null {
+  prunePendingActivations();
+  if (userCode) return pendingActivations.get(pendingKey(cwd, studioUrl, userCode)) ?? null;
+  let latest: PendingActivation | null = null;
+  for (const entry of pendingActivations.values()) {
+    if (entry.cwd !== cwd || entry.studioUrl !== studioUrl) continue;
+    if (!latest || entry.createdAt >= latest.createdAt) latest = entry;
+  }
+  return latest;
+}
+
+/** Test hook: drop in-memory activations between tests. */
+export function resetPendingActivationsForTests(): void {
+  pendingActivations.clear();
+}
+
+/** The email claim of a session JWT, decoded for comparison only (Studio verifies on use). */
+function jwtEmailClaim(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8")) as {
+      email?: unknown;
+    };
+    return typeof payload.email === "string" ? payload.email : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Always the bare activation page on the trusted Studio origin: the user types
+ * the code there, so a link can never carry an approvable code.
+ */
+function safeActivateUrl(_raw: unknown, studioUrl: string, _userCode: string): string {
+  return `${studioUrl}/activate`;
+}
+
+const USER_CODE_PATTERN = /^[A-Za-z0-9-]{4,32}$/;
+
+function approveInstruction(url: string, userCode: string, email: string): string {
+  return `Open ${url}, sign in to Brandcode Studio as ${email}, type the code ${userCode}, check that the page shows ${email}, then click Approve.`;
+}
+
+function emailMismatchResponse(entry: PendingActivation) {
+  return buildResponse({
+    what_happened: `Studio refused activation ${entry.userCode}: the account that approved it is not ${entry.email}. No credentials were stored.`,
+    next_steps: [
+      `Ask the user to sign in to Brandcode Studio as ${entry.email} before approving, then run brand_brandcode_auth mode="activate" email="${entry.email}" for a new code`,
+      'Or, if they use a different Studio account, run brand_brandcode_auth mode="activate" email="<that account\'s email>"',
+    ],
+    data: { error: ERROR_CODES.AUTH_FAILED, reason: "email_mismatch", code: entry.userCode },
+  });
+}
+
+function redact(message: string, secret: string): string {
+  return secret ? message.split(secret).join("[redacted]") : message;
+}
+
+async function handleActivate(cwd: string, studioUrl: string, email?: string, userCode?: string) {
   // Check if already authenticated
   const existing = await readAuthCredentials(cwd);
   if (existing) {
@@ -98,61 +230,17 @@ async function handleActivate(cwd: string, studioUrl: string, email?: string, de
     });
   }
 
-  // Phase 2: poll for a previously created device code
-  if (deviceCode) {
-    try {
-      const poll = await pollDeviceCodeApi(studioUrl, deviceCode);
-
-      if (poll.status === "complete") {
-        await writeAuthCredentials(cwd, {
-          email: poll.email,
-          token: poll.token,
-          expiresAt: poll.expiresAt,
-          studioUrl,
-        });
-        return buildResponse({
-          what_happened: `Activated as ${poll.email}`,
-          next_steps: [
-            "You can now save and push brands to Studio",
-            'Run brand_brandcode_connect mode="save" to upload your brand',
-          ],
-          data: { authenticated: true, email: poll.email, studio_url: studioUrl },
-        });
-      }
-
-      if (poll.status === "expired") {
-        return buildResponse({
-          what_happened: "Device code expired",
-          next_steps: ['Run brand_brandcode_auth mode="activate" email="..." to get a new code'],
-          data: { error: ERROR_CODES.AUTH_EXPIRED },
-        });
-      }
-
-      if (poll.status === "not_found") {
-        return buildResponse({
-          what_happened: "Device code not found",
-          next_steps: ['Run brand_brandcode_auth mode="activate" email="..." to get a new code'],
-          data: { error: ERROR_CODES.AUTH_FAILED },
-        });
-      }
-
-      // Still pending — tell agent to wait and poll again
-      return buildResponse({
-        what_happened: "Waiting for user to approve at brandcode.studio/activate",
-        next_steps: [
-          `Ask the user if they've entered the code at brandcode.studio/activate yet`,
-          `Then call brand_brandcode_auth mode="activate" key="${deviceCode}" to check again`,
-        ],
-        data: { status: "pending", code: deviceCode },
-      });
-    } catch (err) {
-      return buildResponse({
-        what_happened: `Poll failed: ${(err as Error).message}`,
-        next_steps: [`Try again: brand_brandcode_auth mode="activate" key="${deviceCode}"`],
-        data: { error: ERROR_CODES.FETCH_FAILED },
-      });
-    }
+  // Phase 2: poll an activation this process created. `key` is the short
+  // code; with neither key nor email, resume the latest pending activation.
+  const pending = userCode || !email ? findActivation(cwd, studioUrl, userCode) : null;
+  if (userCode && !pending) {
+    return buildResponse({
+      what_happened: `No pending activation for code ${normalizeUserCode(userCode)} in this session — it expired, was already used, or the MCP server restarted (pending codes are kept in memory only).`,
+      next_steps: ['Start again: brand_brandcode_auth mode="activate" email="you@example.com"'],
+      data: { error: ERROR_CODES.AUTH_FAILED, reason: "no_pending_activation" },
+    });
   }
+  if (pending) return pollActivation(cwd, pending);
 
   // Phase 1: create a new device code
   if (!email) {
@@ -165,25 +253,58 @@ async function handleActivate(cwd: string, studioUrl: string, email?: string, de
 
   try {
     const result = await requestDeviceCode(studioUrl, email);
+    const shortCode = typeof result.user_code === "string" ? result.user_code : result.code;
+    if (typeof shortCode !== "string" || !USER_CODE_PATTERN.test(shortCode)) {
+      return buildResponse({
+        what_happened: "Activation failed: Studio returned no usable activation code",
+        next_steps: ["Try again in a moment", 'Or use brand_brandcode_auth mode="login" (magic link)'],
+        data: { error: ERROR_CODES.AUTH_FAILED },
+      });
+    }
+    const secret = typeof result.device_code === "string" ? result.device_code.trim() : "";
+    const expiresAtMs = Date.parse(result.expires_at);
+    const entry: PendingActivation = {
+      cwd,
+      studioUrl,
+      userCode: normalizeUserCode(shortCode),
+      // Older Studios have no separate secret and poll by the short code.
+      deviceCode: secret || shortCode,
+      legacyParam: !secret,
+      email,
+      expiresAt: Number.isFinite(expiresAtMs) ? expiresAtMs : Date.now() + 60 * 60 * 1000,
+      createdAt: Date.now(),
+    };
+    rememberActivation(entry);
+
+    const url = safeActivateUrl(result.activate_url, studioUrl, entry.userCode);
+    const instruction = approveInstruction(url, entry.userCode, email);
 
     return buildResponse({
-      what_happened: `Activation code created: ${result.code}`,
+      what_happened: `Activation code ${entry.userCode} created for ${email} — waiting for the user to approve it in Studio`,
       next_steps: [
-        `Tell the user: "Go to ${result.activate_url} and enter code ${result.code} to connect your agent to Brandcode Studio"`,
-        `After they approve, call brand_brandcode_auth mode="activate" key="${result.code}" to complete activation`,
+        `Tell the user: "${instruction}"`,
+        `After they confirm they clicked Approve, call brand_brandcode_auth mode="activate" key="${entry.userCode}" to finish`,
       ],
       data: {
-        code: result.code,
-        activate_url: result.activate_url,
+        code: entry.userCode,
+        email,
+        activate_url: url,
         expires_at: result.expires_at,
         poll_interval: result.poll_interval,
         conversation_guide: {
-          instruction: `Display this to the user: "Go to ${result.activate_url} and enter code **${result.code}** to activate." Then wait for them to confirm they've done it, and call brand_brandcode_auth mode="activate" key="${result.code}" to complete.`,
+          instruction: `Display this to the user: "${instruction}" Wait for them to confirm they approved it, then call brand_brandcode_auth mode="activate" key="${entry.userCode}". If the email shown in Studio is not ${email}, they should not approve — start over with the right email.`,
         },
       },
     });
   } catch (err) {
     if (err instanceof BrandcodeClientError) {
+      if (err.status === 429) {
+        return buildResponse({
+          what_happened: "Activation failed: too many activation requests for this email",
+          next_steps: ["Wait a few minutes, then try again"],
+          data: { error: ERROR_CODES.RATE_LIMITED, status: err.status },
+        });
+      }
       return buildResponse({
         what_happened: `Activation failed: ${err.message}`,
         next_steps: ["Check network connectivity and try again"],
@@ -195,6 +316,115 @@ async function handleActivate(cwd: string, studioUrl: string, email?: string, de
       next_steps: ["Check network connectivity and try again"],
       data: { error: ERROR_CODES.FETCH_FAILED },
     });
+  }
+}
+
+async function pollActivation(cwd: string, entry: PendingActivation) {
+  const { studioUrl, userCode, email } = entry;
+  const again = `brand_brandcode_auth mode="activate" key="${userCode}"`;
+  const restart = `brand_brandcode_auth mode="activate" email="${email}"`;
+
+  let poll: Awaited<ReturnType<typeof pollDeviceCodeApi>>;
+  try {
+    poll = await pollDeviceCodeApi(studioUrl, entry.deviceCode, entry.legacyParam);
+  } catch (err) {
+    if (err instanceof BrandcodeClientError) {
+      if (err.status === 403) {
+        forgetActivation(entry);
+        return emailMismatchResponse(entry);
+      }
+      if (err.status === 404 || err.status === 410) {
+        forgetActivation(entry);
+        return buildResponse({
+          what_happened: `Activation code ${userCode} ${err.status === 410 ? "expired" : "was not found"} in Studio`,
+          next_steps: [`Start again: ${restart}`],
+          data: { error: err.status === 410 ? ERROR_CODES.AUTH_EXPIRED : ERROR_CODES.AUTH_FAILED },
+        });
+      }
+      if (err.status === 429) {
+        return buildResponse({
+          what_happened: "Studio asked us to slow down while checking the activation",
+          next_steps: [`Wait a few seconds, then check again: ${again}`],
+          data: { error: ERROR_CODES.RATE_LIMITED, status: "pending", code: userCode },
+        });
+      }
+    }
+    return buildResponse({
+      what_happened: `Poll failed: ${redact((err as Error).message, entry.deviceCode)}`,
+      next_steps: [`Try again: ${again}`],
+      data: { error: ERROR_CODES.FETCH_FAILED, code: userCode },
+    });
+  }
+
+  switch (poll.status) {
+    case "complete": {
+      forgetActivation(entry);
+      // The session must belong to the email the user asked to activate —
+      // both the poll's email and the token's own claim.
+      const expected = normalizeEmail(email);
+      const claimed = typeof poll.token === "string" ? jwtEmailClaim(poll.token) : null;
+      if (
+        typeof poll.token !== "string" ||
+        typeof poll.email !== "string" ||
+        normalizeEmail(poll.email) !== expected ||
+        (claimed !== null && normalizeEmail(claimed) !== expected)
+      ) {
+        return emailMismatchResponse(entry);
+      }
+      try {
+        await writeAuthCredentials(cwd, {
+          email: poll.email,
+          token: poll.token,
+          expiresAt: poll.expiresAt,
+          studioUrl,
+        });
+      } catch (err) {
+        if (err instanceof CredentialGitignoreError) return gitignoreRefusal(err);
+        throw err;
+      }
+      return buildResponse({
+        what_happened: `Activated as ${poll.email}`,
+        next_steps: [
+          "You can now save and push brands to Studio",
+          'Run brand_brandcode_connect mode="save" to upload your brand',
+        ],
+        data: { authenticated: true, email: poll.email, studio_url: studioUrl },
+      });
+    }
+    case "pending":
+      return buildResponse({
+        what_happened: `Waiting for the user to approve code ${userCode} in Brandcode Studio`,
+        next_steps: [
+          `Ask the user whether they opened the activation page, typed the code, checked that it shows ${email}, and clicked Approve`,
+          `Then check again: ${again}`,
+        ],
+        data: { status: "pending", code: userCode, email },
+      });
+    case "expired":
+      forgetActivation(entry);
+      return buildResponse({
+        what_happened: `Activation code ${userCode} expired`,
+        next_steps: [`Start again: ${restart}`],
+        data: { error: ERROR_CODES.AUTH_EXPIRED },
+      });
+    case "not_found":
+      forgetActivation(entry);
+      return buildResponse({
+        what_happened: `Activation code ${userCode} was not found in Studio (already used or expired)`,
+        next_steps: [`Start again: ${restart}`],
+        data: { error: ERROR_CODES.AUTH_FAILED },
+      });
+    case "email_mismatch":
+      forgetActivation(entry);
+      return emailMismatchResponse(entry);
+    default:
+      // denied / rejected / anything a newer Studio adds: never store, start over.
+      forgetActivation(entry);
+      return buildResponse({
+        what_happened: `Studio did not approve activation ${userCode}. No credentials were stored.`,
+        next_steps: [`If the user meant to approve it, start again: ${restart}`],
+        data: { error: ERROR_CODES.AUTH_FAILED, reason: "not_approved" },
+      });
   }
 }
 
@@ -306,6 +536,7 @@ async function handleLogin(cwd: string, studioUrl: string, email?: string) {
       },
     });
   } catch (err) {
+    if (err instanceof CredentialGitignoreError) return gitignoreRefusal(err);
     if (err instanceof BrandcodeClientError) {
       return buildResponse({
         what_happened: `Login failed: ${err.message}`,
@@ -395,6 +626,7 @@ async function handleSetKey(cwd: string, studioUrl: string, key?: string) {
       },
     });
   } catch (err) {
+    if (err instanceof CredentialGitignoreError) return gitignoreRefusal(err);
     return buildResponse({
       what_happened: `Failed to process token: ${(err as Error).message}`,
       next_steps: [
@@ -435,7 +667,7 @@ async function handleLogout(cwd: string) {
 export function register(server: McpServer) {
   server.tool(
     "brand_brandcode_auth",
-    'Activate Brandcode Studio connection for saving and pushing brands. Preferred mode: "activate" displays a short code (e.g. BRAND-7K4X) for the user to enter at brandcode.studio/activate — no copy-paste of tokens needed. Also supports: "status" (check auth), "login" (magic link fallback), "set_key" (manual token), "logout" (clear credentials). Use when the user wants to save their brand to Studio or says "activate", "connect to Brandcode", or "save my brand online". NOT needed for extraction, preview, or brand_check — those work without auth.',
+    'Activate Brandcode Studio connection for saving and pushing brands. Preferred mode: "activate" gives a short code (e.g. BRAND-7K4X); the user types it at brandcode.studio/activate, checks the email shown, and clicks Approve — no copy-paste of tokens needed. Also supports: "status" (check auth), "login" (magic link fallback), "set_key" (manual token), "logout" (clear credentials). Use when the user wants to save their brand to Studio or says "activate", "connect to Brandcode", or "save my brand online". NOT needed for extraction, preview, or brand_check — those work without auth.',
     paramsShape,
     { title: "Brandcode Studio auth", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async (args) => {

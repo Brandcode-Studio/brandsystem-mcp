@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { parse as parseYaml } from "yaml";
 import { getVersion } from "../lib/version.js";
 import { resolveProfile, CORE_TOOL_NAMES } from "../lib/tool-profile.js";
+import { runGit, decidingIgnoreRule, describeIgnoreRule } from "../lib/credential-gitignore.js";
 
 export type DoctorStatus = "ok" | "warn" | "fail";
 
@@ -255,6 +256,63 @@ export async function checkAuthFile(cwd: string): Promise<DoctorCheck[]> {
 }
 
 /**
+ * Check that .brand/brandcode-auth.json cannot be committed: when the
+ * directory is inside a git work tree the credential file must be ignored
+ * (fail otherwise) and must not already be tracked (fail). Local git only —
+ * no network, and the token is never read.
+ */
+export async function checkAuthGitignore(cwd: string): Promise<DoctorCheck[]> {
+  const rel = ".brand/brandcode-auth.json";
+  if (!(await fileExists(join(cwd, ".brand", "brandcode-auth.json")))) return [];
+
+  const inside = await runGit(cwd, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.code === null) {
+    return [
+      {
+        status: "warn",
+        message: `could not run git — unable to verify ${rel} is gitignored; make sure it is never committed`,
+      },
+    ];
+  }
+  if (inside.code !== 0 || inside.stdout.trim() !== "true") {
+    return [{ status: "ok", message: `not inside a git work tree — ${rel} cannot be committed from here` }];
+  }
+
+  const checks: DoctorCheck[] = [];
+
+  // --no-index: evaluate ignore rules even when the file is already tracked.
+  const ignored = await runGit(cwd, ["check-ignore", "-q", "--no-index", "--", rel]);
+  if (ignored.code === 0) {
+    checks.push({ status: "ok", message: `${rel} is gitignored` });
+  } else if (ignored.code === 1) {
+    const rule = await decidingIgnoreRule(cwd);
+    checks.push({
+      status: "fail",
+      message:
+        `${rel} holds a Studio session token but is NOT gitignored and could be committed — ` +
+        (rule
+          ? `${describeIgnoreRule(rule)}; remove or narrow that rule`
+          : `add the line "brandcode-auth.json" to .brand/.gitignore and make sure no rule re-includes it`),
+    });
+  } else {
+    checks.push({
+      status: "warn",
+      message: `git check-ignore failed — unable to verify ${rel} is gitignored`,
+    });
+  }
+
+  const tracked = await runGit(cwd, ["ls-files", "--error-unmatch", "--", rel]);
+  if (tracked.code === 0) {
+    checks.push({
+      status: "fail",
+      message: `${rel} is tracked by git, so ignore rules cannot protect it — run: git rm --cached ${rel} and commit, then sign in again for a fresh token; treat any token in git history as exposed until it expires`,
+    });
+  }
+
+  return checks;
+}
+
+/**
  * Check MCP client configs for a "brandsystem" server entry.
  */
 export async function checkClientConfigs(
@@ -361,6 +419,7 @@ export async function gatherDoctorChecks(cwd: string): Promise<DoctorCheck[]> {
     checkProfile(),
     ...(await checkBrandDir(cwd)),
     ...(await checkAuthFile(cwd)),
+    ...(await checkAuthGitignore(cwd)),
     ...(await checkClientConfigs(cwd)),
   ];
 }
